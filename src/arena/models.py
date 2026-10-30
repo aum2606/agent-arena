@@ -13,6 +13,13 @@ class Fighter:
 
 
 @dataclass(frozen=True)
+class Attack:
+    problem: str
+    answer: str
+    snippet: str
+
+
+@dataclass(frozen=True)
 class MatchResult:
     """winner is None for a draw."""
 

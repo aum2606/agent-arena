@@ -135,3 +135,111 @@ def test_format_summary() -> None:
         "Final HP: alice 80, bob 80",
         "Result: alice wins by ko",
     ]
+
+
+def sim(config_path: Path, out: Path, n: int) -> int:
+    return main(["sim", "--n", str(n), "--config", str(config_path), "--out", str(out)])
+
+
+def test_sim_saves_each_match_and_prints_stats(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", StubClient)
+    out = tmp_path / "sim.jsonl"
+
+    code = sim(config_path, out, 2)
+
+    text = capsys.readouterr().out
+    assert code == 0
+    assert "[1/2]" in text
+    assert "[2/2]" in text
+    assert "Matches: 2, turns: 12" in text
+    assert len(out.read_text(encoding="utf-8").splitlines()) == 2
+    assert sorted(p.name for p in (tmp_path / "runs" / "logs").glob("*.json")) == [
+        "sim_0000.json",
+        "sim_0001.json",
+    ]
+
+
+def test_sim_resumes_from_saved_matches(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", StubClient)
+    out = tmp_path / "sim.jsonl"
+    sim(config_path, out, 1)
+    capsys.readouterr()
+
+    code = sim(config_path, out, 2)
+
+    text = capsys.readouterr().out
+    assert code == 0
+    assert "[1/2]" not in text
+    assert "[2/2]" in text
+    assert "Matches: 2" in text
+    assert len(out.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_sim_with_enough_saved_matches_runs_nothing(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", StubClient)
+    out = tmp_path / "sim.jsonl"
+    sim(config_path, out, 1)
+    capsys.readouterr()
+
+    assert sim(config_path, out, 1) == 0
+
+    text = capsys.readouterr().out
+    assert "[" not in text.split("Matches:")[0]
+    assert len(out.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_sim_rejects_non_positive_n(
+    config_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert sim(config_path, tmp_path / "sim.jsonl", 0) == 1
+    assert "--n" in capsys.readouterr().err
+
+
+def test_sim_needs_two_fighters(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "RUNS_DIR", tmp_path / "runs")
+    path = tmp_path / "one.toml"
+    path.write_text(CONFIG[: CONFIG.index('[[fighters]]\nname = "bob"')], encoding="utf-8")
+
+    assert sim(path, tmp_path / "sim.jsonl", 1) == 1
+    assert "at least 2 fighters" in capsys.readouterr().err
+
+
+def test_sim_provider_failure_stops_and_keeps_nothing_unfinished(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", FailingClient)
+    out = tmp_path / "sim.jsonl"
+
+    assert sim(config_path, out, 3) == 1
+    assert "rate limited" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_sim_reports_a_damaged_results_file(
+    config_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "sim.jsonl"
+    out.write_text('{"fighter_a": "al', encoding="utf-8")
+
+    assert sim(config_path, out, 1) == 1
+    assert "sim.jsonl:1" in capsys.readouterr().err

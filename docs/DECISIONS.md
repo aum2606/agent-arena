@@ -92,3 +92,27 @@ sympy are wrapped in `verifier.py`, which exposes typed functions to the rest of
 
 **Alternatives considered:** `types-sympy` (does not exist), `# type: ignore` on each import
 (same effect, scattered), a hand-written stub (speculative for two functions).
+
+## D-008 · 2026-10-30 · Config module, settings names and the HTTP client
+
+**Decision:**
+- Add `src/arena/config.py` (loads `config/fighters.toml` into `Settings`, `Provider` and
+  `Fighter`). The layout in CLAUDE.md had no module for this, and `llm.py` and `models.py` should
+  not read files.
+- Provider `base_url` and `api_key_env` live in `fighters.toml` under `[providers.*]`.
+- Supersedes the names in D-004: the budget applies to both attacker and defender (same budget
+  per turn, as the spec requires), so the settings are `turn_time_limit_s` and `turn_max_tokens`.
+  A `backoff_base_s = 2.0` setting is added for 429 backoff. Values are unchanged.
+- `openai>=3.0` is required. That version depends on `httpx2` (not `httpx`), and `llm.py` and its
+  tests import `httpx2` directly so the SDK can be driven with `httpx2.MockTransport` and no
+  network. It is already installed as an `openai` dependency, so no new package is added.
+- Only 429 is retried. Timeouts, connection errors and other HTTP errors raise `LlmError`
+  immediately; a timeout raises `LlmTimeout` so the orchestrator can log a `timeout` event.
+  A response cut off by the token cap is returned with `truncated=True` (also a `timeout` per D-003).
+- The request timeout is httpx's per-read timeout, not a hard wall-clock limit.
+
+**Why:** Keeps I/O at the edges, keeps retry limits configurable, and lets tests exercise the
+real SDK without network access.
+
+**Alternatives considered:** a fake client class (tests would not cover the SDK's real error
+mapping), retrying 5xx and connection errors too (add later only if live runs need it).

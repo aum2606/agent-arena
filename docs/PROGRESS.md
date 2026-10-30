@@ -7,7 +7,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 - [x] 1. models + damage
 - [x] 2. verifier
 - [x] 3. battle_log
-- [ ] 4. llm + config
+- [x] 4. llm + config
 - [ ] 5. prompts + parsing
 - [ ] 6. orchestrator
 - [ ] 7. cli `match`
@@ -19,10 +19,12 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-4. llm + config
+5. prompts + parsing
 
 ## Blockers
 - API keys are needed from task 9.
+- `config/fighters.toml` has providers and settings but no fighters yet; task 9 adds them after
+  checking current free model IDs.
 
 ## Latest sim stats
 None yet.

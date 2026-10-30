@@ -4,6 +4,7 @@ MAX_TURNS = 6  # a round is one turn (D-006)
 STARTING_HP = 100.0
 BASE_DAMAGE = 20.0
 DIFFICULTY = 1.0  # fixed in Phase 0; a difficulty scorer comes later
+BACKFIRE_FACTOR = 0.5  # share of normal damage an attacker takes on a backfire (D-013)
 
 
 def damage(base: float, difficulty: float, score: float) -> float:
@@ -11,6 +12,11 @@ def damage(base: float, difficulty: float, score: float) -> float:
     if not 0.0 <= score <= 1.0:
         raise ValueError(f"score must be in [0, 1], got {score}")
     return base * difficulty * (1.0 - score)
+
+
+def backfire_damage(base: float, difficulty: float) -> float:
+    """Damage the attacker takes when its own problem fails verification."""
+    return base * difficulty * BACKFIRE_FACTOR
 
 
 def apply_damage(hp: float, amount: float) -> float:

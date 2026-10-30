@@ -18,7 +18,7 @@ sequenceDiagram
         O->>P: parse_attack(reply)
         O->>V: verify_attack(answer, snippet)
         alt parse error, timeout or failed check
-            O->>G: backfire, hit (attacker is target)
+            O->>G: backfire, hit (attacker is target, half damage)
         else verified
             O->>G: attack_verified, defend_start
             O->>P: defense_prompts(defender, problem)

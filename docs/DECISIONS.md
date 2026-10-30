@@ -214,3 +214,28 @@ the time. Groq also rate-limited Qwen past 5 retries in 3 of 8 calls in the last
 
 **Alternatives considered:** taking the attacker's answer from its snippet output (removes the
 self-verification rule, so it is an owner decision, not a prompt change).
+
+## D-013 · 2026-10-30 · Backfire costs the attacker half damage
+
+**Decision:** When an attack fails self-verification (or the attacker times out or sends an
+unparseable reply), the attacker takes `base x difficulty x 0.5` damage (10 with Phase 0 numbers)
+instead of the full amount. `BACKFIRE_FACTOR = 0.5` lives in `damage.py` with `backfire_damage`.
+Supersedes the damage in the D-009 backfire bullet and the rule line in CLAUDE.md ("attacker takes
+the damage"); `docs/PRODUCT_SPEC.md` still describes the full-damage product rule. Who wins a turn
+(D-010) is unchanged: the defender still wins a backfire turn.
+
+**Why:** Live runs showed about half of all attacks backfiring (D-011, D-012), which cost attackers
+a full 20 HP almost every other turn. This was the owner's choice among the rule options.
+
+**Consequences:**
+- The most damage one fighter can take in 6 turns is now 3 backfires x 10 + 3 hits x 20 = 90, which
+  is below 100 HP. A knockout is therefore impossible with Phase 0 numbers (D-006 already made it
+  rare), so every match ends by decision or draw and the KO count will stay at 0. The KO path is
+  still tested, with a higher base damage.
+- The 70% gate counts turns won, not HP, so this change does not move the role win rates: a
+  backfire still counts as a defender win. Only HP, damage and match results change. If the gate
+  fails because of backfires, the next options are counting backfire turns as no result or
+  changing which role wins them (an owner decision).
+
+**Alternatives considered:** counting backfire turns as no result (changes the gate metric),
+lowering only the backfire penalty further, giving a defender-side bonus (more rules).

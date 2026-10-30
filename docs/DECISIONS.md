@@ -69,3 +69,16 @@ would hide real dead code later.
 
 **Alternatives considered:** a vulture whitelist file (a suppression that could outlive its
 reason), building the orchestrator first (breaks tests-first, bottom-up tasks).
+
+## D-006 · 2026-10-30 · A round is one turn; matches last 6 turns
+
+**Decision:** "Round" and "turn" mean the same thing. A match is at most 6 turns, so each
+fighter attacks 3 times. `max_turns = 6` is passed to `match_result` by the orchestrator.
+
+**Why:** The spec uses the two words interchangeably, and the owner chose this reading.
+
+**Consequence:** With base damage 20 and 100 HP, a KO needs 5 hits on one fighter out of 6
+turns, so most matches will end by decision. The KO-vs-decision stat will be uninformative
+unless damage is raised. Revisit with a superseding entry if the first sims show this matters.
+
+**Alternatives considered:** 6 rounds of 2 turns each (12 turns, realistic KOs).

@@ -239,3 +239,29 @@ a full 20 HP almost every other turn. This was the owner's choice among the rule
 
 **Alternatives considered:** counting backfire turns as no result (changes the gate metric),
 lowering only the backfire penalty further, giving a defender-side bonus (more rules).
+
+## D-014 · 2026-10-30 · Groq fighter switched to gpt-oss-120b; max retries raised
+
+**Decision:**
+- The Groq fighter is now `gpt-oss` = `openai/gpt-oss-120b`, replacing `qwen`
+  (`qwen/qwen3.8-27b`). Its persona is the same style-only text.
+- `max_retries` 5 -> 8 (other settings unchanged). Supersedes the fighter list and retry count in
+  D-011 and D-004.
+
+**Why:** Groq's free tier limits `qwen/qwen3.8-27b` to 1000 output tokens per minute (OTPM) and
+the account to 8000 tokens per minute; one Qwen reasoning call produces about 1400 output tokens,
+so Qwen could make roughly one call a minute and 429s were constant (`retry-after` is only 1 s,
+which does not reflect the sliding window). `openai/gpt-oss-120b` ran 12 attack-sized calls with
+no 429 and no HTTP 400, finished with `stop` instead of hitting the token cap, and passed
+self-verification 6 of 6 times. `openai/gpt-oss-20b` was not used: it spent all 4096 tokens
+reasoning in 2 of 2 calls, then 429ed on tokens per minute. The extra retries cover the TPM
+window (the exponential waits sum to several minutes).
+
+**Live check:** 3 matches (gpt-oss vs gemini-lite) ran with no provider errors in about 68 s per
+match, so 100 matches would take roughly 2 hours. Groq may also have a daily token limit that is not
+visible in the response headers; if a long sim stops on a 429 mentioning a daily limit, resume the
+next day (the sim is resumable).
+
+**Alternatives considered:** honoring `Retry-After` in `llm.py` (it is 1 s here, so it would not
+help), a higher `call_delay_s` (would slow every call to protect one provider), keeping Qwen
+(a 100-match sim would take 10+ hours).

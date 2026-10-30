@@ -19,21 +19,22 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-10. gate run (100+ matches), after the owner decides how to handle the backfire rate
+10. gate run (100+ matches), after the owner decides how to handle the defender dominance
 
 ## Blockers
-- Backfires dominate: about half of all attacks fail self-verification even after prompt tuning
-  (D-012). Defenders win every backfire turn, so the defender role cannot fall below roughly the
-  backfire rate. Backfire now costs half damage (D-013), but that does not change the per-turn gate metric.
-- Groq's free tier rate-limited Qwen past 5 retries in 3 of 8 calls; a 100-match sim would keep
-  stopping. Probably needs a larger `call_delay_s` / `max_retries` (not yet changed).
+- Defenders win nearly every turn: in the latest 3-match smoke test attackers won 0 of 18 turns
+  (11 blocks, 7 backfires). Verified attacks are easy enough that both fighters block them, and
+  a backfire is also a defender win. The gate (70%) will fail with these rules. Owner decision
+  needed: see the report (difficulty is fixed at 1.0 in Phase 0, D-013 notes the backfire metric).
+- Groq free tier has an unknown daily token limit; a 100-match run (about 2 hours) may stop and
+  need resuming (D-014).
 - No third fighter: the OpenRouter free models tried were unreliable (D-011).
 
 ## Latest sim stats
-Smoke test, 3 matches (qwen vs gemini-lite, `runs/smoke.jsonl`, not the gate run):
-- Attacker wins 5.6% of turns, defender 94.4% (block 8, backfire 9). Backfire rate 50%.
-After prompt tuning (D-012), attack-only checks of 8 attacks per fighter: 8/16, 7/16, 7/16 pass
-self-verification. No full match was rerun.
+Smoke test 2, 3 matches (gpt-oss-120b vs gemini-lite, `runs/smoke2.jsonl`, not the gate run):
+- Attacker wins 0.0% of turns, defender 100% (block 11, backfire 7). Backfire rate 38.9%.
+- About 68 s per match, no provider errors.
+Attack-only check (6 attacks each): gpt-oss 6/6 verified, gemini-lite 3/6.
 
 ## Notes
 - With backfire at half damage a knockout cannot happen in 6 turns (max 90 damage); every match

@@ -3,7 +3,7 @@ turn_time_limit_s = 60.0
 turn_max_tokens = 4096
 snippet_timeout_s = 20.0
 call_delay_s = 2.0
-max_retries = 5
+max_retries = 8
 backoff_base_s = 2.0
 
 [providers.openrouter]
@@ -26,7 +26,7 @@ model = "gemini-3.1-flash-lite"
 persona = "You are Gemini Lite, a quick and precise competitor."
 
 [[fighters]]
-name = "qwen"
+name = "gpt-oss"
 provider = "groq"
-model = "qwen/qwen3.8-27b"
-persona = "You are Qwen, a careful competitor who double-checks every result."
+model = "openai/gpt-oss-120b"
+persona = "You are GPT-OSS, a careful competitor who double-checks every result."

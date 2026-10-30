@@ -2,6 +2,7 @@
 
 ```mermaid
 sequenceDiagram
+    participant C as cli
     participant O as orchestrator
     participant P as prompts
     participant L as llm
@@ -9,6 +10,7 @@ sequenceDiagram
     participant D as damage
     participant G as battle_log
 
+    C->>O: run_match(a, b, llm.complete, log)
     loop each turn (max 6, roles swap)
         O->>G: start_turn, attack_start
         O->>P: attack_prompts(attacker)
@@ -32,9 +34,12 @@ sequenceDiagram
         O->>D: damage, apply_damage, match_result
         O->>G: hp, knockout, match_end
     end
+    O-->>C: MatchRecord
+    C->>G: write(runs/<match_id>.json)
+    C->>C: print summary
 ```
 
-Task 7 adds the CLI at the top of this flow; task 8 adds `stats` reading the `MatchRecord`s.
+Task 8 adds `sim` and `stats`, which read the `MatchRecord`s.
 
 ## Modules
 
@@ -45,4 +50,5 @@ Task 7 adds the CLI at the top of this flow; task 8 adds `stats` reading the `Ma
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.
 - `llm`: OpenAI-compatible client per provider, 429 backoff, delay between calls.
 - `prompts`: attacker and defender prompts and tag parsing of the replies.
+- `cli`: `arena match` (load `.env` and config, run one match, print summary, save log).
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.

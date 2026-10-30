@@ -5,6 +5,14 @@ Side = Literal["a", "b"]
 
 
 @dataclass(frozen=True)
+class Fighter:
+    name: str
+    provider: str
+    model: str
+    persona: str
+
+
+@dataclass(frozen=True)
 class MatchResult:
     """winner is None for a draw."""
 

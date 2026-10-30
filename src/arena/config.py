@@ -1,0 +1,64 @@
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from arena.models import Fighter
+
+
+class ConfigError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Settings:
+    turn_time_limit_s: float
+    turn_max_tokens: int
+    snippet_timeout_s: float
+    call_delay_s: float
+    max_retries: int
+    backoff_base_s: float
+
+
+@dataclass(frozen=True)
+class Provider:
+    base_url: str
+    api_key_env: str
+
+
+@dataclass(frozen=True)
+class Config:
+    settings: Settings
+    providers: dict[str, Provider]
+    fighters: dict[str, Fighter]
+
+
+def _build[T](cls: type[T], raw: Any, what: str) -> T:
+    try:
+        return cls(**raw)
+    except TypeError as exc:
+        raise ConfigError(f"invalid {what}: {exc}") from exc
+
+
+def load_config(path: Path) -> Config:
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"invalid TOML in {path}: {exc}") from exc
+
+    settings = _build(Settings, data.get("settings", {}), "[settings]")
+    providers = {
+        name: _build(Provider, raw, f"provider {name!r}")
+        for name, raw in data.get("providers", {}).items()
+    }
+    fighters: dict[str, Fighter] = {}
+    for raw in data.get("fighters", []):
+        fighter = _build(Fighter, raw, "fighter")
+        if fighter.provider not in providers:
+            raise ConfigError(f"fighter {fighter.name!r} has unknown provider {fighter.provider!r}")
+        if fighter.name in fighters:
+            raise ConfigError(f"duplicate fighter {fighter.name!r}")
+        fighters[fighter.name] = fighter
+    return Config(settings, providers, fighters)

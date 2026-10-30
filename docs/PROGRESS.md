@@ -8,7 +8,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 - [x] 2. verifier
 - [x] 3. battle_log
 - [x] 4. llm + config
-- [ ] 5. prompts + parsing
+- [x] 5. prompts + parsing
 - [ ] 6. orchestrator
 - [ ] 7. cli `match`
 - [ ] 8. stats + cli `sim`
@@ -19,7 +19,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-5. prompts + parsing
+6. orchestrator
 
 ## Blockers
 - API keys are needed from task 9.

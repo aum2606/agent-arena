@@ -1,0 +1,69 @@
+import pytest
+
+from arena.models import Attack, Fighter
+from arena.prompts import ParseError, attack_prompts, defense_prompts, parse_attack, parse_defense
+
+FIGHTER = Fighter("alpha", "groq", "some-model", "You are a ruthless number theorist.")
+
+
+def test_attack_prompts_carry_persona_and_reply_format() -> None:
+    system, user = attack_prompts(FIGHTER)
+
+    assert "ruthless number theorist" in system
+    for tag in ("<problem>", "<answer>", "<code>"):
+        assert tag in system + user
+
+
+def test_defense_prompts_carry_persona_problem_and_reply_format() -> None:
+    system, user = defense_prompts(FIGHTER, "What is 2 + 2?")
+
+    assert "ruthless number theorist" in system
+    assert "What is 2 + 2?" in user
+    assert "<answer>" in system + user
+
+
+def test_parse_attack_extracts_all_three_parts() -> None:
+    text = "<problem>What is 6 * 7?</problem>\n<answer>42</answer>\n<code>print(6 * 7)</code>"
+
+    assert parse_attack(text) == Attack("What is 6 * 7?", "42", "print(6 * 7)")
+
+
+def test_parse_attack_ignores_chatter_and_strips_code_fences() -> None:
+    text = (
+        "Sure! Here is my attack.\n"
+        "<problem>Sum 1..3</problem><answer> 6 </answer>\n"
+        "<code>\n```python\nx = 'a\"b'\nprint(1 + 2 + 3)\n```\n</code>\nGood luck!"
+    )
+
+    attack = parse_attack(text)
+
+    assert attack.answer == "6"
+    assert attack.snippet == "x = 'a\"b'\nprint(1 + 2 + 3)"
+
+
+@pytest.mark.parametrize("missing", ["problem", "answer", "code"])
+def test_parse_attack_names_the_missing_part(missing: str) -> None:
+    parts = {"problem": "P", "answer": "1", "code": "print(1)"}
+    del parts[missing]
+    text = "".join(f"<{k}>{v}</{k}>" for k, v in parts.items())
+
+    with pytest.raises(ParseError, match=missing):
+        parse_attack(text)
+
+
+def test_parse_attack_rejects_empty_part() -> None:
+    with pytest.raises(ParseError, match="answer"):
+        parse_attack("<problem>P</problem><answer>  </answer><code>print(1)</code>")
+
+
+def test_parse_defense_extracts_the_answer() -> None:
+    assert parse_defense("Let me think... <answer> 3/4 </answer>") == "3/4"
+
+
+def test_parse_defense_uses_the_last_answer_tag() -> None:
+    assert parse_defense("<answer>draft</answer> wait, no: <answer>7</answer>") == "7"
+
+
+def test_parse_defense_without_tag_is_an_error() -> None:
+    with pytest.raises(ParseError, match="answer"):
+        parse_defense("I think it is 7")

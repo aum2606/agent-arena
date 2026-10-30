@@ -18,7 +18,7 @@ Goal: prove the game rules are balanced before any UI exists.
 - 2 fighters, 100 HP each. Fighter = {name, provider, model, persona} from `config/fighters.toml`.
 - Attacker returns: math problem + its answer + a Python snippet that computes the answer.
 - Self-verify: run the snippet (subprocess, timeout, temp dir). Output ≠ stated answer, error,
-  or timeout → **backfire**: attacker takes the damage.
+  or timeout → **backfire**: attacker takes half the damage (D-013).
 - Defender answers within time/token budget. Checked with SymPy equality. score = 1 or 0.
 - `damage = base × difficulty × (1 − score)`, base = 20, difficulty = 1.0 (fixed in Phase 0).
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).

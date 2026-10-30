@@ -129,12 +129,13 @@ def test_wrong_snippet_backfires_and_defender_is_never_asked() -> None:
     record, log = play(llm)
 
     assert llm.defense_calls == 0
+    assert all(t.damage == 10.0 for t in record.turns)
     assert all(t.outcome == "backfire" and t.target == t.attacker for t in record.turns)
     assert event_types(log, 1) == ["attack_start", "backfire", "hit", "hp"]
     backfire = log.to_dict()["turns"][0]["events"][1]
     assert backfire["actor"] == "a"
     assert "mismatch" in backfire["reason"]
-    assert (record.hp_a, record.hp_b) == (40.0, 40.0)
+    assert (record.hp_a, record.hp_b) == (70.0, 70.0)
 
 
 @pytest.mark.parametrize("reply", ["no tags here", good_attack(code="raise SystemExit(1)")])
@@ -194,7 +195,10 @@ def test_unparseable_defense_scores_zero() -> None:
     assert (result["type"], result["score"]) == ("defend_result", 0.0)
 
 
-def test_knockout_ends_the_match_early_and_is_logged() -> None:
+def test_knockout_ends_the_match_early_and_is_logged(monkeypatch: pytest.MonkeyPatch) -> None:
+    # With Phase 0 numbers one fighter can take at most 90 damage in 6 turns (D-013), so raise
+    # base damage to exercise the knockout path.
+    monkeypatch.setattr("arena.orchestrator.BASE_DAMAGE", 40.0)
     liar = good_attack(code="print(41)")
     llm = FakeLlm(
         attacks={"alice": [liar] * 3, "bob": [good_attack()] * 3},
@@ -203,12 +207,12 @@ def test_knockout_ends_the_match_early_and_is_logged() -> None:
 
     record, log = play(llm)
 
-    # alice backfires on turns 1, 3, 5 and is hit on turns 2, 4: five hits = KO on turn 5.
-    assert len(record.turns) == 5
+    # alice: backfire -20 (turn 1), hit -40 (turn 2), backfire -20 (turn 3), hit -40 (turn 4) = KO.
+    assert len(record.turns) == 4
     assert record.hp_a == 0.0
     assert (record.result.winner, record.result.reason) == ("b", "ko")
-    assert event_types(log, 5)[-3:] == ["hp", "knockout", "match_end"]
-    end = log.to_dict()["turns"][4]["events"][-1]
+    assert event_types(log, 4)[-3:] == ["hp", "knockout", "match_end"]
+    end = log.to_dict()["turns"][3]["events"][-1]
     assert (end["winner"], end["reason"]) == ("b", "ko")
 
 

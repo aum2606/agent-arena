@@ -24,7 +24,7 @@ None in progress.
 ## Blockers
 - Backfires dominate: about half of all attacks fail self-verification even after prompt tuning
   (D-012). Defenders win every backfire turn, so the defender role cannot fall below roughly the
-  backfire rate. Owner decision needed on rules before the gate run (see report).
+  backfire rate. Backfire now costs half damage (D-013), but that does not change the per-turn gate metric.
 - Groq's free tier rate-limited Qwen past 5 retries in 3 of 8 calls; a 100-match sim would keep
   stopping. Probably needs a larger `call_delay_s` / `max_retries` (not yet changed).
 - No third fighter: the OpenRouter free models tried were unreliable (D-011).
@@ -36,4 +36,6 @@ After prompt tuning (D-012), attack-only checks of 8 attacks per fighter: 8/16, 
 self-verification. No full match was rerun.
 
 ## Notes
+- With backfire at half damage a knockout cannot happen in 6 turns (max 90 damage); every match
+  ends by decision or draw (D-013).
 - Vulture is back to `uv run vulture src` and passes (D-005/D-009 transition ended with task 7).

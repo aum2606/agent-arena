@@ -9,6 +9,7 @@ from arena.damage import (
     MAX_TURNS,
     STARTING_HP,
     apply_damage,
+    backfire_damage,
     damage,
     match_result,
 )
@@ -74,8 +75,7 @@ def _defend(
     return score
 
 
-def _hit(log: BattleLog, turn: int, attacker: Side, target: Side) -> TurnResult:
-    amount = damage(BASE_DAMAGE, DIFFICULTY, 0.0)
+def _hit(log: BattleLog, turn: int, attacker: Side, target: Side, amount: float) -> TurnResult:
     log.emit("hit", target=target, damage=amount)
     outcome: Literal["hit", "backfire"] = "backfire" if target == attacker else "hit"
     return TurnResult(turn, attacker, outcome, target, amount)
@@ -96,14 +96,15 @@ def play_turn(
         attack = _pose_attack(fighters[attacker_side], attacker_side, complete, settings, log)
     except _Backfire as exc:
         log.emit("backfire", actor=attacker_side, reason=str(exc))
-        return _hit(log, turn, attacker_side, target=attacker_side)
+        amount = backfire_damage(BASE_DAMAGE, DIFFICULTY)
+        return _hit(log, turn, attacker_side, attacker_side, amount)
     log.emit("attack_verified", actor=attacker_side, problem=attack.problem, answer=attack.answer)
     log.emit("defend_start", actor=defender_side)
     score = _defend(fighters[defender_side], defender_side, attack, complete, log)
     if score == 1.0:
         log.emit("block", actor=defender_side)
         return TurnResult(turn, attacker_side, "block", defender_side, 0.0)
-    return _hit(log, turn, attacker_side, target=defender_side)
+    return _hit(log, turn, attacker_side, defender_side, damage(BASE_DAMAGE, DIFFICULTY, 0.0))
 
 
 def run_match(

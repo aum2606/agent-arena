@@ -1,11 +1,13 @@
 import pytest
 
 from arena.damage import (
+    BACKFIRE_FACTOR,
     BASE_DAMAGE,
     DIFFICULTY,
     MAX_TURNS,
     STARTING_HP,
     apply_damage,
+    backfire_damage,
     damage,
     match_result,
 )
@@ -14,6 +16,12 @@ from arena.models import MatchResult
 
 def test_phase0_constants() -> None:
     assert (STARTING_HP, BASE_DAMAGE, DIFFICULTY, MAX_TURNS) == (100.0, 20.0, 1.0, 6)
+
+
+def test_backfire_costs_the_attacker_half_the_damage() -> None:
+    assert BACKFIRE_FACTOR == 0.5
+    assert backfire_damage(BASE_DAMAGE, DIFFICULTY) == 10.0
+    assert backfire_damage(BASE_DAMAGE, 2.0) == 20.0
 
 
 @pytest.mark.parametrize(

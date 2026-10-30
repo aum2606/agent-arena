@@ -82,3 +82,13 @@ turns, so most matches will end by decision. The KO-vs-decision stat will be uni
 unless damage is raised. Revisit with a superseding entry if the first sims show this matters.
 
 **Alternatives considered:** 6 rounds of 2 turns each (12 turns, realistic KOs).
+
+## D-007 · 2026-10-30 · mypy ignores missing stubs for sympy only
+
+**Decision:** `ignore_missing_imports` is set for `sympy` and `sympy.*` in the mypy config.
+
+**Why:** sympy has no stubs or `py.typed` marker, so strict mypy rejects the import. Calls into
+sympy are wrapped in `verifier.py`, which exposes typed functions to the rest of the code.
+
+**Alternatives considered:** `types-sympy` (does not exist), `# type: ignore` on each import
+(same effect, scattered), a hand-written stub (speculative for two functions).

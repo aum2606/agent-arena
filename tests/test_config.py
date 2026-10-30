@@ -45,7 +45,8 @@ def test_load_valid_config(tmp_path: Path) -> None:
 
 
 def test_shipped_config_parses() -> None:
-    load_config(Path(__file__).parents[1] / "config" / "fighters.toml")
+    config = load_config(Path(__file__).parents[1] / "config" / "fighters.toml")
+    assert len(config.fighters) >= 2  # `arena sim` needs a pair
 
 
 def test_missing_file(tmp_path: Path) -> None:

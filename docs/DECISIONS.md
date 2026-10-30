@@ -165,3 +165,26 @@ and restart on free-tier rate limits.
 
 **Alternatives considered:** a `--seed` flag (not needed yet), skipping a failed match and
 carrying on (could hide a broken provider for the whole run), a round-robin schedule.
+
+## D-011 · 2026-10-30 · Live fighters and settings changes after the smoke test
+
+**Decision:**
+- Fighters (IDs checked against each provider's `/models` endpoint, then with a tiny request):
+  `gemini-lite` = Gemini `gemini-3.1-flash-lite`, `qwen` = Groq `qwen/qwen3.8-27b`.
+  `gemini-2.5-*` returned 404 for this key, so it is not used.
+- No OpenRouter fighter for now. The `:free` models tried either always ran out of tokens while
+  reasoning (`nvidia/nemotron-3.5-lightning`), did so about half the time (`cohere/north-mini-code`,
+  `poolside/laguna-s-2.1`), or returned 429 from the upstream provider (the `google/gemma-4-*`
+  models). Empty, truncated replies would show up in the stats as infrastructure noise, not play.
+  The OpenRouter provider stays configured.
+- Groq `openai/gpt-oss-20b` was dropped: it answers HTTP 400 "model called a tool" when asked
+  for Python code, which would abort sims.
+- Supersedes numbers in D-004: `turn_max_tokens` 1024 -> 4096 (reasoning models spent all 1024
+  tokens thinking and returned nothing) and `snippet_timeout_s` 5 -> 20 (importing sympy alone
+  takes about 2.5 s on this machine, so 5 s caused spurious backfires on heavier snippets).
+
+**Why:** Both changes remove infrastructure failures that would otherwise be scored as game
+outcomes.
+
+**Alternatives considered:** a provider-specific reasoning-effort option (not generic across the
+three providers, so more code), 8192 tokens (free-tier tokens-per-minute limits count the cap).

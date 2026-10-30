@@ -116,3 +116,27 @@ real SDK without network access.
 
 **Alternatives considered:** a fake client class (tests would not cover the SDK's real error
 mapping), retrying 5xx and connection errors too (add later only if live runs need it).
+
+## D-009 · 2026-10-30 · Orchestrator behaviour and vulture timing
+
+**Decision:**
+- `orchestrator.py` takes the LLM as a plain callable `(fighter, system, user) -> Completion`
+  (`LlmClient.complete` in production, a scripted fake in tests). No protocol or base class.
+- Fighter A attacks on odd turns, B on even turns; the caller decides who is A.
+- Backfire (unparseable attack, failed or crashed snippet, or attacker timeout) logs `backfire`
+  then `hit` with the attacker as target. An attacker timeout also logs a `timeout` event.
+- Defender timeout, or a reply cut off by the token cap, logs `timeout` then `hit` (D-003). An
+  unparseable defender reply scores 0 with a `defend_result` carrying the reason.
+- Any other `LlmError` propagates out of `run_match`; the caller treats it as an aborted match
+  (D-003).
+- `TurnResult` and `MatchRecord` (in `models.py`) carry per-turn outcomes so stats do not parse
+  the event log. Per-turn role outcome: attacker wins on `hit`, defender wins on `block` or
+  `backfire`.
+- `MAX_TURNS = 6` lives in `damage.py` next to the other rule constants.
+- Supersedes the timing in D-005: `run_match` has no caller in `src` until the CLI (task 7), so
+  the dead-code check stays `vulture src tests` until then and becomes `vulture src` with task 7.
+
+**Why:** Keeps game flow testable without network and keeps stats simple.
+
+**Alternatives considered:** a `Protocol` for the LLM (extra type for one real implementation),
+treating attacker timeouts as aborts (one slow free model would stall whole sims).

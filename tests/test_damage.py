@@ -1,11 +1,19 @@
 import pytest
 
-from arena.damage import BASE_DAMAGE, DIFFICULTY, STARTING_HP, apply_damage, damage, match_result
+from arena.damage import (
+    BASE_DAMAGE,
+    DIFFICULTY,
+    MAX_TURNS,
+    STARTING_HP,
+    apply_damage,
+    damage,
+    match_result,
+)
 from arena.models import MatchResult
 
 
 def test_phase0_constants() -> None:
-    assert (STARTING_HP, BASE_DAMAGE, DIFFICULTY) == (100.0, 20.0, 1.0)
+    assert (STARTING_HP, BASE_DAMAGE, DIFFICULTY, MAX_TURNS) == (100.0, 20.0, 1.0, 6)
 
 
 @pytest.mark.parametrize(

@@ -22,8 +22,6 @@ None in progress.
 2. verifier
 
 ## Blockers
-- Open rule question: is a "round" one turn or two (one attack each)? Must be settled before task 6
-  (it sets `max_turns`). With 6 turns and base 20, a KO is almost impossible.
 - API keys are needed from task 9.
 
 ## Latest sim stats

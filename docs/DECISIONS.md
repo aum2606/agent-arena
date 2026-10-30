@@ -56,3 +56,16 @@ between calls 2 s, max retries 5. They live in a `[settings]` table in
 limited, so the defaults are conservative. Expect to tune them after the first live runs.
 
 **Alternatives considered:** a separate `config/game.toml` (extra file, a layout change).
+
+## D-005 · 2026-10-30 · Vulture also scans tests while modules are unwired
+
+**Decision:** Until the orchestrator (task 6) wires the modules together, the dead-code check
+is `uv run vulture src tests`. From task 6 on it is `uv run vulture src` as in CLAUDE.md, and
+it must pass clean at the gate.
+
+**Why:** The modules are built bottom-up, so pure functions are only called by their tests
+until the orchestrator exists. `vulture src` alone flags all of them; a whitelist or ignore
+would hide real dead code later.
+
+**Alternatives considered:** a vulture whitelist file (a suppression that could outlive its
+reason), building the orchestrator first (breaks tests-first, bottom-up tasks).

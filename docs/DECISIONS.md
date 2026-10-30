@@ -140,3 +140,28 @@ mapping), retrying 5xx and connection errors too (add later only if live runs ne
 
 **Alternatives considered:** a `Protocol` for the LLM (extra type for one real implementation),
 treating attacker timeouts as aborts (one slow free model would stall whole sims).
+
+## D-010 · 2026-10-30 · Stats definitions and how `sim` works
+
+**Decision:**
+- Per-turn role outcomes (from D-009): the attacker wins a turn on `hit`; the defender wins on
+  `block` or `backfire`. The gate passes when neither role is above 70% of turns and at least
+  100 matches are saved; below 100 matches it reports INCOMPLETE.
+- "Average damage" is damage per turn (blocks count as 0). Endings are reported as KO, decision
+  (a winner on HP) and draw (equal HP), so draws are not folded into decisions.
+- `arena sim --n N` means N matches in total. It counts the lines already in the results file and
+  runs the rest, so rerunning after a crash or rate limit resumes. Each finished match is appended
+  to `runs/sim.jsonl` (`--out` to change) and its battle log is written to `runs/logs/`.
+- Pairs are `random.Random(match_index).sample(fighters, 2)`: random but identical when resumed,
+  and the first fighter in the pair attacks first.
+- A provider error stops the sim with exit code 1. The aborted match is not saved or scored
+  (D-003); finished matches are kept.
+- A damaged results line (for example from a crash mid-write) is an error naming the file and
+  line; delete the line to continue. It is never skipped silently.
+- Reading and appending the results file lives in `stats.py` rather than a new module.
+
+**Why:** Keeps the gate measurable per turn as the brief says, and keeps long sims safe to stop
+and restart on free-tier rate limits.
+
+**Alternatives considered:** a `--seed` flag (not needed yet), skipping a failed match and
+carrying on (could hide a broken provider for the whole run), a round-robin schedule.

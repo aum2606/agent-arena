@@ -11,7 +11,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 - [x] 5. prompts + parsing
 - [x] 6. orchestrator
 - [x] 7. cli `match`
-- [ ] 8. stats + cli `sim`
+- [x] 8. stats + cli `sim`
 - [ ] 9. live smoke test (needs API keys)
 - [ ] 10. gate run, report, tag `v0.1.0-prototype`
 
@@ -19,7 +19,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-8. stats + cli `sim`
+9. live smoke test (needs API keys and 2+ fighters in `config/fighters.toml`)
 
 ## Blockers
 - API keys are needed from task 9.

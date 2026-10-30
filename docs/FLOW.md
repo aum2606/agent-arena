@@ -39,7 +39,9 @@ sequenceDiagram
     C->>C: print summary
 ```
 
-Task 8 adds `sim` and `stats`, which read the `MatchRecord`s.
+`arena sim --n N` repeats the loop above for each missing match (pairs picked by a per-index
+seeded RNG), calling `stats.append_record` after each one, then prints `format_stats` over all
+saved records.
 
 ## Modules
 
@@ -50,5 +52,6 @@ Task 8 adds `sim` and `stats`, which read the `MatchRecord`s.
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.
 - `llm`: OpenAI-compatible client per provider, 429 backoff, delay between calls.
 - `prompts`: attacker and defender prompts and tag parsing of the replies.
-- `cli`: `arena match` (load `.env` and config, run one match, print summary, save log).
+- `cli`: `arena match` and `arena sim` (load `.env` and config, run matches, print output).
+- `stats`: balance stats over `MatchRecord`s, plus reading and appending the results JSONL.
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.

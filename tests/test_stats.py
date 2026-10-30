@@ -1,0 +1,97 @@
+from pathlib import Path
+from typing import Literal
+
+import pytest
+
+from arena.models import MatchRecord, MatchResult, TurnResult
+from arena.stats import ResultsError, append_record, compute_stats, format_stats, load_records
+
+type Outcome = Literal["hit", "block", "backfire"]
+
+
+def record(outcomes: list[Outcome], result: MatchResult, hp: tuple[float, float]) -> MatchRecord:
+    turns = []
+    for i, outcome in enumerate(outcomes, start=1):
+        attacker = "a" if i % 2 else "b"
+        defender = "b" if i % 2 else "a"
+        target = attacker if outcome == "backfire" else defender
+        turns.append(TurnResult(i, attacker, outcome, target, 0.0 if outcome == "block" else 20.0))
+    return MatchRecord("alice", "bob", turns, hp[0], hp[1], result)
+
+
+def many(n: int, outcomes: list[Outcome]) -> list[MatchRecord]:
+    return [record(outcomes, MatchResult(None, "decision"), (60.0, 60.0)) for _ in range(n)]
+
+
+def test_compute_stats() -> None:
+    records = [
+        record(["hit", "block", "backfire", "hit"], MatchResult("a", "decision"), (80.0, 40.0)),
+        record(["hit", "hit"], MatchResult(None, "decision"), (80.0, 60.0)),
+        record(["backfire"], MatchResult("b", "ko"), (0.0, 100.0)),
+    ]
+
+    stats = compute_stats(records)
+
+    assert (stats.matches, stats.turns) == (3, 7)
+    assert (stats.hits, stats.blocks, stats.backfires) == (4, 1, 2)
+    assert stats.attacker_win_rate == pytest.approx(4 / 7)
+    assert stats.defender_win_rate == pytest.approx(3 / 7)
+    assert stats.backfire_rate == pytest.approx(2 / 7)
+    assert stats.average_damage_per_turn == pytest.approx(120 / 7)
+    assert stats.average_match_length == pytest.approx(7 / 3)
+    assert (stats.kos, stats.decisions, stats.draws) == (1, 1, 1)
+
+
+def test_gate_passes_when_neither_role_exceeds_70_percent() -> None:
+    stats = compute_stats(many(100, ["hit", "block", "hit", "block"]))
+    assert "Gate: PASS" in format_stats(stats)
+
+
+def test_gate_fails_and_names_the_dominant_role() -> None:
+    stats = compute_stats(many(100, ["hit", "hit", "hit", "block"]))
+    text = format_stats(stats)
+    assert "Gate: FAIL" in text
+    assert "attacker" in text.split("Gate:")[1]
+
+
+def test_gate_is_incomplete_below_100_matches() -> None:
+    text = format_stats(compute_stats(many(3, ["hit", "block"])))
+    assert "Gate: INCOMPLETE (3/100 matches)" in text
+
+
+def test_format_stats_lines() -> None:
+    lines = format_stats(compute_stats(many(2, ["hit", "block", "backfire"]))).splitlines()
+    assert lines[:6] == [
+        "Matches: 2, turns: 6",
+        "Attacker wins 33.3% of turns (hit 2)",
+        "Defender wins 66.7% of turns (block 2, backfire 2)",
+        "Backfire rate: 33.3%",
+        "Average damage per turn: 13.3",
+        "Average match length: 3.0 turns",
+    ]
+    assert lines[6] == "Endings: KO 0, decision 0, draw 2"
+
+
+def test_append_and_load_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "runs" / "sim.jsonl"
+    first = record(["hit", "block"], MatchResult("a", "decision"), (100.0, 80.0))
+    second = record(["backfire"], MatchResult("b", "ko"), (0.0, 100.0))
+
+    append_record(path, first)
+    append_record(path, second)
+
+    assert load_records(path) == [first, second]
+
+
+def test_load_missing_file_is_empty(tmp_path: Path) -> None:
+    assert load_records(tmp_path / "nope.jsonl") == []
+
+
+def test_load_reports_the_bad_line(tmp_path: Path) -> None:
+    path = tmp_path / "sim.jsonl"
+    append_record(path, record(["hit"], MatchResult("a", "decision"), (100.0, 80.0)))
+    with path.open("a", encoding="utf-8") as f:
+        f.write('{"fighter_a": "alice", "tru')
+
+    with pytest.raises(ResultsError, match=r"sim\.jsonl:2"):
+        load_records(path)

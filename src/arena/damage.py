@@ -1,5 +1,6 @@
 from arena.models import MatchResult
 
+MAX_TURNS = 6  # a round is one turn (D-006)
 STARTING_HP = 100.0
 BASE_DAMAGE = 20.0
 DIFFICULTY = 1.0  # fixed in Phase 0; a difficulty scorer comes later

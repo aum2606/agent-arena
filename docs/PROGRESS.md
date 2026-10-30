@@ -1,0 +1,31 @@
+# Progress — Phase 0 (Balance Prototype)
+
+Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
+
+## Checklist
+- [x] 0. Bootstrap (git, uv, tooling, pre-commit, docs skeleton)
+- [ ] 1. models + damage
+- [ ] 2. verifier
+- [ ] 3. battle_log
+- [ ] 4. llm + config
+- [ ] 5. prompts + parsing
+- [ ] 6. orchestrator
+- [ ] 7. cli `match`
+- [ ] 8. stats + cli `sim`
+- [ ] 9. live smoke test (needs API keys)
+- [ ] 10. gate run, report, tag `v0.1.0-prototype`
+
+## Current task
+None in progress.
+
+## Next task
+1. models + damage
+
+## Blockers
+None. API keys are needed from task 9.
+
+## Latest sim stats
+None yet.
+
+## Notes
+- `pytest` exits with code 5 ("no tests collected") until task 1 adds the first tests.

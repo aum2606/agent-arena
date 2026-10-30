@@ -5,7 +5,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 ## Checklist
 - [x] 0. Bootstrap (git, uv, tooling, pre-commit, docs skeleton)
 - [x] 1. models + damage
-- [ ] 2. verifier
+- [x] 2. verifier
 - [ ] 3. battle_log
 - [ ] 4. llm + config
 - [ ] 5. prompts + parsing
@@ -19,7 +19,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-2. verifier
+3. battle_log
 
 ## Blockers
 - API keys are needed from task 9.

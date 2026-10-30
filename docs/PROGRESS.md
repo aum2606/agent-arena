@@ -19,19 +19,21 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-10. gate run (100+ matches) once the owner has seen the smoke-test findings below
+10. gate run (100+ matches), after the owner decides how to handle the backfire rate
 
 ## Blockers
-- Smoke test shows the gate would fail with the current prompts (see below). Owner decision needed
-  on whether to tune prompts/rules before the 100-match run.
+- Backfires dominate: about half of all attacks fail self-verification even after prompt tuning
+  (D-012). Defenders win every backfire turn, so the defender role cannot fall below roughly the
+  backfire rate. Owner decision needed on rules before the gate run (see report).
+- Groq's free tier rate-limited Qwen past 5 retries in 3 of 8 calls; a 100-match sim would keep
+  stopping. Probably needs a larger `call_delay_s` / `max_retries` (not yet changed).
 - No third fighter: the OpenRouter free models tried were unreliable (D-011).
 
 ## Latest sim stats
 Smoke test, 3 matches (qwen vs gemini-lite, `runs/smoke.jsonl`, not the gate run):
 - Attacker wins 5.6% of turns, defender 94.4% (block 8, backfire 9). Backfire rate 50%.
-- All 9 backfires were "snippet output != stated answer": models state the answer before the
-  snippet, so they often guess it wrong. A few snippets also returned unevaluated sympy objects.
-- About 2 minutes per match (Groq 429 backoff included), so 100 matches take roughly 3 hours.
+After prompt tuning (D-012), attack-only checks of 8 attacks per fighter: 8/16, 7/16, 7/16 pass
+self-verification. No full match was rerun.
 
 ## Notes
 - Vulture is back to `uv run vulture src` and passes (D-005/D-009 transition ended with task 7).

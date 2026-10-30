@@ -67,3 +67,27 @@ def test_parse_defense_uses_the_last_answer_tag() -> None:
 def test_parse_defense_without_tag_is_an_error() -> None:
     with pytest.raises(ParseError, match="answer"):
         parse_defense("I think it is 7")
+
+
+def test_attack_request_asks_for_code_before_answer() -> None:
+    _, user = attack_prompts(FIGHTER)
+
+    assert user.index("<code>") < user.index("<answer>")
+
+
+def test_attack_rules_warn_against_unevaluated_output() -> None:
+    system, _ = attack_prompts(FIGHTER)
+
+    assert "Integral(" in system
+    assert "doit()" in system
+
+
+def test_attack_rules_allow_working_before_the_tags() -> None:
+    system, _ = attack_prompts(FIGHTER)
+
+    assert "step by step" in system
+
+
+def test_both_roles_are_told_how_to_write_constants() -> None:
+    for system in (attack_prompts(FIGHTER)[0], defense_prompts(FIGHTER, "P")[0]):
+        assert "Euler's number is E" in system

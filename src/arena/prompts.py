@@ -4,17 +4,29 @@ from arena.models import Attack, Fighter
 
 ANSWER_FORMAT = (
     "Write answers as plain ASCII that SymPy can parse, e.g. 42, 7/3, sqrt(2), x**2 + 1. "
-    "Use ** for powers, never ^ or LaTeX."
+    "Use ** for powers, never ^ or LaTeX. "
+    "Euler's number is E and the imaginary unit is I; never write e or i for them."
 )
 
 ATTACKER_RULES = f"""You are fighting in Agent Arena. Your opponent loses health when it fails \
 a problem you pose.
 
 Pose one math problem with exactly one exact answer (a number or a closed-form expression). \
-Make it hard for an opponent who has no tools and little time, but it must be correct: you must \
-also give your answer and a short Python snippet that prints that answer and nothing else. \
-Use only the standard library or sympy. If the snippet's output does not equal your stated \
-answer, or it crashes or runs for more than a few seconds, YOU take the damage instead.
+Make it hard for an opponent who has no tools and little time, but you must be certain of the \
+answer: if your snippet's output does not equal your stated answer, or the snippet crashes or \
+runs too long, YOU take the damage instead.
+
+To avoid that:
+- Work the problem out step by step before the tags and check your result by hand. Only the \
+tags at the end of your reply are used.
+- Write the Python snippet first, then state exactly what it will print as your answer. Never \
+state an answer you have not derived from the snippet's logic.
+- The snippet prints only the final value, fully evaluated: a number or a simplified \
+expression such as 155 or 5*pi/32. Never print an unevaluated object such as Integral(...) or \
+Sum(...); call doit() and simplify().
+- Prefer problems that plain Python or simple sympy settle quickly: counting, sums, modular \
+arithmetic, number theory, and integrals or series with exact closed forms.
+- Use only the standard library or sympy.
 
 {ANSWER_FORMAT}"""
 
@@ -26,8 +38,8 @@ reasoning short.
 
 ATTACK_REQUEST = """Reply in exactly this format:
 <problem>the problem statement</problem>
-<answer>your answer</answer>
-<code>python snippet that prints the answer</code>"""
+<code>python snippet that prints the answer</code>
+<answer>your answer, written exactly as the snippet prints it</answer>"""
 
 DEFENSE_REQUEST = "Reply with your final answer inside <answer></answer> tags."
 

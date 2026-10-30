@@ -23,10 +23,10 @@ api_key_env = "GROQ_API_KEY"
 name = "gemini-lite"
 provider = "gemini"
 model = "gemini-3.1-flash-lite"
-persona = "You are Gemini Lite, a quick and precise competitor who likes combinatorics and sums."
+persona = "You are Gemini Lite, a quick and precise competitor."
 
 [[fighters]]
 name = "qwen"
 provider = "groq"
 model = "qwen/qwen3.8-27b"
-persona = "You are Qwen, a careful competitor who likes calculus and geometry."
+persona = "You are Qwen, a careful competitor who double-checks every result."

@@ -188,3 +188,29 @@ outcomes.
 
 **Alternatives considered:** a provider-specific reasoning-effort option (not generic across the
 three providers, so more code), 8192 tokens (free-tier tokens-per-minute limits count the cap).
+
+## D-012 · 2026-10-30 · Attacker prompt tuning (no rule change)
+
+**Decision:**
+- The attacker reply format is now `<problem>`, `<code>`, `<answer>` (code first), and the answer
+  must be written exactly as the snippet prints it. The prompt tells attackers to work the problem
+  out step by step before the tags (only the tags are parsed), to print fully evaluated values
+  (never `Integral(...)` or `Sum(...)`), and to prefer problems plain Python or simple sympy settle
+  quickly.
+- Both roles are told that Euler's number is `E` and the imaginary unit is `I`. A bare `e` parses
+  as an ordinary symbol, so correct answers written with `e` were failing the equality check.
+- Fighter personas are style-only. The first versions named topics ("likes calculus"), which pushed
+  Qwen toward integrals that sympy cannot evaluate.
+- The rules (self-verification, backfire, damage) are unchanged.
+
+**Why:** The smoke test (D-011) showed about 50% of attacks backfiring, mostly from stated answers
+that did not match the snippet.
+
+**Result (live, 8 attacks per fighter per run, so roughly +/-12 points of noise):** the overall
+attack pass rate stayed around 45-50% (smoke test 9 of 18 failed; after tuning 7/16, 7/16, 8/16).
+The tuning removed two specific failure types (unevaluated sympy objects, `e` vs `E`) but not the
+main one: models state arithmetic results they computed in their heads, and are wrong about half
+the time. Groq also rate-limited Qwen past 5 retries in 3 of 8 calls in the last run.
+
+**Alternatives considered:** taking the attacker's answer from its snippet output (removes the
+self-verification rule, so it is an owner decision, not a prompt change).

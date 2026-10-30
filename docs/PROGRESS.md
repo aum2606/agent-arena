@@ -10,7 +10,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 - [x] 4. llm + config
 - [x] 5. prompts + parsing
 - [x] 6. orchestrator
-- [ ] 7. cli `match`
+- [x] 7. cli `match`
 - [ ] 8. stats + cli `sim`
 - [ ] 9. live smoke test (needs API keys)
 - [ ] 10. gate run, report, tag `v0.1.0-prototype`
@@ -19,7 +19,7 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 None in progress.
 
 ## Next task
-7. cli `match`
+8. stats + cli `sim`
 
 ## Blockers
 - API keys are needed from task 9.
@@ -30,5 +30,5 @@ None in progress.
 None yet.
 
 ## Notes
-- Until task 7, vulture runs as `uv run vulture src tests` (D-005, D-009).
+- Vulture is back to `uv run vulture src` and passes (D-005/D-009 transition ended with task 7).
 - `pytest` exits with code 5 ("no tests collected") until task 1 adds the first tests.

@@ -28,7 +28,8 @@ the rule levers (steps 3 and 4) if the defender share is still above 70%.
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
 - Groq's 8000 tokens-per-minute limit counts prompt + `max_tokens` (4096) per request, so two
-  close calls hit it and the sim waits up to 300 s; lowering `turn_max_tokens` is untested.
+  close calls hit it and the sim waits up to 300 s. Lowering `turn_max_tokens` to 2048 was tried and
+  rejected (D-019): gpt-oss got cut off in 40% of attacks.
 - Infra is slow and flaky on free tiers: Gemini 503s, Groq 429s, connection errors (not
   retried). The last 14 matches took about 4 hours of wall time.
 - Only two fighters of unequal strength; the OpenRouter free models tried were unreliable (D-011).

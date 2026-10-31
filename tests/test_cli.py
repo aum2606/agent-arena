@@ -43,7 +43,7 @@ class StubClient:
         pass
 
     def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
-        if user == ATTACK_REQUEST:
+        if user.endswith(ATTACK_REQUEST):
             return Completion(
                 "<problem>6 * 7?</problem><answer>42</answer><code>print(42)</code>", False
             )

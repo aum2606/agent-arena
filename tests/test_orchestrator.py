@@ -1,3 +1,5 @@
+import random
+
 import pytest
 
 from arena.battle_log import BattleLog
@@ -5,7 +7,7 @@ from arena.config import Settings
 from arena.llm import Completion, LlmError, LlmTimeout
 from arena.models import Fighter, MatchRecord
 from arena.orchestrator import run_match
-from arena.prompts import ATTACK_REQUEST
+from arena.prompts import ATTACK_REQUEST, TOPICS
 
 SETTINGS = Settings(
     turn_time_limit_s=30.0,
@@ -21,8 +23,10 @@ B = Fighter("bob", "p", "m", "persona b")
 type Reply = str | Exception | Completion
 
 
-def good_attack(answer: str = "42", code: str = "print(42)") -> str:
-    return f"<problem>What is the answer?</problem><answer>{answer}</answer><code>{code}</code>"
+def good_attack(
+    answer: str = "42", code: str = "print(42)", problem: str = "What is the answer?"
+) -> str:
+    return f"<problem>{problem}</problem><answer>{answer}</answer><code>{code}</code>"
 
 
 def answer(value: str) -> str:
@@ -40,9 +44,11 @@ class FakeLlm:
         self.attacks = attacks or {}
         self.defenses = defenses or {}
         self.defense_calls = 0
+        self.attack_requests: list[str] = []
 
     def __call__(self, fighter: Fighter, system: str, user: str) -> Completion:
-        if user == ATTACK_REQUEST:
+        if user.endswith(ATTACK_REQUEST):
+            self.attack_requests.append(user)
             reply = self.attacks[fighter.name].pop(0)
         else:
             self.defense_calls += 1
@@ -54,7 +60,7 @@ class FakeLlm:
 
 def play(llm: FakeLlm) -> tuple[MatchRecord, BattleLog]:
     log = BattleLog("m1")
-    return run_match(A, B, llm, SETTINGS, log), log
+    return run_match(A, B, llm, SETTINGS, log, random.Random(0)), log
 
 
 def event_types(log: BattleLog, turn: int) -> list[str]:
@@ -221,3 +227,48 @@ def test_provider_failure_aborts_the_match() -> None:
 
     with pytest.raises(LlmError, match="rate limited"):
         play(llm)
+
+
+def test_attacker_prompts_list_the_problems_posed_so_far() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": [good_attack(problem=f"alice problem {i}") for i in range(3)],
+            "bob": [good_attack(problem=f"bob problem {i}") for i in range(3)],
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    play(llm)
+
+    first, second, third = llm.attack_requests[:3]
+    assert "alice problem 0" not in first
+    assert "alice problem 0" in second
+    assert "alice problem 0" in third
+    assert "bob problem 0" in third
+
+
+def test_backfired_problems_are_not_listed_as_used() -> None:
+    liar = good_attack(code="print(41)", problem="never verified")
+    llm = FakeLlm(
+        attacks={"alice": [liar, liar, liar], "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    play(llm)
+
+    assert all("never verified" not in request for request in llm.attack_requests)
+
+
+def test_each_turn_gets_a_topic_from_the_rng() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+    rng = random.Random(0)
+    expected = [rng.choice(TOPICS) for _ in range(6)]
+
+    play(llm)
+
+    assert len(llm.attack_requests) == 6
+    for request, topic in zip(llm.attack_requests, expected, strict=True):
+        assert topic in request

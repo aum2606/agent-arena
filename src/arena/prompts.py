@@ -36,6 +36,20 @@ reasoning short.
 
 {ANSWER_FORMAT}"""
 
+# One is picked at random per turn: without it, deterministic models repeat one easy problem.
+TOPICS = (
+    "number theory",
+    "combinatorics",
+    "algebra and polynomials",
+    "probability",
+    "series and sums",
+    "calculus (limits, derivatives, integrals)",
+    "geometry and trigonometry",
+    "linear algebra",
+    "recurrences and sequences",
+    "modular arithmetic",
+)
+
 ATTACK_REQUEST = """Reply in exactly this format:
 <problem>the problem statement</problem>
 <code>python snippet that prints the answer</code>
@@ -50,9 +64,17 @@ class ParseError(Exception):
     pass
 
 
-def attack_prompts(fighter: Fighter) -> tuple[str, str]:
-    """(system, user) messages asking the fighter to attack."""
-    return f"{fighter.persona}\n\n{ATTACKER_RULES}", ATTACK_REQUEST
+def attack_prompts(fighter: Fighter, topic: str, used_problems: list[str]) -> tuple[str, str]:
+    """(system, user) messages asking the fighter to attack with a problem on `topic`."""
+    parts = [f"Topic for this turn: {topic}. Pose your problem in that area."]
+    if used_problems:
+        listed = "\n".join(f"- {problem}" for problem in used_problems)
+        parts.append(
+            f"Problems already posed in this match:\n{listed}\n"
+            "Do not repeat them or pose close variants."
+        )
+    parts.append(ATTACK_REQUEST)
+    return f"{fighter.persona}\n\n{ATTACKER_RULES}", "\n\n".join(parts)
 
 
 def defense_prompts(fighter: Fighter, problem: str) -> tuple[str, str]:

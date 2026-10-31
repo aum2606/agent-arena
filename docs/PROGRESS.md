@@ -22,8 +22,8 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Owner decision on the rules suggested by the sweep (answer from the snippet's output; difficulty
-pitched near skill). Live sims stay slow, so test rule changes with `arena synth` first.
+Simulate a closed-loop attacker that targets difficulty near its skill (D-021), then try the
+prompt live. Live sims stay slow, so test with `arena synth` first.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
@@ -54,13 +54,15 @@ A model of the rules, not of LLMs (see D-020). Results depend only on skill minu
   The live result (3.8%) matches this regime: strong models, problems that are too easy.
 - Stronger models alone make it worse (skill 0.9, difficulty 0.5: 2-3%) unless problems get harder
   with skill.
-- If the attacker's answer is certain (it comes from running the snippet), the attacker wins 7% at
-  difficulty 0.4, 31% at 0.6, 51% at 0.7, 70% at 0.8, 84% at 0.9 for skill 0.7. The gate passes
-  when problem difficulty is within about 0.1 of the fighters' skill; at skill 0.9 the same
-  numbers need difficulty 0.8 to 0.9.
-- Implication for the rules (owner decision): derive the attacker's answer by running its snippet
-  (the product spec's intent) instead of backfiring on a mismatch, and pitch problem difficulty
-  near the defender's skill (the spec's difficulty scorer, or a prompt that targets it).
+- Correction (D-021): taking the attacker's answer from its snippet looked like the fix but is not.
+  `arena synth --compare-rules` shows its extra attacker wins come from broken problems (about half
+  the hits at the sweet spot); wins on solvable problems equal the current rule's. Keep backfire on
+  mismatch.
+- The current rule can pass the gate offline: with attacker bonus 0.1, difficulty near skill gives
+  31-33% attacker wins (skill 0.7, difficulty 0.7-0.8; skill 0.9, difficulty 0.9), at the cost of
+  30-48% backfires. With no bonus the attacker peaks at about 22%.
+- So the lever is difficulty targeting. Next: simulate a closed-loop attacker (it is told how its
+  earlier problems fared and moves toward the edge of its ability), then try it live.
 
 ## Suggested next steps
 1. DONE (D-017): attacker variety. Each turn has a random topic and the attacker sees the problems

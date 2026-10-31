@@ -252,3 +252,11 @@ def test_synth_prints_the_sweep_table(capsys: pytest.CaptureFixture[str]) -> Non
     assert code == 0
     assert "Attacker win rate" in out
     assert "gate passes" in out
+
+
+def test_synth_can_compare_the_two_answer_rules(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["synth", "--compare-rules", "--matches", "2"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Rule comparison" in out

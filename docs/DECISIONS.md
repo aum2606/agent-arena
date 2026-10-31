@@ -383,3 +383,39 @@ tested live, and the open question was whether stronger models would fix the bal
 **Alternatives considered:** a separate script outside `src` (would duplicate the match rules),
 fitting the model to the 48 live matches (too little data), more sweep axes such as unequal skills
 (not needed for this question).
+
+## D-021 · 2026-10-31 · Do not take the attacker's answer from its snippet; compare the rules offline
+
+**Decision:** The self-verification rule stays as it is: a stated answer that differs from the
+snippet's output is a backfire (D-013). Taking the answer from the snippet's output instead was
+simulated (`arena synth --compare-rules [--skill S] [--bonus B]`) and rejected.
+
+**Why:** The mismatch check is also what keeps broken problems out: a problem whose statement and
+snippet disagree is ill posed. If the snippet's output became the answer key, such a problem would
+verify and every defender would fail it. The simulator tags each problem as well posed or broken
+and counts hits on well-posed problems separately (300 matches per row, both fighters skill 0.7,
+attacker bonus 0.1):
+
+- difficulty 0.6: current rule 24% attacker wins; snippet rule 37%, of which 22% from solvable problems
+- difficulty 0.7: current 31%; snippet 62%, of which 31% from solvable problems
+- difficulty 0.8: current 33%; snippet 80%, of which 30% from solvable problems
+
+The snippet rule adds no legitimate attacker wins (the solvable-problem share equals the current
+rule's win rate); the extra wins come from broken problems, and it would pass or fail the gate for
+the wrong reason. This corrects my earlier suggestion (PROGRESS.md, previous sweep notes) that
+deriving the answer from the snippet was the fix.
+
+**What does work under the current rule (offline model, not yet live):** with an attacker bonus of
+0.1 the gate passes when problem difficulty sits near the fighters' skill: 31-33% attacker wins at
+difficulty 0.7-0.8 for skill 0.7, and 32% at difficulty 0.9 for skill 0.9. With no bonus the
+attacker peaks at about 22% and the gate fails at any difficulty. Backfires are 30-48% of turns
+in the passing cells, so that is the price of pitching problems at the attacker's own limit.
+
+**Consequence:** the lever is difficulty targeting, not the answer rule. The real attackers pitch
+problems too easy (live: 95% of verified attacks blocked). A closed-loop prompt (tell the attacker
+how its previous problems fared so it moves toward the edge of its ability) is the next thing to
+simulate and then try live.
+
+**Alternatives considered:** a second pass where the attacker may restate its answer after seeing
+the snippet's output (same broken-problem hole), an LLM judge for well-posedness (the spec keeps
+judges out of ranked play).

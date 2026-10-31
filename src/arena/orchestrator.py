@@ -24,9 +24,11 @@ from arena.prompts import (
     parse_attack,
     parse_defense,
 )
-from arena.verifier import answers_match, verify_attack
+from arena.verifier import Verification, answers_match, verify_attack
 
 Complete = Callable[[Fighter, str, str], Completion]
+# (stated answer, snippet, timeout in seconds); the synthetic simulator swaps in a fast stand-in.
+Verify = Callable[[str, str, float], Verification]
 
 
 class _Backfire(Exception):
@@ -42,6 +44,7 @@ def _pose_attack(
     side: Side,
     prompts: tuple[str, str],
     complete: Complete,
+    verify: Verify,
     settings: Settings,
     log: BattleLog,
 ) -> Attack:
@@ -55,7 +58,7 @@ def _pose_attack(
         attack = parse_attack(reply.text)
     except ParseError as exc:
         raise _Backfire(str(exc)) from exc
-    check = verify_attack(attack.answer, attack.snippet, settings.snippet_timeout_s)
+    check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
     if not check.passed:
         raise _Backfire(check.reason)
     return attack
@@ -93,6 +96,7 @@ def play_turn(
     attacker_side: Side,
     fighters: dict[Side, Fighter],
     complete: Complete,
+    verify: Verify,
     settings: Settings,
     log: BattleLog,
     topic: str,
@@ -105,7 +109,7 @@ def play_turn(
     try:
         fighter = fighters[attacker_side]
         prompts = attack_prompts(fighter, topic, used_problems)
-        attack = _pose_attack(fighter, attacker_side, prompts, complete, settings, log)
+        attack = _pose_attack(fighter, attacker_side, prompts, complete, verify, settings, log)
     except _Backfire as exc:
         log.emit("backfire", actor=attacker_side, reason=str(exc))
         amount = backfire_damage(BASE_DAMAGE, DIFFICULTY)
@@ -127,6 +131,7 @@ def run_match(
     settings: Settings,
     log: BattleLog,
     rng: random.Random,
+    verify: Verify = verify_attack,
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
     used_problems: list[str] = []
@@ -139,7 +144,7 @@ def run_match(
         attacker_side: Side = "a" if turn % 2 == 1 else "b"
         topic = rng.choice(TOPICS)
         result = play_turn(
-            turn, attacker_side, fighters, complete, settings, log, topic, used_problems
+            turn, attacker_side, fighters, complete, verify, settings, log, topic, used_problems
         )
         turns.append(result)
         hp[result.target] = apply_damage(hp[result.target], result.damage)

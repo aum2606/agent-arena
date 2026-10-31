@@ -243,3 +243,12 @@ def test_sim_reports_a_damaged_results_file(
 
     assert sim(config_path, out, 1) == 1
     assert "sim.jsonl:1" in capsys.readouterr().err
+
+
+def test_synth_prints_the_sweep_table(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["synth", "--matches", "2"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Attacker win rate" in out
+    assert "gate passes" in out

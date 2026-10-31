@@ -22,8 +22,8 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Measure steps 1 and 2 together with a 20+ match sim once the providers allow it, and decide on
-the rule levers (steps 3 and 4) if the defender share is still above 70%.
+Owner decision on the rules suggested by the sweep (answer from the snippet's output; difficulty
+pitched near skill). Live sims stay slow, so test rule changes with `arena synth` first.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
@@ -45,6 +45,22 @@ the rule levers (steps 3 and 4) if the defender share is still above 70%.
 - Defender failures in the logs: 11 wrong answers, 4 timeouts.
 - gemini-lite posed only 26 distinct problems in 83 verified attacks; one trivial sum came up 35
   times. gpt-oss posed 126 distinct problems in 129 attacks.
+
+## Scripted-fighter sweep (`arena synth`, D-020)
+A model of the rules, not of LLMs (see D-020). Results depend only on skill minus difficulty:
+- With no attacker advantage the attacker's best case is about 22-25% of turns (skill equal to
+  problem difficulty), so the 70% gate cannot pass however strong the models are.
+- When skill exceeds difficulty by 0.2 or more, the attacker wins 0-3% of turns whatever its bonus.
+  The live result (3.8%) matches this regime: strong models, problems that are too easy.
+- Stronger models alone make it worse (skill 0.9, difficulty 0.5: 2-3%) unless problems get harder
+  with skill.
+- If the attacker's answer is certain (it comes from running the snippet), the attacker wins 7% at
+  difficulty 0.4, 31% at 0.6, 51% at 0.7, 70% at 0.8, 84% at 0.9 for skill 0.7. The gate passes
+  when problem difficulty is within about 0.1 of the fighters' skill; at skill 0.9 the same
+  numbers need difficulty 0.8 to 0.9.
+- Implication for the rules (owner decision): derive the attacker's answer by running its snippet
+  (the product spec's intent) instead of backfiring on a mismatch, and pitch problem difficulty
+  near the defender's skill (the spec's difficulty scorer, or a prompt that targets it).
 
 ## Suggested next steps
 1. DONE (D-017): attacker variety. Each turn has a random topic and the attacker sees the problems

@@ -343,3 +343,15 @@ backfire rate more than they lower the block rate.
 **Alternatives considered:** waiting for more matches (hours of rate-limit waits for little
 information), lowering `turn_max_tokens` to 2048 to double Groq throughput (separate change, may
 truncate long reasoning replies).
+
+## D-019 · 2026-10-31 · `turn_max_tokens` stays at 4096 (2048 tried and rejected)
+
+**Decision:** The token cap stays at 4096. A cap of 2048 was tried live and not committed.
+
+**Why:** With the current prompts (step-by-step reasoning, difficulty rules), gpt-oss-120b hit the
+2048 cap in 2 of 5 attacks (one reply was empty) and 1 of 5 defenses; gemini-lite hit it in none.
+Every cut-off would be logged as a backfire or a defender timeout, so the stats would measure the
+cap and not the game. Groq still rate-limited the calls with waits of up to 214 s, so the lower
+cap did not fix throughput either (the check of 20 calls took 56 minutes, mostly 429 and 503 waits).
+
+**Alternatives considered:** 3072 (untested), a larger `call_delay_s` (slows every call).

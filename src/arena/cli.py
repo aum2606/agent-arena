@@ -10,9 +10,16 @@ from dotenv import load_dotenv
 from arena.battle_log import BattleLog
 from arena.config import ConfigError, load_config
 from arena.llm import LlmClient, LlmError
-from arena.models import MatchRecord
+from arena.models import MatchRecord, Outcome, Side
 from arena.orchestrator import run_match
-from arena.stats import ResultsError, append_record, compute_stats, format_stats, load_records
+from arena.stats import (
+    ResultsError,
+    append_record,
+    attack_outcomes,
+    compute_stats,
+    format_stats,
+    load_records,
+)
 from arena.synthetic import (
     compare_adaptive,
     compare_rules,
@@ -89,8 +96,18 @@ def _sim(args: argparse.Namespace) -> None:
         a, b = rng.sample(names, 2)
         match_id = f"sim_{i:04d}"
         log = BattleLog(match_id)
+        history: dict[Side, list[Outcome]] = {
+            "a": attack_outcomes(records, a),
+            "b": attack_outcomes(records, b),
+        }
         record = run_match(
-            config.fighters[a], config.fighters[b], client.complete, config.settings, log, rng
+            config.fighters[a],
+            config.fighters[b],
+            client.complete,
+            config.settings,
+            log,
+            rng,
+            history=history,
         )
         log.write(RUNS_DIR / "logs" / f"{match_id}.json")
         append_record(args.out, record)

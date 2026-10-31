@@ -22,9 +22,8 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Owner decision: feed each attacker a rolling summary of its recent outcomes across the sim
-(derived from `runs/sim.jsonl`, see D-022) and try it live in a 10-20 match sim. Live sims stay
-slow; whether an LLM follows the nudge is unknown.
+Rolling outcome feedback is implemented (D-023). Run a live sim into `runs/feedback.jsonl` and
+compare it with the 48-match baseline (attacker 3.8%); whether the LLMs follow the nudge is unknown.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.

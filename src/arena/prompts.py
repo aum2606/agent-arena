@@ -1,6 +1,8 @@
 import re
+from collections import Counter
+from collections.abc import Sequence
 
-from arena.models import Attack, Fighter
+from arena.models import Attack, Fighter, Outcome
 
 ANSWER_FORMAT = (
     "Write answers as plain ASCII that SymPy can parse, e.g. 42, 7/3, sqrt(2), x**2 + 1. "
@@ -42,6 +44,8 @@ reasoning short.
 
 {ANSWER_FORMAT}"""
 
+HISTORY_WINDOW = 10  # how many of an attacker's latest problems its feedback summarises
+
 # One is picked at random per turn: without it, deterministic models repeat one easy problem.
 TOPICS = (
     "number theory",
@@ -70,14 +74,35 @@ class ParseError(Exception):
     pass
 
 
-def attack_prompts(fighter: Fighter, topic: str, used_problems: list[str]) -> tuple[str, str]:
-    """(system, user) messages asking the fighter to attack with a problem on `topic`."""
+def attack_prompts(
+    fighter: Fighter,
+    topic: str,
+    used_problems: list[str],
+    recent_outcomes: Sequence[Outcome] = (),
+) -> tuple[str, str]:
+    """(system, user) messages asking the fighter to attack with a problem on `topic`.
+
+    `recent_outcomes` are how its own earlier problems ended, oldest first; the summary nudges
+    its difficulty toward the point where about a third of its problems land (D-022, D-023).
+    """
     parts = [f"Topic for this turn: {topic}. Pose your problem in that area."]
     if used_problems:
         listed = "\n".join(f"- {problem}" for problem in used_problems)
         parts.append(
             f"Problems already posed in this match:\n{listed}\n"
             "Do not repeat them or pose close variants."
+        )
+    if recent_outcomes:
+        window = recent_outcomes[-HISTORY_WINDOW:]
+        counts = Counter(window)
+        parts.append(
+            f"How your last {len(window)} problems fared - "
+            f"blocked by your opponent (too easy): {counts['block']}; "
+            f"failed your own check (too hard): {counts['backfire']}; "
+            f"hit your opponent: {counts['hit']}. "
+            "Aim for about a third of your problems to hit your opponent: if most were blocked, "
+            "make the next one clearly harder; if many failed your own check, make it a little "
+            "easier."
         )
     parts.append(ATTACK_REQUEST)
     return f"{fighter.persona}\n\n{ATTACKER_RULES}", "\n\n".join(parts)

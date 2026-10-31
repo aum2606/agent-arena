@@ -13,7 +13,7 @@ sequenceDiagram
     C->>O: run_match(a, b, llm.complete, log, rng, verify)
     loop each turn (max 6, roles swap)
         O->>G: start_turn, attack_start
-        O->>P: attack_prompts(attacker, random topic, problems so far)
+        O->>P: attack_prompts(attacker, random topic, problems so far, its recent outcomes)
         O->>L: complete(attacker)
         O->>P: parse_attack(reply)
         O->>V: verify_attack(answer, snippet)
@@ -40,7 +40,8 @@ sequenceDiagram
 ```
 
 `arena sim --n N` repeats the loop above for each missing match (pairs picked by a per-index
-seeded RNG), calling `stats.append_record` after each one, then prints `format_stats` over all
+seeded RNG; each fighter's earlier attack outcomes come from the saved results via
+`stats.attack_outcomes` and go to `run_match` as `history`), calling `stats.append_record` after each one, then prints `format_stats` over all
 saved records.
 
 `arena synth` runs the same `run_match` with `SyntheticLlm.complete` and `synthetic_verify`

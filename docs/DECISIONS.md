@@ -355,3 +355,31 @@ cap and not the game. Groq still rate-limited the calls with waits of up to 214 
 cap did not fix throughput either (the check of 20 calls took 56 minutes, mostly 429 and 503 waits).
 
 **Alternatives considered:** 3072 (untested), a larger `call_delay_s` (slows every call).
+
+## D-020 · 2026-10-31 · Scripted-fighter simulator (`arena synth`)
+
+**Decision:**
+- New module `src/arena/synthetic.py` and command `arena synth [--matches N] [--difficulty D]
+  [--seed S]`. It replays the real `run_match` with scripted fighters instead of LLMs and prints a
+  table of the attacker's per-turn win rate for skills 0.3 to 0.9 (both fighters equal) against an
+  attacker bonus of 0.0 to 0.3, marking cells where the 70% gate would pass. No network, about
+  70 s for 300 matches per cell.
+- Model: success at any task is a coin flip with probability `1 / (1 + exp(-10 * (skill -
+  difficulty)))`. Deriving an attack's answer uses `skill + attack_bonus` at the problem's
+  difficulty (drawn around the `--difficulty` value with a 0.1 spread); solving it uses `skill`.
+  The scripted snippet always prints 1, and a failed attacker states 2, so the real answer check
+  and backfire path run.
+- `run_match` gained an optional `verify` argument (default `verify_attack`) so the simulator can
+  skip the subprocess; `play_turn` and `_pose_attack` pass it through. Production calls are
+  unchanged.
+- The simulator is a model of the rules, not of real LLMs. It does not capture formatting errors,
+  truncation, rate limits or fighters that differ per task type, and its constants (slope 10,
+  spread 0.1, the skill and bonus grids) are not fitted to the live data.
+- Adds a layout entry (`synthetic.py`) to CLAUDE.md and a `synth` line to its commands.
+
+**Why:** Free-tier providers allow roughly one live match per 15 minutes, so rule changes cannot be
+tested live, and the open question was whether stronger models would fix the balance.
+
+**Alternatives considered:** a separate script outside `src` (would duplicate the match rules),
+fitting the model to the 48 live matches (too little data), more sweep axes such as unequal skills
+(not needed for this question).

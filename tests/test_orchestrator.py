@@ -8,6 +8,7 @@ from arena.llm import Completion, LlmError, LlmTimeout
 from arena.models import Fighter, MatchRecord
 from arena.orchestrator import run_match
 from arena.prompts import ATTACK_REQUEST, TOPICS
+from arena.verifier import Verification
 
 SETTINGS = Settings(
     turn_time_limit_s=30.0,
@@ -272,3 +273,24 @@ def test_each_turn_gets_a_topic_from_the_rng() -> None:
     assert len(llm.attack_requests) == 6
     for request, topic in zip(llm.attack_requests, expected, strict=True):
         assert topic in request
+
+
+def test_run_match_uses_the_injected_verifier() -> None:
+    seen: list[str] = []
+
+    def verify(stated: str, snippet: str, timeout_s: float) -> Verification:
+        seen.append(stated)
+        return Verification(False, "injected failure")
+
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+    log = BattleLog("m1")
+
+    record = run_match(A, B, llm, SETTINGS, log, random.Random(0), verify)
+
+    assert len(seen) == 6
+    assert all(t.outcome == "backfire" for t in record.turns)
+    assert llm.defense_calls == 0
+    assert "injected failure" in str(log.to_dict())

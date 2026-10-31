@@ -13,6 +13,7 @@ from arena.llm import LlmClient, LlmError
 from arena.models import MatchRecord
 from arena.orchestrator import run_match
 from arena.stats import ResultsError, append_record, compute_stats, format_stats, load_records
+from arena.synthetic import format_sweep, sweep
 
 DEFAULT_CONFIG = Path("config/fighters.toml")
 RUNS_DIR = Path("runs")
@@ -91,6 +92,16 @@ def _sim(args: argparse.Namespace) -> None:
     print(format_stats(compute_stats(records)))
 
 
+def _synth(args: argparse.Namespace) -> None:
+    rates = sweep(args.matches, args.difficulty, args.seed)
+    print(format_sweep(rates))
+    print(
+        f"{args.matches} matches per cell, problem difficulty {args.difficulty}. Both fighters "
+        "share the row's skill; the column adds to attackers' reliability (tools, designing "
+        "backwards)."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="arena")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -104,6 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     sim.add_argument("--out", type=Path, default=RUNS_DIR / "sim.jsonl", help="results file")
     sim.set_defaults(run=_sim)
+    synth = commands.add_parser("synth", help="balance sweep with scripted fighters, no LLM calls")
+    synth.add_argument("--matches", type=int, default=100, help="matches per table cell")
+    synth.add_argument("--difficulty", type=float, default=0.5, help="problem difficulty, 0 to 1")
+    synth.add_argument("--seed", type=int, default=0)
+    synth.set_defaults(run=_synth)
     args = parser.parse_args(argv)
 
     load_dotenv()

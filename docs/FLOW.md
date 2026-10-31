@@ -10,7 +10,7 @@ sequenceDiagram
     participant D as damage
     participant G as battle_log
 
-    C->>O: run_match(a, b, llm.complete, log, rng)
+    C->>O: run_match(a, b, llm.complete, log, rng, verify)
     loop each turn (max 6, roles swap)
         O->>G: start_turn, attack_start
         O->>P: attack_prompts(attacker, random topic, problems so far)
@@ -43,6 +43,9 @@ sequenceDiagram
 seeded RNG), calling `stats.append_record` after each one, then prints `format_stats` over all
 saved records.
 
+`arena synth` runs the same `run_match` with `SyntheticLlm.complete` and `synthetic_verify`
+(scripted fighters, no network) for each cell of a skill x attacker-bonus table.
+
 ## Modules
 
 - `models`: dataclasses (`Fighter`, `Attack`, `TurnResult`, `MatchRecord`, `MatchResult`).
@@ -54,4 +57,5 @@ saved records.
 - `prompts`: attacker and defender prompts and tag parsing of the replies.
 - `cli`: `arena match` and `arena sim` (load `.env` and config, run matches, print output).
 - `stats`: balance stats over `MatchRecord`s, plus reading and appending the results JSONL.
+- `synthetic`: scripted fighters and the balance sweep behind `arena synth` (D-020).
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.

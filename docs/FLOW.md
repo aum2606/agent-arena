@@ -10,10 +10,10 @@ sequenceDiagram
     participant D as damage
     participant G as battle_log
 
-    C->>O: run_match(a, b, llm.complete, log)
+    C->>O: run_match(a, b, llm.complete, log, rng)
     loop each turn (max 6, roles swap)
         O->>G: start_turn, attack_start
-        O->>P: attack_prompts(attacker)
+        O->>P: attack_prompts(attacker, random topic, problems so far)
         O->>L: complete(attacker)
         O->>P: parse_attack(reply)
         O->>V: verify_attack(answer, snippet)

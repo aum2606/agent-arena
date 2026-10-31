@@ -293,3 +293,25 @@ per match, and the result was decisive: 3.8% against a 70% limit cannot move wit
 
 **Alternatives considered:** waiting for 100 matches (many more hours for the same conclusion),
 tagging the failed gate anyway (a tag would read as a pass).
+
+## D-017 · 2026-10-31 · Attacker variety: random topic and problem history
+
+**Decision:** Each turn the attacker prompt names a topic picked with `rng.choice(TOPICS)` from ten
+math areas and lists the problems already verified in the match, with "do not repeat them or pose
+close variants". `run_match` takes an `rng: random.Random`; `sim` passes the same
+`random.Random(match_index)` it uses to pick the pair (so a resumed sim repeats the topics), and
+`match` passes an unseeded one. Problems that backfired are not listed. No rule changes, no sampling
+temperature setting.
+
+**Why:** In the 48-match gate run gemini-lite posed only 26 distinct problems in 83 verified
+attacks (one trivial sum 35 times, because every match started from the same prompt), so it never
+landed a hit and the role statistics mostly measured one repeated easy problem.
+
+**Evidence so far (thin):** a 3-match live test (`runs/variety.jsonl`) gave 13 verified problems,
+all distinct (gemini-lite 6, gpt-oss 7), with two near-duplicates of one series worded slightly
+differently. The test was stopped there because Gemini 503s stalled it; the defender still won
+12 blocks + 5 backfires against 1 hit in 18 turns, so this does not fix the balance on its own.
+
+**Alternatives considered:** a `temperature` setting (not accepted by every model, and the topic
+list gives variety without depending on sampling), a history of problems across matches (couples
+matches, harms resumability), more topics per turn (weaker constraint).

@@ -22,7 +22,7 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Owner decision on how to rebalance (see "Suggested next steps" below), then rerun a short sim.
+Difficulty prompt (step 2 below), tested with a short sim once Gemini is stable.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
@@ -43,8 +43,8 @@ Owner decision on how to rebalance (see "Suggested next steps" below), then reru
   times. gpt-oss posed 126 distinct problems in 129 attacks.
 
 ## Suggested next steps
-1. Fix attacker variety: give the attacker the problems already posed this match, require a new
-   topic each turn, and request a higher sampling temperature.
+1. DONE (D-017): attacker variety. Each turn has a random topic and the attacker sees the problems
+   already posed. Not yet measured at scale (3 live matches: 13 verified problems, all distinct).
 2. Raise problem difficulty in the attacker prompt (multi-step, no textbook formula), since 95% of
    verified attacks are solved.
 3. Change the gate metric (an owner decision): measure verified attacks only, and report results
@@ -55,6 +55,8 @@ Owner decision on how to rebalance (see "Suggested next steps" below), then reru
    with 30-match sims before any 100-match run.
 
 ## Notes
+- `runs/logs_gate48/` holds the battle logs of the 48 gate-run matches (the new sims reuse the
+  `sim_000N` names in `runs/logs/`). `runs/variety.jsonl` has 3 matches from the variety test.
 - With backfire at half damage a knockout cannot happen in 6 turns (max 90 damage); every match
   ends by decision or draw (D-013).
 - Vulture is `uv run vulture src` and passes.

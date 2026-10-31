@@ -52,7 +52,12 @@ def _match(args: argparse.Namespace) -> None:
     log = BattleLog(match_id)
     client = LlmClient(config.providers, config.settings)
     record = run_match(
-        config.fighters[args.a], config.fighters[args.b], client.complete, config.settings, log
+        config.fighters[args.a],
+        config.fighters[args.b],
+        client.complete,
+        config.settings,
+        log,
+        random.Random(),
     )
     path = RUNS_DIR / f"{match_id}.json"
     log.write(path)
@@ -72,11 +77,12 @@ def _sim(args: argparse.Namespace) -> None:
     client = LlmClient(config.providers, config.settings)
     # Seeding by match index keeps the pairing identical when a sim is resumed.
     for i in range(len(records), args.n):
-        a, b = random.Random(i).sample(names, 2)
+        rng = random.Random(i)
+        a, b = rng.sample(names, 2)
         match_id = f"sim_{i:04d}"
         log = BattleLog(match_id)
         record = run_match(
-            config.fighters[a], config.fighters[b], client.complete, config.settings, log
+            config.fighters[a], config.fighters[b], client.complete, config.settings, log, rng
         )
         log.write(RUNS_DIR / "logs" / f"{match_id}.json")
         append_record(args.out, record)

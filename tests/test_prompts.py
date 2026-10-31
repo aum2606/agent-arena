@@ -1,13 +1,21 @@
 import pytest
 
 from arena.models import Attack, Fighter
-from arena.prompts import ParseError, attack_prompts, defense_prompts, parse_attack, parse_defense
+from arena.prompts import (
+    ATTACK_REQUEST,
+    ParseError,
+    attack_prompts,
+    defense_prompts,
+    parse_attack,
+    parse_defense,
+)
 
+TOPIC = "number theory"
 FIGHTER = Fighter("alpha", "groq", "some-model", "You are a ruthless number theorist.")
 
 
 def test_attack_prompts_carry_persona_and_reply_format() -> None:
-    system, user = attack_prompts(FIGHTER)
+    system, user = attack_prompts(FIGHTER, TOPIC, [])
 
     assert "ruthless number theorist" in system
     for tag in ("<problem>", "<answer>", "<code>"):
@@ -70,24 +78,50 @@ def test_parse_defense_without_tag_is_an_error() -> None:
 
 
 def test_attack_request_asks_for_code_before_answer() -> None:
-    _, user = attack_prompts(FIGHTER)
+    _, user = attack_prompts(FIGHTER, TOPIC, [])
 
     assert user.index("<code>") < user.index("<answer>")
 
 
 def test_attack_rules_warn_against_unevaluated_output() -> None:
-    system, _ = attack_prompts(FIGHTER)
+    system, _ = attack_prompts(FIGHTER, TOPIC, [])
 
     assert "Integral(" in system
     assert "doit()" in system
 
 
 def test_attack_rules_allow_working_before_the_tags() -> None:
-    system, _ = attack_prompts(FIGHTER)
+    system, _ = attack_prompts(FIGHTER, TOPIC, [])
 
     assert "step by step" in system
 
 
 def test_both_roles_are_told_how_to_write_constants() -> None:
-    for system in (attack_prompts(FIGHTER)[0], defense_prompts(FIGHTER, "P")[0]):
+    for system in (attack_prompts(FIGHTER, TOPIC, [])[0], defense_prompts(FIGHTER, "P")[0]):
         assert "Euler's number is E" in system
+
+
+def test_attack_prompt_names_this_turns_topic() -> None:
+    _, user = attack_prompts(FIGHTER, "combinatorics", [])
+
+    assert "combinatorics" in user
+
+
+def test_attack_prompt_lists_problems_already_posed_and_forbids_repeats() -> None:
+    _, user = attack_prompts(FIGHTER, TOPIC, ["Sum 1..10", "Find gcd(12, 18)"])
+
+    assert "Sum 1..10" in user
+    assert "Find gcd(12, 18)" in user
+    assert "Do not repeat" in user
+
+
+def test_attack_prompt_without_history_has_no_history_section() -> None:
+    _, user = attack_prompts(FIGHTER, TOPIC, [])
+
+    assert "already posed" not in user
+
+
+def test_reply_format_is_still_the_end_of_the_attack_prompt() -> None:
+    _, user = attack_prompts(FIGHTER, TOPIC, ["P"])
+
+    assert user.endswith(ATTACK_REQUEST)

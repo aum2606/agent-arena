@@ -1,3 +1,4 @@
+import random
 from collections.abc import Callable
 from typing import Literal
 
@@ -16,6 +17,7 @@ from arena.damage import (
 from arena.llm import Completion, LlmTimeout
 from arena.models import Attack, Fighter, MatchRecord, Side, TurnResult
 from arena.prompts import (
+    TOPICS,
     ParseError,
     attack_prompts,
     defense_prompts,
@@ -36,11 +38,16 @@ def _other(side: Side) -> Side:
 
 
 def _pose_attack(
-    attacker: Fighter, side: Side, complete: Complete, settings: Settings, log: BattleLog
+    attacker: Fighter,
+    side: Side,
+    prompts: tuple[str, str],
+    complete: Complete,
+    settings: Settings,
+    log: BattleLog,
 ) -> Attack:
     """Get a verified attack or raise _Backfire. Other provider errors abort the match."""
     try:
-        reply = complete(attacker, *attack_prompts(attacker))
+        reply = complete(attacker, *prompts)
     except LlmTimeout as exc:
         log.emit("timeout", actor=side)
         raise _Backfire(str(exc)) from exc
@@ -88,16 +95,22 @@ def play_turn(
     complete: Complete,
     settings: Settings,
     log: BattleLog,
+    topic: str,
+    used_problems: list[str],
 ) -> TurnResult:
+    """Plays one turn; a verified problem is appended to `used_problems`."""
     defender_side = _other(attacker_side)
     log.start_turn(turn)
     log.emit("attack_start", actor=attacker_side)
     try:
-        attack = _pose_attack(fighters[attacker_side], attacker_side, complete, settings, log)
+        fighter = fighters[attacker_side]
+        prompts = attack_prompts(fighter, topic, used_problems)
+        attack = _pose_attack(fighter, attacker_side, prompts, complete, settings, log)
     except _Backfire as exc:
         log.emit("backfire", actor=attacker_side, reason=str(exc))
         amount = backfire_damage(BASE_DAMAGE, DIFFICULTY)
         return _hit(log, turn, attacker_side, attacker_side, amount)
+    used_problems.append(attack.problem)
     log.emit("attack_verified", actor=attacker_side, problem=attack.problem, answer=attack.answer)
     log.emit("defend_start", actor=defender_side)
     score = _defend(fighters[defender_side], defender_side, attack, complete, log)
@@ -113,8 +126,10 @@ def run_match(
     complete: Complete,
     settings: Settings,
     log: BattleLog,
+    rng: random.Random,
 ) -> MatchRecord:
-    """Fighter A attacks first and roles swap every turn."""
+    """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
+    used_problems: list[str] = []
     fighters: dict[Side, Fighter] = {"a": fighter_a, "b": fighter_b}
     hp: dict[Side, float] = {"a": STARTING_HP, "b": STARTING_HP}
     turns: list[TurnResult] = []
@@ -122,7 +137,10 @@ def run_match(
     while True:
         turn += 1
         attacker_side: Side = "a" if turn % 2 == 1 else "b"
-        result = play_turn(turn, attacker_side, fighters, complete, settings, log)
+        topic = rng.choice(TOPICS)
+        result = play_turn(
+            turn, attacker_side, fighters, complete, settings, log, topic, used_problems
+        )
         turns.append(result)
         hp[result.target] = apply_damage(hp[result.target], result.damage)
         log.emit("hp", a=hp["a"], b=hp["b"])

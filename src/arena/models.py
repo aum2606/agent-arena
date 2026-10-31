@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 Side = Literal["a", "b"]
+Outcome = Literal["hit", "block", "backfire"]
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class TurnResult:
 
     turn: int
     attacker: Side
-    outcome: Literal["hit", "block", "backfire"]
+    outcome: Outcome
     target: Side  # who takes `damage`
     damage: float
 

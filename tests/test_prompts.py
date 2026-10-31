@@ -145,3 +145,32 @@ def test_attack_rules_no_longer_steer_toward_standard_closed_forms() -> None:
     system, _ = attack_prompts(FIGHTER, TOPIC, [])
 
     assert "exact closed forms" not in system
+
+
+def test_attack_prompt_without_outcomes_has_no_feedback_section() -> None:
+    _, user = attack_prompts(FIGHTER, TOPIC, [])
+
+    assert "How your last" not in user
+
+
+def test_attack_prompt_summarises_how_recent_problems_fared() -> None:
+    outcomes = ["block", "block", "hit", "backfire"]
+
+    _, user = attack_prompts(FIGHTER, TOPIC, [], outcomes)
+
+    assert "How your last 4 problems fared" in user
+    assert "blocked by your opponent (too easy): 2" in user
+    assert "failed your own check (too hard): 1" in user
+    assert "hit your opponent: 1" in user
+    assert "about a third" in user
+    assert user.endswith(ATTACK_REQUEST)
+
+
+def test_attack_prompt_only_counts_the_most_recent_window() -> None:
+    outcomes = ["backfire"] * 5 + ["block"] * 10
+
+    _, user = attack_prompts(FIGHTER, TOPIC, [], outcomes)
+
+    assert "How your last 10 problems fared" in user
+    assert "blocked by your opponent (too easy): 10" in user
+    assert "failed your own check (too hard): 0" in user

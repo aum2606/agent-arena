@@ -294,3 +294,44 @@ def test_run_match_uses_the_injected_verifier() -> None:
     assert all(t.outcome == "backfire" for t in record.turns)
     assert llm.defense_calls == 0
     assert "injected failure" in str(log.to_dict())
+
+
+def blocked_everything() -> FakeLlm:
+    return FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+
+def test_prior_outcomes_reach_the_attacker_prompt() -> None:
+    llm = blocked_everything()
+    history = {"a": ["block", "block", "hit"], "b": []}
+
+    run_match(A, B, llm, SETTINGS, BattleLog("m1"), random.Random(0), history=history)
+
+    first_a, first_b = llm.attack_requests[:2]
+    assert "blocked by your opponent (too easy): 2" in first_a
+    assert "hit your opponent: 1" in first_a
+    assert "How your last" not in first_b
+
+
+def test_this_matchs_outcomes_join_the_history_as_it_goes() -> None:
+    llm = blocked_everything()
+
+    play(llm)
+
+    # alice attacks on turns 1, 3, 5 (requests 0, 2, 4); her turn-1 problem was blocked.
+    turn3 = llm.attack_requests[2]
+    assert "How your last 1 problems fared" in turn3
+    assert "blocked by your opponent (too easy): 1" in turn3
+    assert "How your last" not in llm.attack_requests[0]
+
+
+def test_run_match_does_not_modify_the_callers_history() -> None:
+    history: dict[str, list[str]] = {"a": ["hit"], "b": ["block"]}
+
+    run_match(
+        A, B, blocked_everything(), SETTINGS, BattleLog("m1"), random.Random(0), history=history
+    )
+
+    assert history == {"a": ["hit"], "b": ["block"]}

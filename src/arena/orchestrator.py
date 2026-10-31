@@ -15,7 +15,7 @@ from arena.damage import (
     match_result,
 )
 from arena.llm import Completion, LlmTimeout
-from arena.models import Attack, Fighter, MatchRecord, Side, TurnResult
+from arena.models import Attack, Fighter, MatchRecord, Outcome, Side, TurnResult
 from arena.prompts import (
     TOPICS,
     ParseError,
@@ -101,6 +101,7 @@ def play_turn(
     log: BattleLog,
     topic: str,
     used_problems: list[str],
+    recent_outcomes: list[Outcome],
 ) -> TurnResult:
     """Plays one turn; a verified problem is appended to `used_problems`."""
     defender_side = _other(attacker_side)
@@ -108,7 +109,7 @@ def play_turn(
     log.emit("attack_start", actor=attacker_side)
     try:
         fighter = fighters[attacker_side]
-        prompts = attack_prompts(fighter, topic, used_problems)
+        prompts = attack_prompts(fighter, topic, used_problems, recent_outcomes)
         attack = _pose_attack(fighter, attacker_side, prompts, complete, verify, settings, log)
     except _Backfire as exc:
         log.emit("backfire", actor=attacker_side, reason=str(exc))
@@ -132,9 +133,14 @@ def run_match(
     log: BattleLog,
     rng: random.Random,
     verify: Verify = verify_attack,
+    history: dict[Side, list[Outcome]] | None = None,
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
     used_problems: list[str] = []
+    # Each fighter's own attack outcomes, earlier matches first (copied: the caller's stay intact).
+    outcomes: dict[Side, list[Outcome]] = {"a": [], "b": []}
+    for side, earlier in (history or {}).items():
+        outcomes[side] = list(earlier)
     fighters: dict[Side, Fighter] = {"a": fighter_a, "b": fighter_b}
     hp: dict[Side, float] = {"a": STARTING_HP, "b": STARTING_HP}
     turns: list[TurnResult] = []
@@ -144,9 +150,19 @@ def run_match(
         attacker_side: Side = "a" if turn % 2 == 1 else "b"
         topic = rng.choice(TOPICS)
         result = play_turn(
-            turn, attacker_side, fighters, complete, verify, settings, log, topic, used_problems
+            turn,
+            attacker_side,
+            fighters,
+            complete,
+            verify,
+            settings,
+            log,
+            topic,
+            used_problems,
+            outcomes[attacker_side],
         )
         turns.append(result)
+        outcomes[attacker_side].append(result.outcome)
         hp[result.target] = apply_damage(hp[result.target], result.damage)
         log.emit("hp", a=hp["a"], b=hp["b"])
         if hp[result.target] <= 0:

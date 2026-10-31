@@ -4,7 +4,14 @@ from typing import Literal
 import pytest
 
 from arena.models import MatchRecord, MatchResult, TurnResult
-from arena.stats import ResultsError, append_record, compute_stats, format_stats, load_records
+from arena.stats import (
+    ResultsError,
+    append_record,
+    attack_outcomes,
+    compute_stats,
+    format_stats,
+    load_records,
+)
 
 type Outcome = Literal["hit", "block", "backfire"]
 
@@ -95,3 +102,27 @@ def test_load_reports_the_bad_line(tmp_path: Path) -> None:
 
     with pytest.raises(ResultsError, match=r"sim\.jsonl:2"):
         load_records(path)
+
+
+def test_attack_outcomes_lists_only_the_fighters_own_attacks_in_order() -> None:
+    first = record(
+        ["hit", "block", "backfire", "block"], MatchResult("a", "decision"), (80.0, 60.0)
+    )
+    second = MatchRecord(
+        "bob",
+        "alice",
+        [TurnResult(1, "a", "block", "b", 0.0), TurnResult(2, "b", "hit", "a", 20.0)],
+        100.0,
+        80.0,
+        MatchResult("a", "decision"),
+    )
+
+    # alice is fighter A in the first match (attacks on turns 1 and 3) and fighter B in the second.
+    assert attack_outcomes([first, second], "alice") == ["hit", "backfire", "hit"]
+    assert attack_outcomes([first, second], "bob") == ["block", "block", "block"]
+
+
+def test_attack_outcomes_for_an_unknown_fighter_is_empty() -> None:
+    assert (
+        attack_outcomes([record(["hit"], MatchResult("a", "decision"), (80.0, 60.0))], "zed") == []
+    )

@@ -448,3 +448,26 @@ would work if it did.
 **Alternatives considered:** a longer match so in-match feedback suffices (would change D-006 and
 free-tier cost), a per-fighter difficulty setting in `fighters.toml` found by calibration (manual,
 but needs no prompt feedback), the spec's difficulty scorer (out of scope for Phase 0).
+
+## D-023 · 2026-10-31 · Attackers see how their recent problems fared
+
+**Decision:** The attacker prompt gets one more section when the fighter has attacked before: "How
+your last N problems fared - blocked by your opponent (too easy): x; failed your own check (too
+hard): y; hit your opponent: z. Aim for about a third of your problems to hit...", with N at most 10
+(`HISTORY_WINDOW` in `prompts.py`). The outcomes are the fighter's own attacks in earlier matches of
+the sim plus its earlier turns in the current match. `run_match` takes an optional `history`
+(per side, oldest first) and `arena sim` builds it from the saved results with
+`stats.attack_outcomes`, so a resumed sim reconstructs the same feedback. `arena match` passes no
+history (only the match's own turns count). No rule changes; the caller's lists are copied, not
+modified. Implements the "consequence" of D-022.
+
+**Why:** The scripted-fighter model (D-022) showed a closed-loop attacker passes the gate only if its
+calibration persists across matches; one 6-turn match gives too little feedback.
+
+**Evidence:** none live yet beyond the unit tests; the offline model assumes the attacker obeys the
+nudge exactly. Whether Gemini Lite and GPT-OSS do is what the next live sim measures. Matches in a
+sim now depend on earlier ones, so a sim's order matters and results cannot be shuffled.
+
+**Alternatives considered:** a per-fighter difficulty value in `fighters.toml` (manual calibration,
+no prompt change), feedback from the opponent's problems too (not what the model simulated),
+numeric difficulty targets (LLMs cannot rate difficulty reliably).

@@ -3,7 +3,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from arena.models import MatchRecord, MatchResult, TurnResult
+from arena.models import MatchRecord, MatchResult, Outcome, TurnResult
 
 GATE_MAX_ROLE_WIN_RATE = 0.70
 GATE_MIN_MATCHES = 100
@@ -123,3 +123,13 @@ def load_records(path: Path) -> list[MatchRecord]:
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise ResultsError(f"{path}:{number}: unreadable result line ({exc!r})") from exc
     return records
+
+
+def attack_outcomes(records: list[MatchRecord], name: str) -> list[Outcome]:
+    """Outcomes of the fighter's own attacks across the matches, oldest first."""
+    outcomes: list[Outcome] = []
+    for record in records:
+        side = "a" if record.fighter_a == name else "b" if record.fighter_b == name else None
+        if side is not None:
+            outcomes += [t.outcome for t in record.turns if t.attacker == side]
+    return outcomes

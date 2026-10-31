@@ -268,3 +268,27 @@ def test_synth_can_show_the_closed_loop_attacker(capsys: pytest.CaptureFixture[s
     out = capsys.readouterr().out
     assert code == 0
     assert "Closed-loop attacker" in out
+
+
+class RecordingClient(StubClient):
+    prompts: list[str] = []  # shared on purpose so the test can read it
+
+    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+        if user.endswith(ATTACK_REQUEST):
+            RecordingClient.prompts.append(user)
+        return super().complete(fighter, system, user)
+
+
+def test_sim_feeds_earlier_matches_back_into_attacker_prompts(
+    config_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    RecordingClient.prompts = []
+    monkeypatch.setattr(cli, "LlmClient", RecordingClient)
+
+    assert sim(config_path, tmp_path / "sim.jsonl", 2) == 0
+
+    first_match, second_match = RecordingClient.prompts[:6], RecordingClient.prompts[6:]
+    assert not any("blocked by your opponent (too easy): 3" in p for p in first_match)
+    # every attack in match 1 was blocked, so the next match's first attacks report 3 blocks each
+    assert "blocked by your opponent (too easy): 3" in second_match[0]
+    assert "blocked by your opponent (too easy): 3" in second_match[1]

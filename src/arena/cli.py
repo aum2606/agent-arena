@@ -13,7 +13,14 @@ from arena.llm import LlmClient, LlmError
 from arena.models import MatchRecord
 from arena.orchestrator import run_match
 from arena.stats import ResultsError, append_record, compute_stats, format_stats, load_records
-from arena.synthetic import compare_rules, format_comparison, format_sweep, sweep
+from arena.synthetic import (
+    compare_adaptive,
+    compare_rules,
+    format_adaptive,
+    format_comparison,
+    format_sweep,
+    sweep,
+)
 
 DEFAULT_CONFIG = Path("config/fighters.toml")
 RUNS_DIR = Path("runs")
@@ -93,6 +100,10 @@ def _sim(args: argparse.Namespace) -> None:
 
 
 def _synth(args: argparse.Namespace) -> None:
+    if args.adaptive:
+        rates = compare_adaptive(args.skill, args.bonus, args.matches, args.seed)
+        print(format_adaptive(rates, args.skill, args.bonus))
+        return
     if args.compare_rules:
         rows = compare_rules(args.skill, args.bonus, args.matches, args.seed)
         print(format_comparison(rows, args.skill, args.bonus))
@@ -128,7 +139,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="compare backfire-on-mismatch with taking the answer from the snippet",
     )
-    synth.add_argument("--skill", type=float, default=0.7, help="skill for --compare-rules")
+    synth.add_argument(
+        "--adaptive", action="store_true", help="closed-loop attacker by step and start"
+    )
+    synth.add_argument("--skill", type=float, default=0.7, help="skill for the modes above")
     synth.add_argument("--bonus", type=float, default=0.1, help="attacker bonus, same flag")
     synth.set_defaults(run=_synth)
     args = parser.parse_args(argv)

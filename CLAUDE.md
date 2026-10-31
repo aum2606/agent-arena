@@ -33,6 +33,7 @@ uv run arena match --a <fighter> --b <fighter>
 uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl
 uv run arena synth --matches 100          # balance sweep with scripted fighters, no network (D-020)
 uv run arena synth --compare-rules        # answer-rule comparison by difficulty (D-021)
+uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)
 uv run pytest                             # tests
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src

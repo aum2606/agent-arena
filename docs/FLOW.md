@@ -44,7 +44,7 @@ seeded RNG), calling `stats.append_record` after each one, then prints `format_s
 saved records.
 
 `arena synth` runs the same `run_match` with `SyntheticLlm.complete` and `synthetic_verify`
-(scripted fighters, no network) for each cell of a skill x attacker-bonus table, or `--compare-rules` to compare answer rules.
+(scripted fighters, no network) for each cell of a skill x attacker-bonus table, or `--compare-rules` / `--adaptive` to compare answer rules or closed-loop attackers.
 
 ## Modules
 

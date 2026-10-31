@@ -25,6 +25,8 @@ DIFFICULTY_SPREAD = 0.1  # std dev of the difficulty a fighter draws for each pr
 SKILLS = (0.3, 0.5, 0.7, 0.9)
 ADVANTAGES = (0.0, 0.1, 0.2, 0.3)
 DIFFICULTIES = (0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+STEPS = (0.0, 0.1, 0.2, 0.3)  # closed-loop attacker: difficulty change per outcome
+STARTS = (0.3, 0.5, 0.7)  # closed-loop attacker: difficulty of its first problem
 
 # Only `snippet_timeout_s` is read by the orchestrator and `synthetic_verify` ignores it.
 _SETTINGS = Settings(
@@ -37,6 +39,7 @@ _SETTINGS = Settings(
 )
 _DIFFICULTY_IN_PROBLEM = re.compile(r"d=(\d+\.\d+)")
 _QUALITY_IN_PROBLEM = re.compile(r"q=([01])")
+_PROBLEM_NUMBER = re.compile(r"#(\d+)")
 _SNIPPET = re.compile(r"print\((\d+)\)")
 
 
@@ -56,6 +59,10 @@ class SyntheticLlm:
     A problem is well posed (`q=1`) when its attacker derived the answer correctly. With
     `answer_from_snippet` the attacker's stated answer is whatever its snippet prints, so a
     badly derived problem still verifies but cannot be answered: it is a broken problem.
+
+    With `adaptive_step` > 0 each attacker is closed-loop: its next problem is harder by that step
+    after a blocked problem, easier after one that failed its own check, and unchanged after a hit.
+    Call `reset` between matches, as the real attacker only sees its own match.
     """
 
     def __init__(
@@ -64,20 +71,37 @@ class SyntheticLlm:
         difficulty: float,
         rng: random.Random,
         answer_from_snippet: bool = False,
+        adaptive_step: float = 0.0,
     ) -> None:
         self._skills = skills
-        self._difficulty = difficulty
+        self._start = difficulty
         self._rng = rng
         self._answer_from_snippet = answer_from_snippet
+        self._step = adaptive_step
+        self._current = dict.fromkeys(skills, difficulty)
+        self._owner: dict[int, str] = {}  # problem number -> attacker name
         self._problems = 0
         self.fair_hits = 0  # failed defenses of well-posed problems
+
+    def difficulty_of(self, name: str) -> float:
+        return self._current[name]
+
+    def reset(self) -> None:
+        self._current = dict.fromkeys(self._skills, self._start)
+
+    def _shift(self, name: str, delta: float) -> None:
+        self._current[name] = min(1.0, max(0.0, self._current[name] + delta))
 
     def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
         skill = self._skills[fighter.name]
         if user.endswith(ATTACK_REQUEST):
-            d = min(1.0, max(0.0, self._rng.gauss(self._difficulty, DIFFICULTY_SPREAD)))
+            mean = self.difficulty_of(fighter.name)
+            d = min(1.0, max(0.0, self._rng.gauss(mean, DIFFICULTY_SPREAD)))
             derived = self._rng.random() < success_probability(skill.level + skill.attack_bonus, d)
             self._problems += 1
+            self._owner[self._problems] = fighter.name
+            if not derived:
+                self._shift(fighter.name, -self._step)
             problem = f"Synthetic problem #{self._problems} d={d:.3f} q={int(derived)}"
             if derived:
                 number, stated = 1, "1"
@@ -92,8 +116,14 @@ class SyntheticLlm:
             )
         difficulty = _tagged_number(_DIFFICULTY_IN_PROBLEM, user)
         solved = self._rng.random() < success_probability(skill.level, difficulty)
-        if _tagged_number(_QUALITY_IN_PROBLEM, user) == 1.0 and not solved:
-            self.fair_hits += 1
+        if _tagged_number(_QUALITY_IN_PROBLEM, user) == 1.0:
+            if solved:
+                tag = _PROBLEM_NUMBER.search(user)
+                owner = self._owner.get(int(tag.group(1))) if tag else None
+                if owner is not None:
+                    self._shift(owner, self._step)
+            else:
+                self.fair_hits += 1
         return Completion(f"<answer>{'1' if solved else '2'}</answer>", False)
 
 
@@ -126,15 +156,19 @@ def play_synthetic(
     matches: int,
     seed: int,
     answer_from_snippet: bool = False,
+    adaptive_step: float = 0.0,
 ) -> SyntheticRun:
     rng = random.Random(seed)
     a = Fighter("synthetic-a", "synthetic", "synthetic", "")
     b = Fighter("synthetic-b", "synthetic", "synthetic", "")
-    llm = SyntheticLlm({a.name: skills[0], b.name: skills[1]}, difficulty, rng, answer_from_snippet)
-    records = [
-        run_match(a, b, llm.complete, _SETTINGS, BattleLog(f"synthetic_{i}"), rng, synthetic_verify)
-        for i in range(matches)
-    ]
+    llm = SyntheticLlm(
+        {a.name: skills[0], b.name: skills[1]}, difficulty, rng, answer_from_snippet, adaptive_step
+    )
+    records = []
+    for i in range(matches):
+        llm.reset()
+        log = BattleLog(f"synthetic_{i}")
+        records.append(run_match(a, b, llm.complete, _SETTINGS, log, rng, synthetic_verify))
     return SyntheticRun(records, llm.fair_hits)
 
 
@@ -210,4 +244,35 @@ def format_comparison(rows: list[RuleRow], skill: float, bonus: float) -> str:
         lines.append(
             f"{row.difficulty:<12.1f}{now:<10}{row.backfire:<12.0%}{snippet:<21}{row.fair:.0%}"
         )
+    return "\n".join(lines)
+
+
+def compare_adaptive(
+    skill: float, bonus: float, matches: int, seed: int
+) -> dict[tuple[float, float], float]:
+    """Attacker win rate per (adaptive step, starting difficulty); step 0 is a fixed attacker."""
+    pair = (Skill(skill, bonus), Skill(skill, bonus))
+    return {
+        (step, start): compute_stats(
+            play_synthetic(pair, start, matches, seed, adaptive_step=step).records
+        ).attacker_win_rate
+        for step in STEPS
+        for start in STARTS
+    }
+
+
+def format_adaptive(rates: dict[tuple[float, float], float], skill: float, bonus: float) -> str:
+    width = len("start 0.3") + 3
+    lines = [
+        f"Closed-loop attacker at skill {skill}, bonus {bonus} "
+        "(attacker win rate per turn, * = gate passes)",
+        "step         " + "".join(f"start {start}".ljust(width) for start in STARTS),
+    ]
+    for step in STEPS:
+        label = f"{step:.1f}" + (" (fixed)" if step == 0.0 else "")
+        cells = "".join(
+            f"{rates[(step, start)]:.0%}{_gate_mark(rates[(step, start)])}".ljust(width)
+            for start in STARTS
+        )
+        lines.append(label.ljust(13) + cells)
     return "\n".join(lines)

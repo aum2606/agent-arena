@@ -315,3 +315,31 @@ differently. The test was stopped there because Gemini 503s stalled it; the defe
 **Alternatives considered:** a `temperature` setting (not accepted by every model, and the topic
 list gives variety without depending on sampling), a history of problems across matches (couples
 matches, harms resumability), more topics per turn (weaker constraint).
+
+## D-018 · 2026-10-31 · Attacker difficulty prompt (no rule change)
+
+**Decision:** The attacker rules now ask for a problem that needs at least three distinct steps or
+ideas, is not a textbook formula or well-known closed form, and hides a trap; they say a problem
+a strong solver finishes in one or two lines is too easy. They suggest designing backwards (start
+from a structure whose answer the attacker can derive with certainty, then wrap it in a multi-step
+setup) and allow brute-force counting, searching or simulating over up to a few million cases. The
+earlier hint to prefer "integrals or series with exact closed forms" is removed. Rules, damage and
+settings are unchanged.
+
+**Why:** In the 48-match gate run 95% of verified attacks were blocked, and the attacker prompt
+itself steered toward standard sums and integrals (D-012).
+
+**Evidence: effectively none.** A 6-match live test (`runs/difficulty.jsonl`) was stopped after
+one match because Groq's 8000 tokens-per-minute limit (each request reserves its prompt plus
+`max_tokens` 4096) kept the sim waiting up to 300 s. In that match, 3 of 6 attacks backfired
+(missing `<code>` tag, a 20 s snippet timeout, a numeric mismatch) and the 3 verified problems,
+which were harder than before, were all blocked. One match cannot show whether the block rate or
+the backfire rate changed. The change is committed as an untested hypothesis and should be
+measured when the providers allow a 20+ match sim.
+
+**Risk:** the attacker cannot run its snippet before answering, so harder problems may raise the
+backfire rate more than they lower the block rate.
+
+**Alternatives considered:** waiting for more matches (hours of rate-limit waits for little
+information), lowering `turn_max_tokens` to 2048 to double Groq throughput (separate change, may
+truncate long reasoning replies).

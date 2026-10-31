@@ -22,10 +22,13 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Difficulty prompt (step 2 below), tested with a short sim once Gemini is stable.
+Measure steps 1 and 2 together with a 20+ match sim once the providers allow it, and decide on
+the rule levers (steps 3 and 4) if the defender share is still above 70%.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
+- Groq's 8000 tokens-per-minute limit counts prompt + `max_tokens` (4096) per request, so two
+  close calls hit it and the sim waits up to 300 s; lowering `turn_max_tokens` is untested.
 - Infra is slow and flaky on free tiers: Gemini 503s, Groq 429s, connection errors (not
   retried). The last 14 matches took about 4 hours of wall time.
 - Only two fighters of unequal strength; the OpenRouter free models tried were unreliable (D-011).
@@ -45,8 +48,8 @@ Difficulty prompt (step 2 below), tested with a short sim once Gemini is stable.
 ## Suggested next steps
 1. DONE (D-017): attacker variety. Each turn has a random topic and the attacker sees the problems
    already posed. Not yet measured at scale (3 live matches: 13 verified problems, all distinct).
-2. Raise problem difficulty in the attacker prompt (multi-step, no textbook formula), since 95% of
-   verified attacks are solved.
+2. DONE (D-018): difficulty prompt (multi-step, no textbook formula, trap, design backwards).
+   Untested: the live sim was stopped after 1 match because of Groq rate limits.
 3. Change the gate metric (an owner decision): measure verified attacks only, and report results
    per fighter pair, because role effects are confounded with fighter strength.
 4. If still above 70%: give the defender a smaller token/time budget than the attacker, or raise

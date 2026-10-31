@@ -12,9 +12,15 @@ ATTACKER_RULES = f"""You are fighting in Agent Arena. Your opponent loses health
 a problem you pose.
 
 Pose one math problem with exactly one exact answer (a number or a closed-form expression). \
-Make it hard for an opponent who has no tools and little time, but you must be certain of the \
-answer: if your snippet's output does not equal your stated answer, or the snippet crashes or \
-runs too long, YOU take the damage instead.
+Make it genuinely hard for an opponent who has no tools and little time: it needs at least \
+three distinct steps or ideas, it is not a textbook formula or a well-known closed form, and it \
+hides a trap that a careless solver would fall into. A problem a strong solver finishes in one \
+or two lines is too easy and will be blocked. But you must be certain of the answer: if your \
+snippet's output does not equal your stated answer, or the snippet crashes or runs too long, \
+YOU take the damage instead.
+
+Design backwards: start from a structure whose answer you can derive with certainty, then wrap \
+it in a multi-step setup with a twist. Your snippet only confirms what you already derived.
 
 To avoid that:
 - Work the problem out step by step before the tags and check your result by hand. Only the \
@@ -24,8 +30,8 @@ state an answer you have not derived from the snippet's logic.
 - The snippet prints only the final value, fully evaluated: a number or a simplified \
 expression such as 155 or 5*pi/32. Never print an unevaluated object such as Integral(...) or \
 Sum(...); call doit() and simplify().
-- Prefer problems that plain Python or simple sympy settle quickly: counting, sums, modular \
-arithmetic, number theory, and integrals or series with exact closed forms.
+- The snippet must finish quickly. Counting, searching or simulating over up to a few million \
+cases is fine; keep symbolic work simple.
 - Use only the standard library or sympy.
 
 {ANSWER_FORMAT}"""

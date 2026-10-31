@@ -125,3 +125,23 @@ def test_reply_format_is_still_the_end_of_the_attack_prompt() -> None:
     _, user = attack_prompts(FIGHTER, TOPIC, ["P"])
 
     assert user.endswith(ATTACK_REQUEST)
+
+
+def test_attack_rules_demand_multi_step_problems_with_a_trap() -> None:
+    system, _ = attack_prompts(FIGHTER, TOPIC, [])
+
+    assert "at least three distinct steps" in system
+    assert "textbook formula" in system
+    assert "trap" in system
+
+
+def test_attack_rules_suggest_designing_backwards_from_a_known_result() -> None:
+    system, _ = attack_prompts(FIGHTER, TOPIC, [])
+
+    assert "Design backwards" in system
+
+
+def test_attack_rules_no_longer_steer_toward_standard_closed_forms() -> None:
+    system, _ = attack_prompts(FIGHTER, TOPIC, [])
+
+    assert "exact closed forms" not in system

@@ -131,13 +131,39 @@ def test_timeout_is_its_own_error(harness: type[Harness]) -> None:
         harness(slow).client.complete(FIGHTER, "s", "u")
 
 
-def test_other_http_errors_fail_without_retrying(harness: type[Harness]) -> None:
-    h = harness(lambda _: httpx2.Response(500, json={"error": {"message": "boom"}}))
+def test_client_errors_fail_without_retrying(harness: type[Harness]) -> None:
+    h = harness(lambda _: httpx2.Response(400, json={"error": {"message": "bad request"}}))
 
-    with pytest.raises(LlmError, match="500"):
+    with pytest.raises(LlmError, match="400"):
         h.client.complete(FIGHTER, "s", "u")
 
     assert len(h.requests) == 1
+
+
+def unavailable() -> httpx2.Response:
+    return httpx2.Response(503, json={"error": {"message": "overloaded"}})
+
+
+def test_retries_503_with_backoff(harness: type[Harness]) -> None:
+    responses = [unavailable(), unavailable(), chat_response("back up")]
+    h = harness(lambda _: responses.pop(0))
+
+    assert h.client.complete(FIGHTER, "s", "u").text == "back up"
+    assert len(h.requests) == 3
+    first, second, delay = h.sleeps
+    assert 0.5 <= first <= 1.5
+    assert 1.0 <= second <= 3.0
+    assert delay == 2.0
+
+
+def test_gives_up_on_persistent_server_errors(harness: type[Harness]) -> None:
+    h = harness(lambda _: unavailable())
+
+    with pytest.raises(LlmError, match="HTTP 503"):
+        h.client.complete(FIGHTER, "s", "u")
+
+    assert len(h.requests) == SETTINGS.max_retries + 1
+    assert len(h.sleeps) == SETTINGS.max_retries
 
 
 def test_response_without_choices_is_an_error(harness: type[Harness]) -> None:

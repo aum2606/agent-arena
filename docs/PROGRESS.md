@@ -26,6 +26,7 @@ None in progress.
   (11 blocks, 7 backfires). Verified attacks are easy enough that both fighters block them, and
   a backfire is also a defender win. The gate (70%) will fail with these rules. Owner decision
   needed: see the report (difficulty is fixed at 1.0 in Phase 0, D-013 notes the backfire metric).
+- Gemini 503s stopped the first gate attempt at 34/100; 5xx are now retried (D-015).
 - Groq free tier has an unknown daily token limit; a 100-match run (about 2 hours) may stop and
   need resuming (D-014).
 - No third fighter: the OpenRouter free models tried were unreliable (D-011).

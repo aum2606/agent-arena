@@ -58,13 +58,15 @@ class LlmClient:
                     max_tokens=s.turn_max_tokens,
                     timeout=s.turn_time_limit_s,
                 )
-            except openai.RateLimitError as exc:
+            except (openai.RateLimitError, openai.InternalServerError) as exc:
+                # 429 and 5xx (e.g. Gemini 503 "overloaded") are transient: back off and retry.
+                problem = "rate limited" if exc.status_code == 429 else f"HTTP {exc.status_code}"
                 if attempt == s.max_retries:
                     raise LlmError(
-                        f"{fighter.provider} rate limited after {s.max_retries} retries"
+                        f"{fighter.provider} {problem} after {s.max_retries} retries"
                     ) from exc
                 delay = s.backoff_base_s * 2**attempt * random.uniform(0.5, 1.5)
-                logger.warning("%s rate limited, retrying in %.1fs", fighter.provider, delay)
+                logger.warning("%s %s, retrying in %.1fs", fighter.provider, problem, delay)
                 self._sleep(delay)
             except openai.APITimeoutError as exc:
                 raise LlmTimeout(f"{fighter.provider} timed out") from exc

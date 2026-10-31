@@ -280,3 +280,16 @@ minutes later. Free tiers return 5xx under load, and one 503 in a 600-call run e
 **Alternatives considered:** retrying connection errors too (one earlier stop was a Groq
 "Connection error", probably the laptop sleeping; add if it recurs), a separate 5xx retry limit
 (more settings for no clear need).
+
+## D-016 · 2026-10-31 · Gate run stopped at 48 of 100 matches
+
+**Decision:** The Phase 0 gate run was stopped by the owner at 48 saved matches. The result is
+recorded in `docs/PROGRESS.md`: the defender won 96.2% of turns (limit 70%), so the gate is
+failing and was not reached. `v0.1.0-prototype` is not tagged. `arena sim --n 100` can resume
+from `runs/sim.jsonl` if the run is ever completed.
+
+**Why:** Free-tier outages (Gemini 503s, Groq rate limits) cut throughput to roughly 30 minutes
+per match, and the result was decisive: 3.8% against a 70% limit cannot move with 52 more matches.
+
+**Alternatives considered:** waiting for 100 matches (many more hours for the same conclusion),
+tagging the failed gate anyway (a tag would read as a pass).

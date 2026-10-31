@@ -22,8 +22,9 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Simulate a closed-loop attacker that targets difficulty near its skill (D-021), then try the
-prompt live. Live sims stay slow, so test with `arena synth` first.
+Owner decision: feed each attacker a rolling summary of its recent outcomes across the sim
+(derived from `runs/sim.jsonl`, see D-022) and try it live in a 10-20 match sim. Live sims stay
+slow; whether an LLM follows the nudge is unknown.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.
@@ -61,8 +62,10 @@ A model of the rules, not of LLMs (see D-020). Results depend only on skill minu
 - The current rule can pass the gate offline: with attacker bonus 0.1, difficulty near skill gives
   31-33% attacker wins (skill 0.7, difficulty 0.7-0.8; skill 0.9, difficulty 0.9), at the cost of
   30-48% backfires. With no bonus the attacker peaks at about 22%.
-- So the lever is difficulty targeting. Next: simulate a closed-loop attacker (it is told how its
-  earlier problems fared and moves toward the edge of its ability), then try it live.
+- So the lever is difficulty targeting. A closed-loop attacker (D-022) does not converge inside one
+  6-turn match (2 feedback events: 3% -> 14% from a start that is too easy), but converges to
+  difficulty 0.7-0.8 and passes the gate (29-31%, 35% backfires) if its calibration persists
+  across matches.
 
 ## Suggested next steps
 1. DONE (D-017): attacker variety. Each turn has a random topic and the attacker sees the problems

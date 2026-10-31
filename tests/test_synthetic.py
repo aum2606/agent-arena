@@ -9,10 +9,14 @@ from arena.synthetic import (
     ADVANTAGES,
     DIFFICULTIES,
     SKILLS,
+    STARTS,
+    STEPS,
     RuleRow,
     Skill,
     SyntheticLlm,
+    compare_adaptive,
     compare_rules,
+    format_adaptive,
     format_comparison,
     format_sweep,
     play_synthetic,
@@ -22,6 +26,7 @@ from arena.synthetic import (
 )
 
 FIGHTER = Fighter("a", "synthetic", "synthetic", "")
+OPPONENT = Fighter("b", "synthetic", "synthetic", "")
 STRONG = Skill(5.0, 0.0)  # succeeds almost surely at any difficulty
 WEAK = Skill(-5.0, 0.0)  # fails almost surely
 
@@ -159,3 +164,96 @@ def test_format_comparison_marks_gate_passes_and_shows_the_solvable_share() -> N
     assert "50%*" in text  # snippet-rule win rate in gate range
     assert "90%" in text and "90%*" not in text
     assert "20%*" not in text
+
+
+def adaptive_llm(a: Skill, b: Skill, step: float = 0.2) -> SyntheticLlm:
+    return SyntheticLlm({"a": a, "b": b}, 0.5, random.Random(0), adaptive_step=step)
+
+
+def attack_as_a(llm: SyntheticLlm) -> str:
+    return parse_attack(llm.complete(FIGHTER, "", ATTACK_REQUEST).text).problem
+
+
+def test_adaptive_attacker_raises_difficulty_after_its_problem_is_blocked() -> None:
+    llm = adaptive_llm(STRONG, STRONG)
+    problem = attack_as_a(llm)
+
+    llm.complete(OPPONENT, "", defense_prompts(OPPONENT, problem)[1])  # strong defender solves it
+
+    assert llm.difficulty_of("a") == pytest.approx(0.7)
+    assert llm.difficulty_of("b") == pytest.approx(0.5)
+
+
+def test_adaptive_attacker_lowers_difficulty_after_failing_its_own_check() -> None:
+    llm = adaptive_llm(WEAK, STRONG)
+
+    attack_as_a(llm)
+
+    assert llm.difficulty_of("a") == pytest.approx(0.3)
+
+
+def test_adaptive_attacker_holds_difficulty_after_a_hit() -> None:
+    llm = adaptive_llm(STRONG, WEAK)
+    problem = attack_as_a(llm)
+
+    llm.complete(OPPONENT, "", defense_prompts(OPPONENT, problem)[1])  # weak defender fails
+
+    assert llm.difficulty_of("a") == pytest.approx(0.5)
+
+
+def test_adaptive_difficulty_stays_within_zero_and_one() -> None:
+    llm = adaptive_llm(STRONG, STRONG, step=0.4)
+    for _ in range(4):
+        problem = attack_as_a(llm)
+        llm.complete(OPPONENT, "", defense_prompts(OPPONENT, problem)[1])
+    assert llm.difficulty_of("a") == 1.0
+
+    low = adaptive_llm(WEAK, STRONG, step=0.4)
+    for _ in range(4):
+        attack_as_a(low)
+    assert low.difficulty_of("a") == 0.0
+
+
+def test_reset_restores_the_starting_difficulty() -> None:
+    llm = adaptive_llm(WEAK, STRONG)
+    attack_as_a(llm)
+
+    llm.reset()
+
+    assert llm.difficulty_of("a") == 0.5
+
+
+def test_zero_step_keeps_difficulty_fixed() -> None:
+    llm = adaptive_llm(STRONG, STRONG, step=0.0)
+    problem = attack_as_a(llm)
+    llm.complete(OPPONENT, "", defense_prompts(OPPONENT, problem)[1])
+
+    assert llm.difficulty_of("a") == 0.5
+
+
+def test_closed_loop_attacker_beats_a_fixed_attacker_that_starts_too_easy() -> None:
+    pair = (Skill(0.7, 0.1), Skill(0.7, 0.1))
+    fixed = play_synthetic(pair, 0.3, matches=300, seed=2)
+    adaptive = play_synthetic(pair, 0.3, matches=300, seed=2, adaptive_step=0.2)
+
+    assert (
+        compute_stats(adaptive.records).attacker_win_rate
+        > compute_stats(fixed.records).attacker_win_rate + 0.05
+    )
+
+
+def test_compare_adaptive_has_a_cell_per_step_and_start() -> None:
+    rates = compare_adaptive(skill=0.7, bonus=0.1, matches=2, seed=0)
+
+    assert set(rates) == {(step, start) for step in STEPS for start in STARTS}
+
+
+def test_format_adaptive_marks_gate_passes() -> None:
+    rates = {(step, start): 0.1 for step in STEPS for start in STARTS}
+    rates[(STEPS[1], STARTS[1])] = 0.4
+
+    text = format_adaptive(rates, skill=0.7, bonus=0.1)
+
+    assert "Closed-loop attacker" in text
+    assert "40%*" in text
+    assert "10%*" not in text

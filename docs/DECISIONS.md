@@ -419,3 +419,32 @@ simulate and then try live.
 **Alternatives considered:** a second pass where the attacker may restate its answer after seeing
 the snippet's output (same broken-problem hole), an LLM judge for well-posedness (the spec keeps
 judges out of ranked play).
+
+## D-022 · 2026-10-31 · Closed-loop attacker simulated: feedback must span matches
+
+**Decision:** `arena synth --adaptive` simulates an attacker that adjusts problem difficulty from
+how its earlier problems fared (harder after a block, easier after failing its own check, unchanged
+after a hit), via `SyntheticLlm(adaptive_step=...)`. This is a simulator feature only; the real
+attacker prompt is unchanged. Result: in-match feedback is not enough, cross-match feedback is.
+
+**Evidence (offline model, 300 matches per cell, both fighters skill 0.7, attacker bonus 0.1):**
+- Feedback reset every match (an attacker only sees its own 6-turn match, so 3 problems and 2
+  feedback events): a fixed attacker that starts at difficulty 0.3 wins 3% of turns, 14% with step
+  0.2; starting at 0.5 it wins 13% fixed and 20-22% with steps 0.1-0.2. Only a start near the
+  right level (0.7, 31% fixed) passes the gate. Steps above 0.2 overshoot.
+- Feedback persisting across matches (600 matches, step 0.02 to 0.1): the attacker settles at
+  difficulty 0.70-0.80 from any start (0.3, 0.5 or 0.7) and wins 29-31% of turns with a 35% backfire
+  rate, which passes the gate. At skill 0.9 the same loop needs more problems to climb (in-match
+  results at skill 0.9 are lower: 12-24% from the best starts).
+- With no attacker bonus (0.0) no setting passes: the best is 22% (unchanged from D-021).
+
+**Consequence:** to try this live, each attacker's prompt should carry a rolling summary of how its
+recent problems fared across the sim, for example "of your last 10 problems, 6 were blocked, 2 failed
+your own check, 2 hit; aim for about a third hitting". It can be computed from `runs/sim.jsonl`
+(per-turn outcomes), so resuming a sim still works. It couples matches (a later match depends on
+earlier ones) and whether an LLM follows such a nudge is unknown; the model only shows the loop
+would work if it did.
+
+**Alternatives considered:** a longer match so in-match feedback suffices (would change D-006 and
+free-tier cost), a per-fighter difficulty setting in `fighters.toml` found by calibration (manual,
+but needs no prompt feedback), the spec's difficulty scorer (out of scope for Phase 0).

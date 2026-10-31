@@ -260,3 +260,11 @@ def test_synth_can_compare_the_two_answer_rules(capsys: pytest.CaptureFixture[st
     out = capsys.readouterr().out
     assert code == 0
     assert "Rule comparison" in out
+
+
+def test_synth_can_show_the_closed_loop_attacker(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["synth", "--adaptive", "--matches", "2"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Closed-loop attacker" in out

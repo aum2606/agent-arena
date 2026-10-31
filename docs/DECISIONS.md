@@ -265,3 +265,18 @@ next day (the sim is resumable).
 **Alternatives considered:** honoring `Retry-After` in `llm.py` (it is 1 s here, so it would not
 help), a higher `call_delay_s` (would slow every call to protect one provider), keeping Qwen
 (a 100-match sim would take 10+ hours).
+
+## D-015 · 2026-10-31 · Retry 5xx responses like 429s
+
+**Decision:** `LlmClient` now retries HTTP 5xx (`openai.InternalServerError`) with the same
+exponential backoff, jitter and `max_retries` limit as 429. After the limit it raises `LlmError`
+naming the status ("gemini HTTP 503 after 8 retries"). 4xx errors other than 429, timeouts and
+connection errors are still not retried. Supersedes the "only 429 is retried" bullet in D-008.
+
+**Why:** The 100-match gate run stopped repeatedly on Gemini HTTP 503 ("overloaded"), which was
+transient: all six resume attempts failed at the first 503 while the API answered normal requests
+minutes later. Free tiers return 5xx under load, and one 503 in a 600-call run ended the sim.
+
+**Alternatives considered:** retrying connection errors too (one earlier stop was a Groq
+"Connection error", probably the laptop sleeping; add if it recurs), a separate 5xx retry limit
+(more settings for no clear need).

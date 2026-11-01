@@ -491,3 +491,34 @@ of the new hits are `timeout` events before reading it as defender weakness.
 
 **Alternatives considered:** 1024 (reasoning models return empty replies, so it measures the cap),
 a shorter `turn_time_limit_s` (free-tier latency and retries dominate call time).
+
+## D-025 · 2026-11-01 · A failed self-check gets one retry that shows the real result
+
+**Decision:** When an attacker's snippet fails verification (mismatch, crash or snippet timeout), the
+attacker is asked once more. The retry prompt shows its problem, code and stated answer, plus the
+verifier's result (for a mismatch: what the snippet printed), and asks it to fix whichever is wrong.
+The retry is verified exactly like the first attempt; a second failure is a backfire (D-013), with
+the second attempt's reason. Replies that cannot be parsed and LLM timeouts get no retry, as there is
+nothing to show. New log event `attack_retry` (actor, reason) before the retry's own events.
+`prompts.correction_prompt` builds the message; `orchestrator._pose_attack` runs the retry. Amends
+D-013 and the spec's event list; the final check (answer equals snippet output) is unchanged.
+
+**Why:** In the gate run 63 of 76 backfires (83%), and 75 of 96 in the later runs (78%), were a stated
+answer that differed from the snippet's output. The attacker never sees its snippet run, so it guesses
+the number; models are poor at that and good at code. Backfires were about half of all turns, which
+caps the attacker near 52% even against a defender that always fails (D-024). Showing the real output
+lets the attacker correct itself without dropping the check that keeps ill-posed problems out
+(D-021): the corrected answer must still equal what its code prints.
+
+**Risk:** An attacker can copy the printed value without checking it against the problem, so a broken
+problem can now pass. The retry prompt tells it to fix the wrong part and keep the problem as
+written, but nothing enforces it. Watch for hits with no sensible answer when reading live results.
+Costs one extra call on each failed first attempt (about half of attacks).
+
+**Evidence:** unit tests only. The scripted-fighter simulator (D-020 to D-022) now models the retry
+as an independent second draw, which is a rough stand-in; its earlier findings were computed
+without a retry.
+
+**Alternatives considered:** run the snippet first on every attack and ask the attacker to confirm
+(an extra call on every attack, slow on the free tiers); take the answer from the snippet (rejected in
+D-021); prompt-only tweaks (unlikely to remove a guessing error).

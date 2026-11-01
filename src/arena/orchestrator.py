@@ -20,6 +20,7 @@ from arena.prompts import (
     TOPICS,
     ParseError,
     attack_prompts,
+    correction_prompt,
     defense_prompts,
     parse_attack,
     parse_defense,
@@ -40,6 +41,26 @@ def _other(side: Side) -> Side:
     return "b" if side == "a" else "a"
 
 
+def _draft(
+    attacker: Fighter,
+    side: Side,
+    prompts: tuple[str, str],
+    complete: Complete,
+    settings: Settings,
+    log: BattleLog,
+) -> Attack:
+    """One attacker reply, parsed. A timeout or malformed reply raises _Backfire."""
+    try:
+        reply = complete(attacker, *prompts, settings.turn_max_tokens)
+    except LlmTimeout as exc:
+        log.emit("timeout", actor=side)
+        raise _Backfire(str(exc)) from exc
+    try:
+        return parse_attack(reply.text)
+    except ParseError as exc:
+        raise _Backfire(str(exc)) from exc
+
+
 def _pose_attack(
     attacker: Fighter,
     side: Side,
@@ -49,16 +70,19 @@ def _pose_attack(
     settings: Settings,
     log: BattleLog,
 ) -> Attack:
-    """Get a verified attack or raise _Backfire. Other provider errors abort the match."""
-    try:
-        reply = complete(attacker, *prompts, settings.turn_max_tokens)
-    except LlmTimeout as exc:
-        log.emit("timeout", actor=side)
-        raise _Backfire(str(exc)) from exc
-    try:
-        attack = parse_attack(reply.text)
-    except ParseError as exc:
-        raise _Backfire(str(exc)) from exc
+    """Get a verified attack or raise _Backfire. Other provider errors abort the match.
+
+    A failed check gets one retry that shows the attacker the real result (D-025): models guess the
+    answer without running their snippet, so most first attempts miss.
+    """
+    attack = _draft(attacker, side, prompts, complete, settings, log)
+    check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
+    if check.passed:
+        return attack
+    log.emit("attack_retry", actor=side, reason=check.reason)
+    system, user = prompts
+    retry_prompts = (system, correction_prompt(user, attack, check.reason))
+    attack = _draft(attacker, side, retry_prompts, complete, settings, log)
     check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
     if not check.passed:
         raise _Backfire(check.reason)

@@ -14,10 +14,11 @@ class FakeClock:
         return self.now
 
 
-def test_event_types_match_the_phase0_spec() -> None:
+def test_event_types_are_the_phase0_spec_plus_attack_retry() -> None:
     expected = {
         "attack_start",
         "attack_verified",
+        "attack_retry",
         "backfire",
         "defend_start",
         "defend_result",

@@ -26,8 +26,10 @@ Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/f
 attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite
 backfires 21 of 30, gpt-oss 8 of 30. Matches 6-10 backfire less than 1-5 (11 vs 18 of 30), but 10
 matches cannot separate that from noise. The gate is still failing; feedback alone does not fix it.
-Defender token budget cut to 2048 (D-024). Next: a 10-match live trial into `runs/defender.jsonl`;
-count how many new hits are `timeout` events before reading it as a weaker defender.
+Defender token budget cut to 2048 (D-024). Live trial (`runs/defender.jsonl`) stopped at 8 of 10
+matches when Groq returned 429 after 8 retries: attacker 16.7% of turns (8 hits of 48), backfires
+52%. None of the 8 hits was a `timeout`, so the cap never bit; the rise over 6.7% is not caused by
+it and 8 hits cannot separate it from noise. Gate still failing.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.

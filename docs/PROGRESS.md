@@ -22,8 +22,10 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 None in progress.
 
 ## Next task
-Rolling outcome feedback is implemented (D-023). Run a live sim into `runs/feedback.jsonl` and
-compare it with the 48-match baseline (attacker 3.8%); whether the LLMs follow the nudge is unknown.
+Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):
+attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite
+backfires 21 of 30, gpt-oss 8 of 30. Matches 6-10 backfire less than 1-5 (11 vs 18 of 30), but 10
+matches cannot separate that from noise. The gate is still failing; feedback alone does not fix it.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.

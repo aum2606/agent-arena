@@ -22,7 +22,7 @@ sequenceDiagram
         else verified
             O->>G: attack_verified, defend_start
             O->>P: defense_prompts(defender, problem)
-            O->>L: complete(defender)
+            O->>L: complete(defender, defender_max_tokens)
             O->>P: parse_defense(reply)
             O->>V: answers_match(reply, answer)
             alt timeout or wrong answer

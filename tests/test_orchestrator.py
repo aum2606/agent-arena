@@ -13,6 +13,7 @@ from arena.verifier import Verification
 SETTINGS = Settings(
     turn_time_limit_s=30.0,
     turn_max_tokens=256,
+    defender_max_tokens=128,
     snippet_timeout_s=5.0,
     call_delay_s=0.0,
     max_retries=0,
@@ -46,12 +47,15 @@ class FakeLlm:
         self.defenses = defenses or {}
         self.defense_calls = 0
         self.attack_requests: list[str] = []
+        self.caps: list[tuple[str, int]] = []  # ("attack" or "defense", max_tokens)
 
-    def __call__(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def __call__(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         if user.endswith(ATTACK_REQUEST):
+            self.caps.append(("attack", max_tokens))
             self.attack_requests.append(user)
             reply = self.attacks[fighter.name].pop(0)
         else:
+            self.caps.append(("defense", max_tokens))
             self.defense_calls += 1
             reply = self.defenses[fighter.name].pop(0)
         if isinstance(reply, Exception):
@@ -335,3 +339,14 @@ def test_run_match_does_not_modify_the_callers_history() -> None:
     )
 
     assert history == {"a": ["hit"], "b": ["block"]}
+
+
+def test_defender_gets_its_own_token_cap() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    play(llm)
+
+    assert set(llm.caps) == {("attack", 256), ("defense", 128)}

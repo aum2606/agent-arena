@@ -26,7 +26,8 @@ from arena.prompts import (
 )
 from arena.verifier import Verification, answers_match, verify_attack
 
-Complete = Callable[[Fighter, str, str], Completion]
+# (fighter, system prompt, user prompt, max tokens)
+Complete = Callable[[Fighter, str, str, int], Completion]
 # (stated answer, snippet, timeout in seconds); the synthetic simulator swaps in a fast stand-in.
 Verify = Callable[[str, str, float], Verification]
 
@@ -50,7 +51,7 @@ def _pose_attack(
 ) -> Attack:
     """Get a verified attack or raise _Backfire. Other provider errors abort the match."""
     try:
-        reply = complete(attacker, *prompts)
+        reply = complete(attacker, *prompts, settings.turn_max_tokens)
     except LlmTimeout as exc:
         log.emit("timeout", actor=side)
         raise _Backfire(str(exc)) from exc
@@ -65,11 +66,18 @@ def _pose_attack(
 
 
 def _defend(
-    defender: Fighter, side: Side, attack: Attack, complete: Complete, log: BattleLog
+    defender: Fighter,
+    side: Side,
+    attack: Attack,
+    complete: Complete,
+    settings: Settings,
+    log: BattleLog,
 ) -> float:
     """Returns the defender's score: 1.0 for a correct answer, else 0.0."""
     try:
-        reply: Completion | None = complete(defender, *defense_prompts(defender, attack.problem))
+        reply: Completion | None = complete(
+            defender, *defense_prompts(defender, attack.problem), settings.defender_max_tokens
+        )
     except LlmTimeout:
         reply = None
     if reply is None or reply.truncated:
@@ -118,7 +126,7 @@ def play_turn(
     used_problems.append(attack.problem)
     log.emit("attack_verified", actor=attacker_side, problem=attack.problem, answer=attack.answer)
     log.emit("defend_start", actor=defender_side)
-    score = _defend(fighters[defender_side], defender_side, attack, complete, log)
+    score = _defend(fighters[defender_side], defender_side, attack, complete, settings, log)
     if score == 1.0:
         log.emit("block", actor=defender_side)
         return TurnResult(turn, attacker_side, "block", defender_side, 0.0)

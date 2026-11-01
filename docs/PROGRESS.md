@@ -30,6 +30,10 @@ Defender token budget cut to 2048 (D-024). Live trial (`runs/defender.jsonl`) st
 matches when Groq returned 429 after 8 retries: attacker 16.7% of turns (8 hits of 48), backfires
 52%. None of the 8 hits was a `timeout`, so the cap never bit; the rise over 6.7% is not caused by
 it and 8 hits cannot separate it from noise. Gate still failing.
+Backfire diagnosis: 78-83% of backfires are a stated answer that differs from the snippet's output
+(the attacker guesses without seeing the snippet run). A failed check now gets one retry that shows
+the real result (D-025). Next: a 10-match live trial into `runs/retry.jsonl`; compare backfire rate
+(52% before) and count `attack_retry` events that ended verified.
 
 ## Blockers
 - The rules/prompts as they stand give the defender about 96% of turns. Needs a design change.

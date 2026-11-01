@@ -13,6 +13,7 @@ CONFIG = """
 [settings]
 turn_time_limit_s = 30.0
 turn_max_tokens = 256
+defender_max_tokens = 128
 snippet_timeout_s = 5.0
 call_delay_s = 0.0
 max_retries = 0
@@ -42,7 +43,7 @@ class StubClient:
     def __init__(self, providers: dict[str, Provider], settings: Settings) -> None:
         pass
 
-    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         if user.endswith(ATTACK_REQUEST):
             return Completion(
                 "<problem>6 * 7?</problem><answer>42</answer><code>print(42)</code>", False
@@ -51,7 +52,7 @@ class StubClient:
 
 
 class FailingClient(StubClient):
-    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         raise LlmError("rate limited after 5 retries")
 
 
@@ -273,10 +274,10 @@ def test_synth_can_show_the_closed_loop_attacker(capsys: pytest.CaptureFixture[s
 class RecordingClient(StubClient):
     prompts: list[str] = []  # shared on purpose so the test can read it
 
-    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         if user.endswith(ATTACK_REQUEST):
             RecordingClient.prompts.append(user)
-        return super().complete(fighter, system, user)
+        return super().complete(fighter, system, user, max_tokens)
 
 
 def test_sim_feeds_earlier_matches_back_into_attacker_prompts(

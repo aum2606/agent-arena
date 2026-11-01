@@ -14,6 +14,7 @@ class ConfigError(Exception):
 class Settings:
     turn_time_limit_s: float
     turn_max_tokens: int
+    defender_max_tokens: int
     snippet_timeout_s: float
     call_delay_s: float
     max_retries: int

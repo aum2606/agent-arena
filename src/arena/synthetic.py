@@ -32,6 +32,7 @@ STARTS = (0.3, 0.5, 0.7)  # closed-loop attacker: difficulty of its first proble
 _SETTINGS = Settings(
     turn_time_limit_s=0.0,
     turn_max_tokens=0,
+    defender_max_tokens=0,
     snippet_timeout_s=0.0,
     call_delay_s=0.0,
     max_retries=0,
@@ -92,7 +93,9 @@ class SyntheticLlm:
     def _shift(self, name: str, delta: float) -> None:
         self._current[name] = min(1.0, max(0.0, self._current[name] + delta))
 
-    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def complete(
+        self, fighter: Fighter, system: str, user: str, _max_tokens: int = 0
+    ) -> Completion:
         skill = self._skills[fighter.name]
         if user.endswith(ATTACK_REQUEST):
             mean = self.difficulty_of(fighter.name)

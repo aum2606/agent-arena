@@ -9,6 +9,7 @@ VALID = """
 [settings]
 turn_time_limit_s = 60.0
 turn_max_tokens = 1024
+defender_max_tokens = 512
 snippet_timeout_s = 5.0
 call_delay_s = 2.0
 max_retries = 5
@@ -38,6 +39,7 @@ def test_load_valid_config(tmp_path: Path) -> None:
     assert config.settings.max_retries == 5
     assert config.settings.turn_time_limit_s == 60.0
     assert config.settings.snippet_timeout_s == 5.0
+    assert (config.settings.turn_max_tokens, config.settings.defender_max_tokens) == (1024, 512)
     assert config.providers["groq"].api_key_env == "GROQ_API_KEY"
     assert config.providers["groq"].base_url == "https://example.test/v1"
     assert config.fighters["alpha"] == Fighter("alpha", "groq", "some-model", "You are cunning.")

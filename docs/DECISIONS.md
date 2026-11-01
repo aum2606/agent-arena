@@ -2,7 +2,7 @@
 
 Append-only. Never edit an old entry; add a new one that supersedes it.
 
-## D-001 Â· 2026-10-30 Â· Tooling and project setup
+## D-001 · 2026-10-30 · Tooling and project setup
 
 **Decision:** `uv` project with `uv_build` backend and `src/arena` layout, Python pinned to 3.12
 (`requires-python = ">=3.12,<3.13"`). Dev tools: pytest, ruff (E, F, I, UP, B, SIM), mypy
@@ -17,7 +17,7 @@ the `arena` console script.
 **Alternatives considered:** hatchling (extra tool for no gain), `pre-commit` remote repos
 (duplicate version pins), no build backend with `python -m arena` (worse CLI ergonomics).
 
-## D-002 Â· 2026-10-30 Â· Running model-written code is not a secure sandbox
+## D-002 · 2026-10-30 · Running model-written code is not a secure sandbox
 
 **Decision:** Attacker snippets run in a subprocess with a hard timeout, a fresh temp dir and
 a minimal environment. This is NOT a secure sandbox: the snippet can still read the user's
@@ -28,7 +28,7 @@ with SymPy, whose parser evaluates text; that risk is accepted in Phase 0 for th
 
 **Alternatives considered:** Docker or a restricted interpreter now (out of Phase 0 scope).
 
-## D-003 Â· 2026-10-30 Â· Rule clarifications for Phase 0
+## D-003 · 2026-10-30 · Rule clarifications for Phase 0
 
 **Decision:**
 - Malformed attacker output (unparseable, or missing problem, answer or snippet) is a backfire.
@@ -46,7 +46,7 @@ with SymPy, whose parser evaluates text; that risk is accepted in Phase 0 for th
 **Alternatives considered:** scoring provider failures as a loss (would skew the balance
 stats with infrastructure noise).
 
-## D-004 Â· 2026-10-30 Â· Initial tunable numbers
+## D-004 · 2026-10-30 · Initial tunable numbers
 
 **Decision:** Defender time limit 60 s, defender token cap 1024, snippet timeout 5 s, delay
 between calls 2 s, max retries 5. They live in a `[settings]` table in
@@ -57,7 +57,7 @@ limited, so the defaults are conservative. Expect to tune them after the first l
 
 **Alternatives considered:** a separate `config/game.toml` (extra file, a layout change).
 
-## D-005 Â· 2026-10-30 Â· Vulture also scans tests while modules are unwired
+## D-005 · 2026-10-30 · Vulture also scans tests while modules are unwired
 
 **Decision:** Until the orchestrator (task 6) wires the modules together, the dead-code check
 is `uv run vulture src tests`. From task 6 on it is `uv run vulture src` as in CLAUDE.md, and
@@ -70,7 +70,7 @@ would hide real dead code later.
 **Alternatives considered:** a vulture whitelist file (a suppression that could outlive its
 reason), building the orchestrator first (breaks tests-first, bottom-up tasks).
 
-## D-006 Â· 2026-10-30 Â· A round is one turn; matches last 6 turns
+## D-006 · 2026-10-30 · A round is one turn; matches last 6 turns
 
 **Decision:** "Round" and "turn" mean the same thing. A match is at most 6 turns, so each
 fighter attacks 3 times. `max_turns = 6` is passed to `match_result` by the orchestrator.
@@ -83,7 +83,7 @@ unless damage is raised. Revisit with a superseding entry if the first sims show
 
 **Alternatives considered:** 6 rounds of 2 turns each (12 turns, realistic KOs).
 
-## D-007 Â· 2026-10-30 Â· mypy ignores missing stubs for sympy only
+## D-007 · 2026-10-30 · mypy ignores missing stubs for sympy only
 
 **Decision:** `ignore_missing_imports` is set for `sympy` and `sympy.*` in the mypy config.
 
@@ -93,7 +93,7 @@ sympy are wrapped in `verifier.py`, which exposes typed functions to the rest of
 **Alternatives considered:** `types-sympy` (does not exist), `# type: ignore` on each import
 (same effect, scattered), a hand-written stub (speculative for two functions).
 
-## D-008 Â· 2026-10-30 Â· Config module, settings names and the HTTP client
+## D-008 · 2026-10-30 · Config module, settings names and the HTTP client
 
 **Decision:**
 - Add `src/arena/config.py` (loads `config/fighters.toml` into `Settings`, `Provider` and
@@ -117,7 +117,7 @@ real SDK without network access.
 **Alternatives considered:** a fake client class (tests would not cover the SDK's real error
 mapping), retrying 5xx and connection errors too (add later only if live runs need it).
 
-## D-009 Â· 2026-10-30 Â· Orchestrator behaviour and vulture timing
+## D-009 · 2026-10-30 · Orchestrator behaviour and vulture timing
 
 **Decision:**
 - `orchestrator.py` takes the LLM as a plain callable `(fighter, system, user) -> Completion`
@@ -141,7 +141,7 @@ mapping), retrying 5xx and connection errors too (add later only if live runs ne
 **Alternatives considered:** a `Protocol` for the LLM (extra type for one real implementation),
 treating attacker timeouts as aborts (one slow free model would stall whole sims).
 
-## D-010 Â· 2026-10-30 Â· Stats definitions and how `sim` works
+## D-010 · 2026-10-30 · Stats definitions and how `sim` works
 
 **Decision:**
 - Per-turn role outcomes (from D-009): the attacker wins a turn on `hit`; the defender wins on
@@ -166,7 +166,7 @@ and restart on free-tier rate limits.
 **Alternatives considered:** a `--seed` flag (not needed yet), skipping a failed match and
 carrying on (could hide a broken provider for the whole run), a round-robin schedule.
 
-## D-011 Â· 2026-10-30 Â· Live fighters and settings changes after the smoke test
+## D-011 · 2026-10-30 · Live fighters and settings changes after the smoke test
 
 **Decision:**
 - Fighters (IDs checked against each provider's `/models` endpoint, then with a tiny request):
@@ -189,7 +189,7 @@ outcomes.
 **Alternatives considered:** a provider-specific reasoning-effort option (not generic across the
 three providers, so more code), 8192 tokens (free-tier tokens-per-minute limits count the cap).
 
-## D-012 Â· 2026-10-30 Â· Attacker prompt tuning (no rule change)
+## D-012 · 2026-10-30 · Attacker prompt tuning (no rule change)
 
 **Decision:**
 - The attacker reply format is now `<problem>`, `<code>`, `<answer>` (code first), and the answer
@@ -215,7 +215,7 @@ the time. Groq also rate-limited Qwen past 5 retries in 3 of 8 calls in the last
 **Alternatives considered:** taking the attacker's answer from its snippet output (removes the
 self-verification rule, so it is an owner decision, not a prompt change).
 
-## D-013 Â· 2026-10-30 Â· Backfire costs the attacker half damage
+## D-013 · 2026-10-30 · Backfire costs the attacker half damage
 
 **Decision:** When an attack fails self-verification (or the attacker times out or sends an
 unparseable reply), the attacker takes `base x difficulty x 0.5` damage (10 with Phase 0 numbers)
@@ -240,7 +240,7 @@ a full 20 HP almost every other turn. This was the owner's choice among the rule
 **Alternatives considered:** counting backfire turns as no result (changes the gate metric),
 lowering only the backfire penalty further, giving a defender-side bonus (more rules).
 
-## D-014 Â· 2026-10-30 Â· Groq fighter switched to gpt-oss-120b; max retries raised
+## D-014 · 2026-10-30 · Groq fighter switched to gpt-oss-120b; max retries raised
 
 **Decision:**
 - The Groq fighter is now `gpt-oss` = `openai/gpt-oss-120b`, replacing `qwen`
@@ -266,7 +266,7 @@ next day (the sim is resumable).
 help), a higher `call_delay_s` (would slow every call to protect one provider), keeping Qwen
 (a 100-match sim would take 10+ hours).
 
-## D-015 Â· 2026-10-31 Â· Retry 5xx responses like 429s
+## D-015 · 2026-10-31 · Retry 5xx responses like 429s
 
 **Decision:** `LlmClient` now retries HTTP 5xx (`openai.InternalServerError`) with the same
 exponential backoff, jitter and `max_retries` limit as 429. After the limit it raises `LlmError`
@@ -281,7 +281,7 @@ minutes later. Free tiers return 5xx under load, and one 503 in a 600-call run e
 "Connection error", probably the laptop sleeping; add if it recurs), a separate 5xx retry limit
 (more settings for no clear need).
 
-## D-016 Â· 2026-10-31 Â· Gate run stopped at 48 of 100 matches
+## D-016 · 2026-10-31 · Gate run stopped at 48 of 100 matches
 
 **Decision:** The Phase 0 gate run was stopped by the owner at 48 saved matches. The result is
 recorded in `docs/PROGRESS.md`: the defender won 96.2% of turns (limit 70%), so the gate is
@@ -294,7 +294,7 @@ per match, and the result was decisive: 3.8% against a 70% limit cannot move wit
 **Alternatives considered:** waiting for 100 matches (many more hours for the same conclusion),
 tagging the failed gate anyway (a tag would read as a pass).
 
-## D-017 Â· 2026-10-31 Â· Attacker variety: random topic and problem history
+## D-017 · 2026-10-31 · Attacker variety: random topic and problem history
 
 **Decision:** Each turn the attacker prompt names a topic picked with `rng.choice(TOPICS)` from ten
 math areas and lists the problems already verified in the match, with "do not repeat them or pose
@@ -316,7 +316,7 @@ differently. The test was stopped there because Gemini 503s stalled it; the defe
 list gives variety without depending on sampling), a history of problems across matches (couples
 matches, harms resumability), more topics per turn (weaker constraint).
 
-## D-018 Â· 2026-10-31 Â· Attacker difficulty prompt (no rule change)
+## D-018 · 2026-10-31 · Attacker difficulty prompt (no rule change)
 
 **Decision:** The attacker rules now ask for a problem that needs at least three distinct steps or
 ideas, is not a textbook formula or well-known closed form, and hides a trap; they say a problem
@@ -344,7 +344,7 @@ backfire rate more than they lower the block rate.
 information), lowering `turn_max_tokens` to 2048 to double Groq throughput (separate change, may
 truncate long reasoning replies).
 
-## D-019 Â· 2026-10-31 Â· `turn_max_tokens` stays at 4096 (2048 tried and rejected)
+## D-019 · 2026-10-31 · `turn_max_tokens` stays at 4096 (2048 tried and rejected)
 
 **Decision:** The token cap stays at 4096. A cap of 2048 was tried live and not committed.
 
@@ -356,7 +356,7 @@ cap did not fix throughput either (the check of 20 calls took 56 minutes, mostly
 
 **Alternatives considered:** 3072 (untested), a larger `call_delay_s` (slows every call).
 
-## D-020 Â· 2026-10-31 Â· Scripted-fighter simulator (`arena synth`)
+## D-020 · 2026-10-31 · Scripted-fighter simulator (`arena synth`)
 
 **Decision:**
 - New module `src/arena/synthetic.py` and command `arena synth [--matches N] [--difficulty D]
@@ -384,7 +384,7 @@ tested live, and the open question was whether stronger models would fix the bal
 fitting the model to the 48 live matches (too little data), more sweep axes such as unequal skills
 (not needed for this question).
 
-## D-021 Â· 2026-10-31 Â· Do not take the attacker's answer from its snippet; compare the rules offline
+## D-021 · 2026-10-31 · Do not take the attacker's answer from its snippet; compare the rules offline
 
 **Decision:** The self-verification rule stays as it is: a stated answer that differs from the
 snippet's output is a backfire (D-013). Taking the answer from the snippet's output instead was
@@ -420,7 +420,7 @@ simulate and then try live.
 the snippet's output (same broken-problem hole), an LLM judge for well-posedness (the spec keeps
 judges out of ranked play).
 
-## D-022 Â· 2026-10-31 Â· Closed-loop attacker simulated: feedback must span matches
+## D-022 · 2026-10-31 · Closed-loop attacker simulated: feedback must span matches
 
 **Decision:** `arena synth --adaptive` simulates an attacker that adjusts problem difficulty from
 how its earlier problems fared (harder after a block, easier after failing its own check, unchanged
@@ -449,7 +449,7 @@ would work if it did.
 free-tier cost), a per-fighter difficulty setting in `fighters.toml` found by calibration (manual,
 but needs no prompt feedback), the spec's difficulty scorer (out of scope for Phase 0).
 
-## D-023 Â· 2026-10-31 Â· Attackers see how their recent problems fared
+## D-023 · 2026-10-31 · Attackers see how their recent problems fared
 
 **Decision:** The attacker prompt gets one more section when the fighter has attacked before: "How
 your last N problems fared - blocked by your opponent (too easy): x; failed your own check (too
@@ -471,3 +471,23 @@ sim now depend on earlier ones, so a sim's order matters and results cannot be s
 **Alternatives considered:** a per-fighter difficulty value in `fighters.toml` (manual calibration,
 no prompt change), feedback from the opponent's problems too (not what the model simulated),
 numeric difficulty targets (LLMs cannot rate difficulty reliably).
+
+## D-024 · 2026-11-01 · The defender gets its own, smaller token budget
+
+**Decision:** `[settings]` gains `defender_max_tokens` (2048); `turn_max_tokens` (4096) now applies to
+attackers only. The orchestrator passes the cap with each call (`Complete` takes `max_tokens`), so
+`LlmClient` no longer reads `turn_max_tokens`. A defender reply cut off by the cap is already a
+`timeout` event and a hit. The spec's "time/token budget" for the defender is now a real limit that
+differs from the attacker's. Amends D-004 and D-019; no other rule or number changes.
+
+**Why:** The 10-match feedback trial (D-023) left the attacker at 6.7% of turns. Prompt changes alone
+(D-017, D-018, D-023) did not move it, so a rule lever is next. Backfires count as defender wins
+(48% of turns), so even a defender that always failed would cap the attacker at about 52%; this
+lever helps only on the blocked part.
+
+**Risk:** D-019 found that at 2048 gpt-oss-120b hit the cap on 1 of 5 defenses and gemini-lite on
+none, so the cap mostly penalises the more verbose model. If the attacker rate rises, check how many
+of the new hits are `timeout` events before reading it as defender weakness.
+
+**Alternatives considered:** 1024 (reasoning models return empty replies, so it measures the cap),
+a shorter `turn_time_limit_s` (free-tier latency and retries dominate call time).

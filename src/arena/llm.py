@@ -44,7 +44,7 @@ class LlmClient:
         self._sleep = sleep
         self._clients: dict[str, openai.OpenAI] = {}
 
-    def complete(self, fighter: Fighter, system: str, user: str) -> Completion:
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         client = self._client(fighter.provider)
         s = self._settings
         for attempt in range(s.max_retries + 1):
@@ -55,7 +55,7 @@ class LlmClient:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
                     ],
-                    max_tokens=s.turn_max_tokens,
+                    max_tokens=max_tokens,
                     timeout=s.turn_time_limit_s,
                 )
             except (openai.RateLimitError, openai.InternalServerError) as exc:

@@ -135,15 +135,15 @@ def test_event_sequence_for_a_hit_and_for_a_block() -> None:
 
 def test_wrong_snippet_backfires_and_defender_is_never_asked() -> None:
     liar = good_attack(answer="42", code="print(41)")
-    llm = FakeLlm(attacks={"alice": [liar] * 3, "bob": [liar] * 3})
+    llm = FakeLlm(attacks={"alice": [liar] * 6, "bob": [liar] * 6})
 
     record, log = play(llm)
 
     assert llm.defense_calls == 0
     assert all(t.damage == 10.0 for t in record.turns)
     assert all(t.outcome == "backfire" and t.target == t.attacker for t in record.turns)
-    assert event_types(log, 1) == ["attack_start", "backfire", "hit", "hp"]
-    backfire = log.to_dict()["turns"][0]["events"][1]
+    assert event_types(log, 1) == ["attack_start", "attack_retry", "backfire", "hit", "hp"]
+    backfire = log.to_dict()["turns"][0]["events"][2]
     assert backfire["actor"] == "a"
     assert "mismatch" in backfire["reason"]
     assert (record.hp_a, record.hp_b) == (70.0, 70.0)
@@ -152,7 +152,10 @@ def test_wrong_snippet_backfires_and_defender_is_never_asked() -> None:
 @pytest.mark.parametrize("reply", ["no tags here", good_attack(code="raise SystemExit(1)")])
 def test_malformed_or_crashing_attack_backfires(reply: str) -> None:
     llm = FakeLlm(
-        attacks={"alice": [reply, good_attack(), good_attack()], "bob": [good_attack()] * 3},
+        attacks={
+            "alice": [reply, reply, good_attack(), good_attack()],
+            "bob": [good_attack()] * 3,
+        },
         defenses={"alice": [answer("0")] * 3, "bob": [answer("0")] * 3},
     )
 
@@ -212,7 +215,7 @@ def test_knockout_ends_the_match_early_and_is_logged(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr("arena.orchestrator.BASE_DAMAGE", 40.0)
     liar = good_attack(code="print(41)")
     llm = FakeLlm(
-        attacks={"alice": [liar] * 3, "bob": [good_attack()] * 3},
+        attacks={"alice": [liar] * 6, "bob": [good_attack()] * 3},
         defenses={"alice": [answer("0")] * 3, "bob": [answer("42")] * 3},
     )
 
@@ -255,13 +258,13 @@ def test_attacker_prompts_list_the_problems_posed_so_far() -> None:
 def test_backfired_problems_are_not_listed_as_used() -> None:
     liar = good_attack(code="print(41)", problem="never verified")
     llm = FakeLlm(
-        attacks={"alice": [liar, liar, liar], "bob": [good_attack()] * 3},
+        attacks={"alice": [liar] * 6, "bob": [good_attack()] * 3},
         defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
     )
 
     play(llm)
 
-    assert all("never verified" not in request for request in llm.attack_requests)
+    assert all("- never verified" not in request for request in llm.attack_requests)
 
 
 def test_each_turn_gets_a_topic_from_the_rng() -> None:
@@ -287,14 +290,14 @@ def test_run_match_uses_the_injected_verifier() -> None:
         return Verification(False, "injected failure")
 
     llm = FakeLlm(
-        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        attacks={"alice": [good_attack()] * 6, "bob": [good_attack()] * 6},
         defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
     )
     log = BattleLog("m1")
 
     record = run_match(A, B, llm, SETTINGS, log, random.Random(0), verify)
 
-    assert len(seen) == 6
+    assert len(seen) == 12  # every attack is checked twice: the draft and its retry
     assert all(t.outcome == "backfire" for t in record.turns)
     assert llm.defense_calls == 0
     assert "injected failure" in str(log.to_dict())
@@ -350,3 +353,69 @@ def test_defender_gets_its_own_token_cap() -> None:
     play(llm)
 
     assert set(llm.caps) == {("attack", 256), ("defense", 128)}
+
+
+def test_a_failed_check_gets_one_retry_that_shows_the_real_output() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": [good_attack(answer="41")] + [good_attack()] * 3,
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    record, log = play(llm)
+
+    assert event_types(log, 1)[:4] == [
+        "attack_start", "attack_retry", "attack_verified", "defend_start",
+    ]  # fmt: skip
+    assert record.turns[0].outcome == "block"
+    retry = log.to_dict()["turns"][0]["events"][1]
+    assert (retry["actor"], "snippet printed '42', stated '41'" in retry["reason"]) == ("a", True)
+    assert "snippet printed '42', stated '41'" in llm.attack_requests[1]
+    assert "snippet printed" not in llm.attack_requests[0]
+
+
+def test_a_second_failed_check_backfires_with_the_retry_reason() -> None:
+    attempts = [good_attack(answer="41"), good_attack(answer="40")] * 3
+    llm = FakeLlm(
+        attacks={"alice": attempts, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3},
+    )
+
+    record, log = play(llm)
+
+    assert event_types(log, 1) == ["attack_start", "attack_retry", "backfire", "hit", "hp"]
+    assert record.turns[0].outcome == "backfire"
+    assert "stated '40'" in log.to_dict()["turns"][0]["events"][2]["reason"]
+
+
+def test_unparseable_replies_and_timeouts_get_no_retry() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": ["no tags here", good_attack(), good_attack()],
+            "bob": [LlmTimeout("slow"), good_attack(), good_attack()],
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    assert event_types(log, 1) == ["attack_start", "backfire", "hit", "hp"]
+    assert event_types(log, 2) == ["attack_start", "timeout", "backfire", "hit", "hp"]
+
+
+def test_a_timeout_on_the_retry_backfires() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": [good_attack(answer="41"), LlmTimeout("slow"), good_attack(), good_attack()],
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    assert event_types(log, 1) == [
+        "attack_start", "attack_retry", "timeout", "backfire", "hit", "hp",
+    ]  # fmt: skip

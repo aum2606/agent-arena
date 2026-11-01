@@ -5,6 +5,7 @@ from arena.prompts import (
     ATTACK_REQUEST,
     ParseError,
     attack_prompts,
+    correction_prompt,
     defense_prompts,
     parse_attack,
     parse_defense,
@@ -174,3 +175,15 @@ def test_attack_prompt_only_counts_the_most_recent_window() -> None:
     assert "How your last 10 problems fared" in user
     assert "blocked by your opponent (too easy): 10" in user
     assert "failed your own check (too hard): 0" in user
+
+
+def test_correction_prompt_shows_the_failed_attack_and_why_it_failed() -> None:
+    user = attack_prompts(FIGHTER, TOPIC, [])[1]
+    attack = Attack("What is 6 * 7?", "41", "print(42)")
+
+    text = correction_prompt(user, attack, "mismatch: snippet printed '42', stated '41'")
+
+    assert text.startswith(user.removesuffix(ATTACK_REQUEST))
+    assert text.endswith(ATTACK_REQUEST)  # the reply format stays last, as in the first prompt
+    for part in ("What is 6 * 7?", "print(42)", "41", "snippet printed '42', stated '41'"):
+        assert part in text

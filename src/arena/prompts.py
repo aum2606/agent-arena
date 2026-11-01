@@ -108,6 +108,22 @@ def attack_prompts(
     return f"{fighter.persona}\n\n{ATTACKER_RULES}", "\n\n".join(parts)
 
 
+def correction_prompt(user: str, attack: Attack, reason: str) -> str:
+    """`user` (an attack prompt) plus how `attack` failed its check, for the one retry (D-025)."""
+    note = (
+        "Your previous attempt failed the check that runs your snippet:\n"
+        f"<problem>{attack.problem}</problem>\n"
+        f"<code>{attack.snippet}</code>\n"
+        f"<answer>{attack.answer}</answer>\n"
+        f"Result: {reason}\n"
+        "Decide whether your stated answer or your code is wrong and fix that one. Keep the "
+        "problem unless it is itself flawed, and make sure the answer is for the problem as "
+        "written. This is your only retry: if the corrected attempt fails too, you take the "
+        "damage."
+    )
+    return f"{user.removesuffix(ATTACK_REQUEST)}{note}\n\n{ATTACK_REQUEST}"
+
+
 def defense_prompts(fighter: Fighter, problem: str) -> tuple[str, str]:
     """(system, user) messages asking the fighter to solve `problem`."""
     return f"{fighter.persona}\n\n{DEFENDER_RULES}", f"{problem}\n\n{DEFENSE_REQUEST}"

@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from arena.battle_log import EVENT_TYPES, BattleLog
+from arena.battle_log import EVENT_TYPES, SCHEMA_VERSION, BattleLog
+from arena.models import Fighter
 
 
 class FakeClock:
@@ -85,3 +86,23 @@ def test_write_creates_parent_dirs_and_round_trips(tmp_path: Path) -> None:
 
     assert json.loads(path.read_text(encoding="utf-8")) == log.to_dict()
     assert log.to_dict()["match_id"] == "m1"
+
+
+def test_log_header_names_the_schema_and_both_fighters() -> None:
+    alice = Fighter("alice", "groq", "model-a", "You are bold.")
+    bob = Fighter("bob", "gemini", "model-b", "You are careful.")
+    log = BattleLog("m1")
+
+    log.record_fighters(alice, bob)
+
+    data = log.to_dict()
+    assert data["schema"] == SCHEMA_VERSION == 2
+    assert data["fighters"] == {
+        "a": {"name": "alice", "provider": "groq", "model": "model-a", "persona": "You are bold."},
+        "b": {
+            "name": "bob",
+            "provider": "gemini",
+            "model": "model-b",
+            "persona": "You are careful.",
+        },
+    }

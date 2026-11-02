@@ -2,60 +2,104 @@
 
 import { useState } from "react";
 
-import { resultText, type Replay, type Turn } from "../../../lib/api";
+import {
+  resultText,
+  sideLabel,
+  type FighterInfo,
+  type Replay,
+  type ReplaySummary,
+  type Turn,
+} from "../../../lib/api";
 
-function Row({ label, value }: { label: string; value: string | number | null }) {
+function Row({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string | number | null;
+  mono?: boolean;
+}) {
   if (value === null) return null;
   return (
     <>
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd className={mono ? "mono" : undefined}>{value}</dd>
     </>
   );
 }
 
-function RevealPanel({ turn }: { turn: Turn }) {
-  const defender = turn.attacker === "a" ? "B" : "A";
+function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) {
+  const defender = turn.attacker === "a" ? "b" : "a";
+  const first = turn.first_attempt;
   return (
     <section className="panel" aria-label={`Turn ${turn.n} details`}>
       <h2>
-        Turn {turn.n}: Fighter {turn.attacker.toUpperCase()} attacks →{" "}
+        Turn {turn.n}: {sideLabel(summary, turn.attacker)} attacks →{" "}
         <span className={turn.outcome}>{turn.outcome}</span>
       </h2>
       <dl>
-        <Row label="Problem" value={turn.problem} />
+        {first && (
+          <>
+            <Row label="First attempt (failed its check)" value={first.problem} />
+            <Row label="First attempt: stated answer" value={first.answer} />
+            <Row label="First attempt: code" value={first.code} mono />
+            <Row label="First attempt: why it failed" value={first.reason} />
+          </>
+        )}
+        {!first && turn.retried && (
+          <Row label="First attempt" value="failed its check; retried once (details not logged)" />
+        )}
+        <Row label={first ? "Final problem" : "Problem"} value={turn.problem} />
         <Row label="Attacker's stated answer" value={turn.stated_answer} />
+        <Row label="Attacker's code" value={turn.code} mono />
         <Row label="Failed its own check" value={turn.failure_reason} />
         <Row
-          label="Attacker's first attempt"
-          value={turn.retried ? "failed its check; retried once" : null}
-        />
-        <Row
-          label={`Fighter ${defender}'s answer`}
+          label={`${sideLabel(summary, defender)}'s answer`}
           value={turn.timed_out ? "timed out or cut off" : turn.defender_answer}
         />
         <Row label="Defender's score" value={turn.score} />
         <Row label="Damage" value={turn.damage_math} />
-        <Row label="Took the damage" value={turn.target?.toUpperCase() ?? null} />
+        <Row
+          label="Took the damage"
+          value={turn.target === null ? null : sideLabel(summary, turn.target)}
+        />
         <Row label="Turn length" value={`${(turn.duration_ms / 1000).toFixed(1)} s`} />
       </dl>
     </section>
   );
 }
 
+function Fighter({ label, info }: { label: string; info: FighterInfo | null }) {
+  if (info === null) return <div className="muted">{label}: no details in this older log</div>;
+  return (
+    <details>
+      <summary>
+        {label}: {info.name} ({info.provider} / {info.model})
+      </summary>
+      <p>{info.persona}</p>
+    </details>
+  );
+}
+
 export function Viewer({ replay }: { replay: Replay }) {
   const [selected, setSelected] = useState(0);
+  const { summary } = replay;
   const turn = replay.turns[selected];
   return (
     <>
-      <p>{resultText(replay.summary)}</p>
+      <p>{resultText(summary)}</p>
+      <div className="fighters">
+        <Fighter label="A" info={replay.fighter_a} />
+        <Fighter label="B" info={replay.fighter_b} />
+      </div>
       <div className="hp">
         <label>
-          Fighter A: {turn.hp_a} HP
+          {sideLabel(summary, "a")}: {turn.hp_a} HP
           <meter min={0} max={100} value={turn.hp_a} />
         </label>
         <label>
-          Fighter B: {turn.hp_b} HP
+          {sideLabel(summary, "b")}: {turn.hp_b} HP
           <meter min={0} max={100} value={turn.hp_b} />
         </label>
       </div>
@@ -66,7 +110,7 @@ export function Viewer({ replay }: { replay: Replay }) {
           </button>
         ))}
       </div>
-      <RevealPanel turn={turn} />
+      <RevealPanel turn={turn} summary={summary} />
       <div className="nav">
         <button disabled={selected === 0} onClick={() => setSelected(selected - 1)}>
           Previous

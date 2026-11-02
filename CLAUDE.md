@@ -26,7 +26,8 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - `damage = base × difficulty × (1 − score)`, base = 20, difficulty = 1.0 (fixed in Phase 0).
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
 - Battle log events: attack_start, attack_retry, attack_verified, backfire, defend_start, defend_result,
-  hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start).
+  hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start). The log has a
+  header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030).
 - Rule or number changes must be logged in `docs/DECISIONS.md`.
 
 ## Commands

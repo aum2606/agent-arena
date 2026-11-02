@@ -20,6 +20,26 @@ class ReplayError(Exception):
 
 
 @dataclass(frozen=True)
+class Attempt:
+    """An attack that failed its check and was retried (D-025)."""
+
+    problem: str
+    answer: str
+    code: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class FighterInfo:
+    """From the schema 2 log header; persona is revealed because the match is over."""
+
+    name: str
+    provider: str
+    model: str
+    persona: str
+
+
+@dataclass(frozen=True)
 class TurnView:
     n: int
     attacker: str
@@ -29,10 +49,12 @@ class TurnView:
     damage_math: str
     problem: str | None  # None when the attack never verified
     stated_answer: str | None
+    code: str | None  # the attacker's snippet
     defender_answer: str | None
     score: float | None
     timed_out: bool  # the defender timed out or was cut off
     retried: bool  # the attacker's first attempt failed its check (D-025)
+    first_attempt: Attempt | None  # what that attempt was (schema 2 logs only)
     failure_reason: str | None
     hp_a: float
     hp_b: float
@@ -47,12 +69,16 @@ class ReplaySummary:
     hp_a: float
     hp_b: float
     turn_count: int
+    name_a: str | None  # None for schema 1 logs
+    name_b: str | None
 
 
 @dataclass(frozen=True)
 class Replay:
     summary: ReplaySummary
     turns: list[TurnView]
+    fighter_a: FighterInfo | None
+    fighter_b: FighterInfo | None
 
 
 def logs_dir() -> Path:
@@ -72,7 +98,9 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
     first = {e["type"]: e for e in reversed(events)}  # earliest event of each type wins
     attacker = first["attack_start"]["actor"]
     outcome = next(kind for kind in ("backfire", "block", "hit") if kind in first)
-    verified = first.get("attack_verified")
+    # The attempt that ended the turn: the verified one, or the backfired one if it was logged.
+    shown = first.get("attack_verified") or (first["backfire"] if outcome == "backfire" else {})
+    retry = first.get("attack_retry")
     defended = first.get("defend_result")
     hit = first.get("hit")
     hp = first["hp"]
@@ -85,12 +113,16 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
         target=hit["target"] if hit else None,
         damage=damage,
         damage_math=_damage_math(outcome, damage, score),
-        problem=verified["problem"] if verified else None,
-        stated_answer=verified["answer"] if verified else None,
+        problem=shown.get("problem"),
+        stated_answer=shown.get("answer"),
+        code=shown.get("code"),
         defender_answer=defended["answer"] if defended else None,
         score=score,
         timed_out="timeout" in first and attacker != first["timeout"]["actor"],
-        retried="attack_retry" in first,
+        retried=retry is not None,
+        first_attempt=Attempt(retry["problem"], retry["answer"], retry["code"], retry["reason"])
+        if retry and "problem" in retry
+        else None,
         failure_reason=first["backfire"]["reason"] if outcome == "backfire" else None,
         hp_a=hp["a"],
         hp_b=hp["b"],
@@ -105,7 +137,10 @@ def _parse(replay_id: str, path: Path) -> Replay:
         ended: dict[str, Any] = next(
             (e for e in raw["turns"][-1]["events"] if e["type"] == "match_end"), {}
         )
-    except (OSError, ValueError, KeyError, IndexError, TypeError, StopIteration) as exc:
+        header = raw.get("fighters")  # schema 2 only
+        fighter_a = FighterInfo(**header["a"]) if header else None
+        fighter_b = FighterInfo(**header["b"]) if header else None
+    except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
         raise ReplayError(f"replay {replay_id!r} is unreadable: {exc!r}") from exc
     summary = ReplaySummary(
         id=replay_id,
@@ -114,8 +149,10 @@ def _parse(replay_id: str, path: Path) -> Replay:
         hp_a=turns[-1].hp_a,
         hp_b=turns[-1].hp_b,
         turn_count=len(turns),
+        name_a=fighter_a.name if fighter_a else None,
+        name_b=fighter_b.name if fighter_b else None,
     )
-    return Replay(summary, turns)
+    return Replay(summary, turns, fighter_a, fighter_b)
 
 
 def list_replays(directory: Path) -> list[ReplaySummary]:

@@ -419,3 +419,68 @@ def test_a_timeout_on_the_retry_backfires() -> None:
     assert event_types(log, 1) == [
         "attack_start", "attack_retry", "timeout", "backfire", "hit", "hp",
     ]  # fmt: skip
+
+
+def test_log_header_names_both_fighters_with_their_personas() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    data = log.to_dict()
+    assert data["schema"] == 2
+    assert data["fighters"]["a"] == {
+        "name": "alice", "provider": "p", "model": "m", "persona": "persona a",
+    }  # fmt: skip
+    assert data["fighters"]["b"]["name"] == "bob"
+
+
+def test_verified_attack_logs_its_snippet() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    verified = log.to_dict()["turns"][0]["events"][1]
+    assert (verified["problem"], verified["answer"], verified["code"]) == (
+        "What is the answer?", "42", "print(42)",
+    )  # fmt: skip
+
+
+def test_retry_logs_the_first_attempt_and_backfire_logs_the_last() -> None:
+    first = good_attack(answer="41", problem="first try")
+    second = good_attack(answer="40", problem="second try")
+    llm = FakeLlm(
+        attacks={"alice": [first, second] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    events = log.to_dict()["turns"][0]["events"]
+    retry, backfire = events[1], events[2]
+    assert (retry["type"], retry["problem"], retry["answer"], retry["code"]) == (
+        "attack_retry", "first try", "41", "print(42)",
+    )  # fmt: skip
+    assert (backfire["type"], backfire["problem"], backfire["answer"], backfire["code"]) == (
+        "backfire", "second try", "40", "print(42)",
+    )  # fmt: skip
+
+
+def test_backfire_without_a_parsed_attack_has_no_attempt_fields() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": ["no tags here", good_attack(), good_attack()],
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    _, log = play(llm)
+
+    backfire = log.to_dict()["turns"][0]["events"][1]
+    assert set(backfire) == {"t", "type", "actor", "reason"}

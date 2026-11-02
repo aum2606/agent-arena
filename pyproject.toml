@@ -66,4 +66,8 @@ ignore_names = [
     "duration_ms",
     "id",
     "turn_count",
+    "code",
+    "first_attempt",
+    "name_a",
+    "name_b",
 ]

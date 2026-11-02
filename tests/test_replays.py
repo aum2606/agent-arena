@@ -1,0 +1,178 @@
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from arena_api.app import app
+
+type Event = dict[str, Any]
+
+
+def turn(n: int, events: list[Event]) -> dict[str, Any]:
+    return {"turn": n, "events": events}
+
+
+def block_turn(n: int, attacker: str, defender: str) -> dict[str, Any]:
+    return turn(
+        n,
+        [
+            {"t": 0, "type": "attack_start", "actor": attacker},
+            {
+                "t": 900,
+                "type": "attack_verified",
+                "actor": attacker,
+                "problem": "6 * 7?",
+                "answer": "42",
+            },
+            {"t": 900, "type": "defend_start", "actor": defender},
+            {"t": 2100, "type": "defend_result", "actor": defender, "score": 1.0, "answer": "42"},
+            {"t": 2100, "type": "block", "actor": defender},
+            {"t": 2100, "type": "hp", "a": 100.0, "b": 100.0},
+        ],
+    )
+
+
+def hit_turn(n: int, attacker: str, defender: str) -> dict[str, Any]:
+    return turn(
+        n,
+        [
+            {"t": 0, "type": "attack_start", "actor": attacker},
+            {
+                "t": 800,
+                "type": "attack_verified",
+                "actor": attacker,
+                "problem": "hard?",
+                "answer": "7",
+            },
+            {"t": 800, "type": "defend_start", "actor": defender},
+            {"t": 3000, "type": "defend_result", "actor": defender, "score": 0.0, "answer": "8"},
+            {"t": 3000, "type": "hit", "target": defender, "damage": 20.0},
+            {"t": 3000, "type": "hp", "a": 100.0, "b": 80.0},
+        ],
+    )
+
+
+def backfire_turn(n: int, attacker: str, *, retried: bool) -> dict[str, Any]:
+    events: list[Event] = [{"t": 0, "type": "attack_start", "actor": attacker}]
+    reason = "mismatch: snippet printed '2/3', stated '5/4'"
+    if retried:
+        events.append({"t": 4000, "type": "attack_retry", "actor": attacker, "reason": reason})
+    events += [
+        {"t": 7000, "type": "backfire", "actor": attacker, "reason": reason},
+        {"t": 7000, "type": "hit", "target": attacker, "damage": 10.0},
+        {"t": 7000, "type": "hp", "a": 90.0, "b": 80.0},
+    ]
+    return turn(n, events)
+
+
+def write_log(directory: Path, name: str, turns: list[dict[str, Any]]) -> None:
+    turns[-1]["events"].append(
+        {"t": 1, "type": "match_end", "winner": "b", "reason": "decision", "turns": len(turns)}
+    )
+    (directory / f"{name}.json").write_text(
+        json.dumps({"match_id": name, "turns": turns}), encoding="utf-8"
+    )
+
+
+@pytest.fixture
+def logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("ARENA_LOGS_DIR", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(app)
+
+
+def test_lists_replays_with_their_result(logs: Path, client: TestClient) -> None:
+    write_log(logs, "m_b", [block_turn(1, "a", "b"), hit_turn(2, "b", "a")])
+    write_log(logs, "m_a", [hit_turn(1, "a", "b")])
+
+    response = client.get("/replays")
+
+    assert response.status_code == 200
+    assert [r["id"] for r in response.json()] == ["m_a", "m_b"]
+    assert response.json()[1] == {
+        "id": "m_b",
+        "winner": "b",
+        "reason": "decision",
+        "hp_a": 100.0,
+        "hp_b": 80.0,
+        "turn_count": 2,
+    }
+
+
+def test_replay_turns_carry_what_the_reveal_panel_shows(logs: Path, client: TestClient) -> None:
+    write_log(logs, "m1", [hit_turn(1, "a", "b"), block_turn(2, "b", "a")])
+
+    turns = client.get("/replays/m1").json()["turns"]
+
+    assert turns[0] == {
+        "n": 1, "attacker": "a", "outcome": "hit", "target": "b", "damage": 20.0,
+        "damage_math": "20 × 1 × (1 − 0) = 20", "problem": "hard?", "stated_answer": "7",
+        "defender_answer": "8", "score": 0.0, "timed_out": False, "retried": False,
+        "failure_reason": None, "hp_a": 100.0, "hp_b": 80.0, "duration_ms": 3000,
+    }  # fmt: skip
+    assert (turns[1]["outcome"], turns[1]["damage"], turns[1]["damage_math"]) == (
+        "block", 0.0, "no damage",
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize("retried", [False, True])
+def test_backfire_turn_shows_the_reason_and_whether_it_was_retried(
+    logs: Path, client: TestClient, retried: bool
+) -> None:
+    write_log(logs, "m1", [backfire_turn(1, "a", retried=retried)])
+
+    (shown,) = client.get("/replays/m1").json()["turns"]
+
+    assert (shown["outcome"], shown["target"], shown["retried"]) == ("backfire", "a", retried)
+    assert shown["failure_reason"] == "mismatch: snippet printed '2/3', stated '5/4'"
+    assert shown["problem"] is None
+    assert shown["damage_math"] == "20 × 1 × 0.5 = 10"
+
+
+def test_defender_timeout_is_flagged(logs: Path, client: TestClient) -> None:
+    timed_out = hit_turn(1, "a", "b")
+    timed_out["events"][3] = {"t": 3000, "type": "timeout", "actor": "b"}
+    write_log(logs, "m1", [timed_out])
+
+    (shown,) = client.get("/replays/m1").json()["turns"]
+
+    assert (shown["timed_out"], shown["score"], shown["defender_answer"]) == (True, None, None)
+    assert shown["damage_math"] == "20 × 1 × (1 − 0) = 20"
+
+
+def test_unknown_replay_is_404(logs: Path, client: TestClient) -> None:
+    assert client.get("/replays/nope").status_code == 404
+
+
+@pytest.mark.parametrize("bad_id", ["..%2Fsecret", "a.b", "a%20b"])
+def test_ids_that_could_leave_the_folder_are_404(
+    logs: Path, client: TestClient, bad_id: str
+) -> None:
+    (logs.parent / "secret.json").write_text("{}", encoding="utf-8")
+
+    assert client.get(f"/replays/{bad_id}").status_code == 404
+
+
+def test_unreadable_logs_are_skipped_in_the_list_and_500_when_asked_for(
+    logs: Path, client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    write_log(logs, "good", [block_turn(1, "a", "b")])
+    (logs / "broken.json").write_text("{not json", encoding="utf-8")
+
+    assert [r["id"] for r in client.get("/replays").json()] == ["good"]
+    assert "broken" in caplog.text
+    assert client.get("/replays/broken").status_code == 500
+
+
+def test_missing_logs_folder_lists_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setenv("ARENA_LOGS_DIR", str(tmp_path / "absent"))
+
+    assert client.get("/replays").json() == []

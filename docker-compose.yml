@@ -24,6 +24,10 @@ services:
       dockerfile: docker/api.Dockerfile
     ports:
       - "127.0.0.1:8100:8000"
+    environment:
+      ARENA_LOGS_DIR: /app/runs/logs
+    volumes:
+      - ./runs/logs:/app/runs/logs:ro
 
   web:
     build:

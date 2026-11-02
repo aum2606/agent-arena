@@ -37,7 +37,7 @@ uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl
 uv run arena synth --matches 100          # balance sweep with scripted fighters, no network (D-020)
 uv run arena synth --compare-rules        # answer-rule comparison by difficulty (D-021)
 uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)
-uv run uvicorn arena_api.app:app --reload # API on :8000 (D-028)
+uv run uvicorn arena_api.app:app --reload # API on :8000; ARENA_LOGS_DIR picks the replay folder (D-028, D-029)
 cd web && npm install && npm run dev      # web app on :3000; `npm run typecheck`, `npm run build`
 docker compose up --build                 # postgres :5442, redis, api :8100, web :3100 (localhost)
 uv run pytest                             # tests
@@ -52,7 +52,7 @@ Update this section if commands change.
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  cli.py   (the game engine)
-src/arena_api/  app.py   (FastAPI; Phase 1)
+src/arena_api/  app.py  replays.py   (FastAPI; Phase 1)
 web/            Next.js + TypeScript app (Phase 1)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
 tests/          one test file per module, no network calls

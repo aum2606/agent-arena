@@ -1,11 +1,11 @@
-import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from arena_api import store
 from arena_api.app import app
+from arena_api.replays import ReplayError, parse_replay
 
 type Event = dict[str, Any]
 
@@ -74,7 +74,6 @@ FIGHTERS = {
 
 
 def write_log(
-    directory: Path,
     name: str,
     turns: list[dict[str, Any]],
     fighters: dict[str, dict[str, str]] | None = None,
@@ -85,13 +84,7 @@ def write_log(
     log: dict[str, Any] = {"match_id": name, "turns": turns}
     if fighters:  # schema 2 (D-030); older logs have neither key
         log |= {"schema": 2, "fighters": fighters}
-    (directory / f"{name}.json").write_text(json.dumps(log), encoding="utf-8")
-
-
-@pytest.fixture
-def logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("ARENA_LOGS_DIR", str(tmp_path))
-    return tmp_path
+    store.insert_finished(name, log, parse_replay(name, log).summary)
 
 
 @pytest.fixture
@@ -99,9 +92,9 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def test_lists_replays_with_their_result(logs: Path, client: TestClient) -> None:
-    write_log(logs, "m_b", [block_turn(1, "a", "b"), hit_turn(2, "b", "a")])
-    write_log(logs, "m_a", [hit_turn(1, "a", "b")])
+def test_lists_replays_with_their_result(database: str, client: TestClient) -> None:
+    write_log("m_b", [block_turn(1, "a", "b"), hit_turn(2, "b", "a")])
+    write_log("m_a", [hit_turn(1, "a", "b")])
 
     response = client.get("/replays")
 
@@ -119,8 +112,8 @@ def test_lists_replays_with_their_result(logs: Path, client: TestClient) -> None
     }
 
 
-def test_replay_turns_carry_what_the_reveal_panel_shows(logs: Path, client: TestClient) -> None:
-    write_log(logs, "m1", [hit_turn(1, "a", "b"), block_turn(2, "b", "a")])
+def test_replay_turns_carry_what_the_reveal_panel_shows(database: str, client: TestClient) -> None:
+    write_log("m1", [hit_turn(1, "a", "b"), block_turn(2, "b", "a")])
 
     turns = client.get("/replays/m1").json()["turns"]
 
@@ -138,9 +131,9 @@ def test_replay_turns_carry_what_the_reveal_panel_shows(logs: Path, client: Test
 
 @pytest.mark.parametrize("retried", [False, True])
 def test_backfire_turn_shows_the_reason_and_whether_it_was_retried(
-    logs: Path, client: TestClient, retried: bool
+    database: str, client: TestClient, retried: bool
 ) -> None:
-    write_log(logs, "m1", [backfire_turn(1, "a", retried=retried)])
+    write_log("m1", [backfire_turn(1, "a", retried=retried)])
 
     (shown,) = client.get("/replays/m1").json()["turns"]
 
@@ -150,10 +143,10 @@ def test_backfire_turn_shows_the_reason_and_whether_it_was_retried(
     assert shown["damage_math"] == "20 × 1 × 0.5 = 10"
 
 
-def test_defender_timeout_is_flagged(logs: Path, client: TestClient) -> None:
+def test_defender_timeout_is_flagged(database: str, client: TestClient) -> None:
     timed_out = hit_turn(1, "a", "b")
     timed_out["events"][3] = {"t": 3000, "type": "timeout", "actor": "b"}
-    write_log(logs, "m1", [timed_out])
+    write_log("m1", [timed_out])
 
     (shown,) = client.get("/replays/m1").json()["turns"]
 
@@ -161,36 +154,28 @@ def test_defender_timeout_is_flagged(logs: Path, client: TestClient) -> None:
     assert shown["damage_math"] == "20 × 1 × (1 − 0) = 20"
 
 
-def test_unknown_replay_is_404(logs: Path, client: TestClient) -> None:
+def test_unknown_replay_is_404(database: str, client: TestClient) -> None:
     assert client.get("/replays/nope").status_code == 404
 
 
 @pytest.mark.parametrize("bad_id", ["..%2Fsecret", "a.b", "a%20b"])
-def test_ids_that_could_leave_the_folder_are_404(
-    logs: Path, client: TestClient, bad_id: str
+def test_ids_that_are_not_plain_names_are_404(
+    database: str, client: TestClient, bad_id: str
 ) -> None:
-    (logs.parent / "secret.json").write_text("{}", encoding="utf-8")
-
     assert client.get(f"/replays/{bad_id}").status_code == 404
 
 
-def test_unreadable_logs_are_skipped_in_the_list_and_500_when_asked_for(
-    logs: Path, client: TestClient, caplog: pytest.LogCaptureFixture
-) -> None:
-    write_log(logs, "good", [block_turn(1, "a", "b")])
-    (logs / "broken.json").write_text("{not json", encoding="utf-8")
+def test_a_stored_log_that_cannot_be_read_is_a_500(database: str, client: TestClient) -> None:
+    write_log("m1", [block_turn(1, "a", "b")])
+    with store.connect() as conn:
+        conn.execute("UPDATE matches SET log = '{}'::jsonb WHERE id = 'm1'")
 
-    assert [r["id"] for r in client.get("/replays").json()] == ["good"]
-    assert "broken" in caplog.text
-    assert client.get("/replays/broken").status_code == 500
+    assert client.get("/replays/m1").status_code == 500
 
 
-def test_missing_logs_folder_lists_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
-) -> None:
-    monkeypatch.setenv("ARENA_LOGS_DIR", str(tmp_path / "absent"))
-
-    assert client.get("/replays").json() == []
+def test_parsing_a_log_without_turns_is_an_error() -> None:
+    with pytest.raises(ReplayError, match="m1"):
+        parse_replay("m1", {"turns": []})
 
 
 def attempt_fields(problem: str, answer: str) -> dict[str, str]:
@@ -198,9 +183,9 @@ def attempt_fields(problem: str, answer: str) -> dict[str, str]:
 
 
 def test_schema_2_log_names_the_fighters_and_reveals_their_personas(
-    logs: Path, client: TestClient
+    database: str, client: TestClient
 ) -> None:
-    write_log(logs, "m1", [block_turn(1, "a", "b")], FIGHTERS)
+    write_log("m1", [block_turn(1, "a", "b")], FIGHTERS)
 
     (summary,) = client.get("/replays").json()
     replay = client.get("/replays/m1").json()
@@ -210,18 +195,18 @@ def test_schema_2_log_names_the_fighters_and_reveals_their_personas(
     assert replay["fighter_b"]["persona"] == "You are careful."
 
 
-def test_old_logs_without_a_header_have_no_fighters(logs: Path, client: TestClient) -> None:
-    write_log(logs, "m1", [block_turn(1, "a", "b")])
+def test_old_logs_without_a_header_have_no_fighters(database: str, client: TestClient) -> None:
+    write_log("m1", [block_turn(1, "a", "b")])
 
     replay = client.get("/replays/m1").json()
 
     assert (replay["fighter_a"], replay["fighter_b"]) == (None, None)
 
 
-def test_verified_turn_shows_the_attackers_code(logs: Path, client: TestClient) -> None:
+def test_verified_turn_shows_the_attackers_code(database: str, client: TestClient) -> None:
     verified = block_turn(1, "a", "b")
     verified["events"][1]["code"] = "print(42)"
-    write_log(logs, "m1", [verified], FIGHTERS)
+    write_log("m1", [verified], FIGHTERS)
 
     (shown,) = client.get("/replays/m1").json()["turns"]
 
@@ -229,12 +214,12 @@ def test_verified_turn_shows_the_attackers_code(logs: Path, client: TestClient) 
 
 
 def test_backfired_turn_shows_the_final_attempt_and_the_first_one(
-    logs: Path, client: TestClient
+    database: str, client: TestClient
 ) -> None:
     failed = backfire_turn(1, "a", retried=True)
     failed["events"][1] |= attempt_fields("first try", "41")
     failed["events"][2] |= attempt_fields("second try", "40")
-    write_log(logs, "m1", [failed], FIGHTERS)
+    write_log("m1", [failed], FIGHTERS)
 
     (shown,) = client.get("/replays/m1").json()["turns"]
 
@@ -249,7 +234,9 @@ def test_backfired_turn_shows_the_final_attempt_and_the_first_one(
     }
 
 
-def test_replay_carries_the_starting_hp_for_the_health_bars(logs: Path, client: TestClient) -> None:
-    write_log(logs, "m1", [block_turn(1, "a", "b")])
+def test_replay_carries_the_starting_hp_for_the_health_bars(
+    database: str, client: TestClient
+) -> None:
+    write_log("m1", [block_turn(1, "a", "b")])
 
     assert client.get("/replays/m1").json()["max_hp"] == 100.0

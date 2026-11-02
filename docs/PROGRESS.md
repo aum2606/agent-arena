@@ -8,7 +8,7 @@ D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 
 ## Phase 1 slices (D-027, details in `docs/PLAN_PHASE1.md`)
 - [x] 1 foundation (compose verified: api :8100, web :3100 shows API ok)  - [x] 2 text replay viewer (48 logs listed and replayed in the browser; names and backfired problems wait for slice 3)  - [x] 3 log schema v2 (names, personas, code and attempts in logs; old logs still load)  - [x] 4 PixiJS renderer (drawn shapes; retry, windup, projectile, think, hit, backfire seen live; block, timeout, KO not yet seen)
-- [ ] 5 persistence + workers  - [ ] 6 auth, fighters, BYO keys  - [ ] 7 difficulty scorer
+- [x] 5 persistence + workers (queued match picked up by the worker; 48 gate logs imported)  - [ ] 6 auth, fighters, BYO keys  - [ ] 7 difficulty scorer
 - [ ] 8 balance re-check (blocks 9)  - [ ] 9 ranked + Elo  - [ ] 10 code domain + sandbox
 - [ ] 11 launch hardening
 

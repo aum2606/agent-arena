@@ -1,6 +1,12 @@
-# Local development stack. Postgres and Redis are started for later slices; nothing uses them yet.
-# Ports are bound to localhost only and are off the usual numbers (3100, 8100, 5442) because other
-# local projects tend to own 3000, 8000 and 5432. The Postgres password is a local-only default (D-028).
+# Local development stack. Ports are bound to localhost only and are off the usual numbers (3100,
+# 8100, 5442) because other local projects tend to own 3000, 8000 and 5432. The Postgres password is
+# a local-only default (D-028). Until sign-in exists (slice 6) anyone who can reach the API can start
+# matches that spend the provider keys in .env, so do not expose it beyond localhost (D-032).
+x-api-env: &api-env
+  DATABASE_URL: postgresql://arena:${POSTGRES_PASSWORD:-arena-dev}@postgres:5432/arena
+  REDIS_URL: redis://redis:6379
+  FIGHTERS_CONFIG: /app/config/fighters.toml
+
 services:
   postgres:
     image: postgres:16
@@ -12,6 +18,11 @@ services:
       - "127.0.0.1:5442:5432" # not 5432: local Postgres installs often own it
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arena -d arena"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
   redis:
     image: redis:7
@@ -22,12 +33,33 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
+    environment: *api-env
+    volumes:
+      - ./config:/app/config:ro
     ports:
       - "127.0.0.1:8100:8000"
-    environment:
-      ARENA_LOGS_DIR: /app/runs/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command: ["uv", "run", "--no-sync", "arq", "arena_api.jobs.WorkerSettings"]
+    environment: *api-env
+    env_file:
+      - path: .env # provider API keys; optional so the stack still starts without them
+        required: false
     volumes:
-      - ./runs/logs:/app/runs/logs:ro
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   web:
     build:

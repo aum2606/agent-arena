@@ -575,7 +575,8 @@ dropped from the MVP (owner kept it, last).
 **Decision:** One repository holds the engine (`src/arena/`), the API (`src/arena_api/`, same
 `pyproject.toml`, so the existing ruff, mypy strict, vulture and pytest cover it) and the web app
 (`web/`). `docker-compose.yml` starts Postgres 16, Redis 7, the API and the web app, with ports bound
-to localhost; Postgres and Redis are unused until slice 5. The Postgres password has a local-only
+to localhost (web 3100, API 8100, Postgres 5442: other local projects already own 3000, 8000 and 5432); Postgres and Redis
+are unused until slice 5. The Postgres password has a local-only
 default (`arena-dev`), overridable with `POSTGRES_PASSWORD`. CI (GitHub Actions) is deferred: the repo
 has no remote, so a workflow would never run; pre-commit still runs the Python checks.
 The web app is hand-written (no `create-next-app`) and checked with `tsc --noEmit` and `next build`;

@@ -39,7 +39,7 @@ uv run arena synth --compare-rules        # answer-rule comparison by difficulty
 uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)
 uv run uvicorn arena_api.app:app --reload # API on :8000 (D-028)
 cd web && npm install && npm run dev      # web app on :3000; `npm run typecheck`, `npm run build`
-docker compose up --build                 # postgres, redis, api, web (localhost only)
+docker compose up --build                 # postgres :5442, redis, api :8100, web :3100 (localhost)
 uv run pytest                             # tests
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src

@@ -1,5 +1,6 @@
 # Local development stack. Postgres and Redis are started for later slices; nothing uses them yet.
-# Ports are bound to localhost only, and the Postgres password is a local-only default (D-028).
+# Ports are bound to localhost only and are off the usual numbers (3100, 8100, 5442) because other
+# local projects tend to own 3000, 8000 and 5432. The Postgres password is a local-only default (D-028).
 services:
   postgres:
     image: postgres:16
@@ -8,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena-dev}
       POSTGRES_DB: arena
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5442:5432" # not 5432: local Postgres installs often own it
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -22,7 +23,7 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8100:8000"
 
   web:
     build:
@@ -31,7 +32,7 @@ services:
     environment:
       API_URL: http://api:8000
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3100:3000"
     depends_on:
       - api
 

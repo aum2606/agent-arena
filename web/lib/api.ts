@@ -52,6 +52,7 @@ export interface Replay {
   turns: Turn[];
   fighter_a: FighterInfo | null;
   fighter_b: FighterInfo | null;
+  max_hp: number;
 }
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";

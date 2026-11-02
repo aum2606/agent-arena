@@ -661,3 +661,41 @@ match is over. New response fields that only the web reads (`code`, `first_attem
 **Alternatives considered:** uppercase sides to match the spec example (rejected, above); a separate
 file for attempts (more files for no reader); storing attempts only for backfires (the viewer also
 needs the first attempt of a retry that then succeeded).
+
+## D-031 · 2026-11-03 · Replay renderer: Pixi with drawn shapes, planned in TypeScript
+
+**Decision:** The replay page plays each turn on a Pixi canvas (720x320). 2D with fighters drawn from
+shapes in code (no sprite art); real sprites can replace them later without touching the animation
+logic. `web/lib/choreography.ts` (`planTurn`, `planMatch`) turns a turn into timed steps: retry
+flash, windup, projectile, think or timeout, block or hit, health-bar move, KO; a backfire is windup,
+rebound, hit on the attacker. Phases have fixed lengths, so a turn plays for 3 to 6 seconds at 1x
+whatever the agents really took. `web/lib/stage.ts` draws the scene as a pure function of (plan,
+time), so play, pause, replay and speed only move a clock. The API's replay response gains `max_hp`
+(from `arena.damage.STARTING_HP`) so the web app has no hard-coded 100. The page has Play match,
+Replay turn, Pause/Resume and 1x/2x; clicking a turn plays it; it honours `prefers-reduced-motion`
+(shows each turn's final picture) and falls back to a message when WebGL is unavailable, leaving the
+text viewer working.
+
+**Dependencies (new):** `pixi.js` 8 (the spec's renderer; loaded only on the replay page, in the
+browser) and `vitest` (dev only). `npm audit` reports 0.
+
+**Why vitest now:** D-029 avoided a JavaScript test framework because the viewer had no logic of its
+own. The planner does, so its 12 tests (step order per outcome, 3 to 6 s per turn, KO only at 0 HP,
+health carried between turns) are worth one dev dependency.
+
+**Revises D-029:** it said slice 4 would add raw events to the API. Not needed: the per-turn view
+already holds everything the animation uses, so the API gets `max_hp` only.
+
+**What was checked live:** in the built-in browser the canvas starts without console errors, and the
+retry flash, windup, projectile, thinking, hit (flash, floating damage, health bar moving to 80%) and
+backfire (projectile out and back, damage on the attacker) were seen. The pane throttles animation
+frames (Pixi caps a frame at 0.1 s, so it ran at about a fifth of real speed), which is why checking
+took long. Block (shield), defender timeout, KO and the whole-match mode were not seen.
+
+**Known limits:** looks basic by design; no sound; the stage is not scrubbable; HP numbers are shown in
+text below the stage, not on the bars. Pixi's `maxElapsedMS` makes the animation run slow, never
+skip, on a slow device.
+
+**Alternatives considered:** sprite art (none exists; replaceable later); deriving the steps from the
+raw log events (more API surface for no extra information); a canvas-free CSS animation (the spec
+chose Pixi and the later effects need it).

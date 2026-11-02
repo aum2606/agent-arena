@@ -247,3 +247,9 @@ def test_backfired_turn_shows_the_final_attempt_and_the_first_one(
         "code": "print(41)",
         "reason": "mismatch: snippet printed '2/3', stated '5/4'",
     }
+
+
+def test_replay_carries_the_starting_hp_for_the_health_bars(logs: Path, client: TestClient) -> None:
+    write_log(logs, "m1", [block_turn(1, "a", "b")])
+
+    assert client.get("/replays/m1").json()["max_hp"] == 100.0

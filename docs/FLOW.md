@@ -68,3 +68,6 @@ saved records.
 - `arena_api` (Phase 1): FastAPI app. `GET /health`; `GET /replays` and `GET /replays/{id}` read the
   battle-log JSON files (`replays.py` turns each log's events into one reveal-panel record per turn).
   Matches will be queued to the orchestrator through it from slice 5.
+- `web` (Phase 1): Next.js app that only calls the API. A replay page plays each turn on a Pixi canvas:
+  `choreography.planTurn` turns a turn into timed steps (3 to 6 s), `stage.Stage` draws the scene as a
+  pure function of (plan, time), `viewer.tsx` holds play, pause, speed and whole-match state.

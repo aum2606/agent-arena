@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from arena.damage import BACKFIRE_FACTOR, BASE_DAMAGE, DIFFICULTY
+from arena.damage import BACKFIRE_FACTOR, BASE_DAMAGE, DIFFICULTY, STARTING_HP
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ class Replay:
     turns: list[TurnView]
     fighter_a: FighterInfo | None
     fighter_b: FighterInfo | None
+    max_hp: float  # what a full health bar means
 
 
 def logs_dir() -> Path:
@@ -152,7 +153,7 @@ def _parse(replay_id: str, path: Path) -> Replay:
         name_a=fighter_a.name if fighter_a else None,
         name_b=fighter_b.name if fighter_b else None,
     )
-    return Replay(summary, turns, fighter_a, fighter_b)
+    return Replay(summary, turns, fighter_a, fighter_b, STARTING_HP)
 
 
 def list_replays(directory: Path) -> list[ReplaySummary]:

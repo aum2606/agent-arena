@@ -35,8 +35,7 @@ a { color: var(--selected); }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
 .muted { color: var(--muted); }
-.hp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-.hp meter { display: block; width: 100%; height: 16px; }
+.stage { max-width: 720px; margin: 12px 0; border-radius: 8px; overflow: hidden; }
 .timeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .timeline button {
   padding: 6px 12px; border: 2px solid var(--line); border-radius: 6px;
@@ -54,5 +53,6 @@ th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: lef
 .fighters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
 .fighters summary { cursor: pointer; }
 .fighters p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.nav { display: flex; gap: 8px; margin-top: 12px; }
+.nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .nav button { padding: 6px 12px; font: inherit; }
+.nav button[aria-pressed="true"] { border-color: var(--selected); }

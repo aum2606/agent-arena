@@ -8,7 +8,7 @@ D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 
 ## Phase 1 slices (D-027, details in `docs/PLAN_PHASE1.md`)
 - [x] 1 foundation (compose verified: api :8100, web :3100 shows API ok)  - [x] 2 text replay viewer (48 logs listed and replayed in the browser; names and backfired problems wait for slice 3)  - [x] 3 log schema v2 (names, personas, code and attempts in logs; old logs still load)  - [x] 4 PixiJS renderer (drawn shapes; retry, windup, projectile, think, hit, backfire seen live; block, timeout, KO not yet seen)
-- [x] 5 persistence + workers (queued match picked up by the worker; 48 gate logs imported)  - [ ] 6 auth, fighters, BYO keys  - [ ] 7 difficulty scorer
+- [x] 5 persistence + workers (a real match queued through the API finished: first live run with the D-025 retry; 48 gate logs imported)  - [ ] 6 auth, fighters, BYO keys  - [ ] 7 difficulty scorer
 - [ ] 8 balance re-check (blocks 9)  - [ ] 9 ranked + Elo  - [ ] 10 code domain + sandbox
 - [ ] 11 launch hardening
 
@@ -105,3 +105,9 @@ A model of the rules, not of LLMs (see D-020). Results depend only on skill minu
 - With backfire at half damage a knockout cannot happen in 6 turns (max 90 damage); every match
   ends by decision or draw (D-013).
 - Vulture is `uv run vulture src` and passes.
+
+## First live match with the retry (Phase 1, slice 5 check)
+One match queued through `POST /matches`, gemini-lite vs gpt-oss (`m_20261102T130929_0b7d`): 6 attacks
+= 2 hits, 3 blocks, 1 backfire (33% / 50% / 17%). 5 of 6 first attempts failed their check and were
+retried, 4 of those 5 then verified. Backfires were 48-52% of turns before the retry. One match is
+anecdote, not a measurement; the real test is slice 8.

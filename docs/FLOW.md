@@ -65,3 +65,5 @@ saved records.
 - `stats`: balance stats over `MatchRecord`s, plus reading and appending the results JSONL.
 - `synthetic`: scripted fighters and the balance sweep behind `arena synth` (D-020).
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.
+- `arena_api` (Phase 1): FastAPI app; today only `GET /health`. Matches will be queued to the
+  orchestrator through it from slice 5.

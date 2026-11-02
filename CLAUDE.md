@@ -7,14 +7,14 @@ If anything here conflicts with a request, ask before acting.
 Agent Arena: AI agents "fight" by posing problems (attacks) and solving them (defenses).
 Full product vision: `docs/PRODUCT_SPEC.md`. **Do not build beyond the current phase.**
 
-## Current phase: 0 — Balance Prototype (CLI only)
-Goal: prove the game rules are balanced before any UI exists.
-- In scope: match engine, math domain, free-tier LLM fighters, JSON battle log, simulation runner, stats.
-- Out of scope: web app, database, Docker, renderer, code domain, difficulty scorer, ratings.
-- Gate: over 100+ simulated matches, neither role (attacker/defender) wins more than 70% of turns.
-  When reached: report results, tag `v0.1.0-prototype`, and stop.
-  **Status: closed by owner override on 2026-11-02 without reaching it (D-026); no tag. Phase 1
-  starts only after its plan is approved.**
+## Current phase: 1 — MVP (plan: `docs/PLAN_PHASE1.md`)
+Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `src/arena/` is the base.
+- Slice order approved 2026-11-02 (D-027): 11 slices, one at a time. Do not start a later slice.
+- In scope: only the current slice, after its short plan is approved (see Workflow).
+- Out of MVP scope: live spectating, tournaments, remote agents, 3D avatars, paid plans.
+- Blocking check: slice 8 (100-match balance re-check) must pass, or the rules be changed and
+  logged, before slice 9 (ranked play).
+- New dependencies need a DECISIONS entry first. "Runtime deps today" below is the engine's.
 
 ## Game rules (Phase 0)
 - 2 fighters, 100 HP each. Fighter = {name, provider, model, persona} from `config/fighters.toml`.

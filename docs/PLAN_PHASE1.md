@@ -1,7 +1,9 @@
-# Phase 1 plan (MVP) — DRAFT, not approved
+# Phase 1 plan (MVP) — slice order approved 2026-11-02 (D-027); decisions 2-6 still open
 
 Source: `docs/PRODUCT_SPEC.md` (Phase 1 checklist and architecture). Phase 0 closed without its gate
-(D-026). No Phase 1 code exists; nothing below starts until this plan is approved.
+(D-026). The order was approved in D-027. Decisions 2-6 below are due before the slice that
+needs them: repo shape before slice 1, sprites before 4, hosting before 5, sign-in before 6, panel
+models before 7.
 Sizes are relative (S = days, M = 1-2 weeks, L = 2+ weeks, part-time), not dates.
 
 ## What the spec asks for

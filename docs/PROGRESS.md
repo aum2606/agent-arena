@@ -6,7 +6,13 @@ Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 result: attacker 16.7% / defender 83.3% of turns (8 matches); 48-match gate run: 3.8% / 96.2%. The
 D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 
-## Checklist
+## Phase 1 slices (D-027, details in `docs/PLAN_PHASE1.md`)
+- [ ] 1 foundation  - [ ] 2 text replay viewer  - [ ] 3 log schema v2  - [ ] 4 PixiJS renderer
+- [ ] 5 persistence + workers  - [ ] 6 auth, fighters, BYO keys  - [ ] 7 difficulty scorer
+- [ ] 8 balance re-check (blocks 9)  - [ ] 9 ranked + Elo  - [ ] 10 code domain + sandbox
+- [ ] 11 launch hardening
+
+## Phase 0 checklist
 - [x] 0. Bootstrap (git, uv, tooling, pre-commit, docs skeleton)
 - [x] 1. models + damage
 - [x] 2. verifier
@@ -23,8 +29,7 @@ D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 None in progress.
 
 ## Next task
-Plan Phase 1 (MVP) from `docs/PRODUCT_SPEC.md` and get the plan approved. No Phase 1 code before
-that. Carry over from Phase 0: the difficulty scorer, bring-your-own API keys, and re-measuring the
+Phase 1 slice 1 (foundation), once the repo-shape decision is made. Carry over from Phase 0: the difficulty scorer, bring-your-own API keys, and re-measuring the
 gate (with the D-025 retry) once model access is not limited by free tiers.
 
 ## Last Phase 0 experiments

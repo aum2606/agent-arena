@@ -554,3 +554,18 @@ by free tiers (bring-your-own keys), and treat it as a blocking check before any
 
 **Alternatives considered:** keep trying on the free tiers (rejected by the owner); tag the engine
 milestone anyway (rejected: it would misreport the gate result).
+
+## D-027 · 2026-11-02 · Phase 1 slice order approved; CLAUDE.md moves to Phase 1
+
+**Decision:** The owner approved the 11-slice order in `docs/PLAN_PHASE1.md`: foundation, text replay
+viewer, log schema v2, PixiJS renderer, persistence and workers, auth/fighters/BYO keys, difficulty
+scorer, balance re-check, ranked and Elo, code domain and sandbox, launch hardening. `CLAUDE.md`'s
+current phase becomes 1 and its scope is "the current slice only". Slice 8 (100-match balance
+re-check with the D-025 retry and the scorer) must pass, or the rules be changed and logged, before
+slice 9. Open decisions 2-6 in the plan are due before the slice that needs them; none is assumed.
+
+**Why:** The spec's build plan puts the UI in Phase 1. Building the replay viewer first costs no
+model calls, so free-tier limits cannot block it.
+
+**Alternatives considered:** code domain earlier (largest security surface, Linux-only sandbox) or
+dropped from the MVP (owner kept it, last).

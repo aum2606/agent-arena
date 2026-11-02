@@ -599,3 +599,33 @@ the built project; `default-groups = ["dev", "api"]` keeps `uv sync` unchanged f
 **Alternatives considered:** separate repos for web and API (rejected by the owner); a shared
 workspace with separate Python projects (more config than one `pyproject` for no gain yet); database
 drivers and a Redis client now (YAGNI until slice 5).
+
+## D-029 · 2026-11-02 · Replay API reads battle-log files and derives the turn view in Python
+
+**Decision:** `GET /replays` lists the `*.json` battle logs in `ARENA_LOGS_DIR` (default `runs/logs`)
+with id, winner, reason, final HP and turn count; `GET /replays/{id}` returns the same summary plus
+one record per turn (attacker, outcome, target, damage and its arithmetic, problem, stated and
+defender answers, score, timeout and retry flags, failure reason, HP after, turn length). The
+arithmetic is built from `arena.damage` constants, not copied numbers. Ids must match
+`[A-Za-z0-9_-]+` (they become file names), an unknown id is a 404, an unreadable log is skipped with a
+warning in the list and is a 500 when asked for directly. The web app only calls this API; it never
+reads files. The viewer is a text page: a timeline of turn buttons and a reveal panel. Compose mounts
+`runs/logs` read-only into the API container. No new dependencies.
+
+**Why Python, not TypeScript:** the log-to-turn logic is the only real logic in the viewer, and it is
+tested by the pytest suite that already exists. Putting it in the web app would need a JavaScript test
+framework (a new dependency) for one function. Slice 4 will add the raw events to the response for the
+animation.
+
+**Linter configuration:** `[tool.vulture] ignore_names` lists the response-field names that vulture
+reports as unused (`damage_math`, `defender_answer`, `timed_out`, `retried`, `failure_reason`,
+`duration_ms`, `id`, `turn_count`): FastAPI serialises them and no Python code reads them. New
+response fields that only the web reads must be added to the list.
+
+**Known gaps until slice 3 (log schema v2):** logs hold no fighter names (the page says Fighter A/B),
+no problem for a backfired turn, and no persona. Problems are shown as plain text, so LaTeX appears
+raw. `runs/logs` mixes several runs; `runs/logs_gate48` is the clean 48-match gate run.
+
+**Alternatives considered:** deriving the turn view in the web app (needs a JS test framework);
+reading files from the web app (breaks the rule that the web never touches storage); returning the raw
+log and letting the page work it out (every consumer repeats the logic).

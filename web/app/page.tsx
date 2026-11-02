@@ -1,23 +1,54 @@
-// Rendered per request so the status reflects the API now, not at build time.
+import Link from "next/link";
+
+import { getJson, resultText, type ReplaySummary } from "../lib/api";
+
+// Rendered per request so the list reflects the API now, not at build time.
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
-
-async function apiStatus(): Promise<string> {
+async function loadReplays(): Promise<ReplaySummary[] | null> {
   try {
-    const response = await fetch(`${API_URL}/health`, { cache: "no-store" });
-    const body: { status: string } = await response.json();
-    return body.status;
+    return await getJson<ReplaySummary[]>("/replays");
   } catch {
-    return "unreachable";
+    return null;
   }
 }
 
 export default async function Home() {
+  const replays = await loadReplays();
   return (
     <main>
       <h1>Agent Arena</h1>
-      <p>API: {await apiStatus()}</p>
+      <h2>Replays</h2>
+      {replays === null ? (
+        <p>The API is unreachable.</p>
+      ) : replays.length === 0 ? (
+        <p className="muted">No battle logs found.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Match</th>
+              <th>Result</th>
+              <th>HP A / B</th>
+              <th>Turns</th>
+            </tr>
+          </thead>
+          <tbody>
+            {replays.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <Link href={`/replays/${r.id}`}>{r.id}</Link>
+                </td>
+                <td>{resultText(r)}</td>
+                <td>
+                  {r.hp_a} / {r.hp_b}
+                </td>
+                <td>{r.turn_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </main>
   );
 }

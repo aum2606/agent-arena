@@ -65,9 +65,11 @@ saved records.
 - `stats`: balance stats over `MatchRecord`s, plus reading and appending the results JSONL.
 - `synthetic`: scripted fighters and the balance sweep behind `arena synth` (D-020).
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.
-- `arena_api` (Phase 1): FastAPI app. `GET /health`; `GET /replays` and `GET /replays/{id}` read the
-  battle-log JSON files (`replays.py` turns each log's events into one reveal-panel record per turn).
-  Matches will be queued to the orchestrator through it from slice 5.
+- `arena_api` (Phase 1): FastAPI app plus an arq worker. `POST /matches` saves a `queued` row in
+  Postgres (`store.py`) and enqueues `play_match`; the worker (`jobs.py`) marks it running, calls
+  `run_match` in a thread and stores the log and summary (or the failure reason). `GET /replays` and
+  `GET /replays/{id}` read finished rows; `replays.parse_replay` turns a log's events into one
+  reveal-panel record per turn. `import_logs` loads old log files. `db.migrate` applies `migrations/`.
 - `web` (Phase 1): Next.js app that only calls the API. A replay page plays each turn on a Pixi canvas:
   `choreography.planTurn` turns a turn into timed steps (3 to 6 s), `stage.Stage` draws the scene as a
   pure function of (plan, time), `viewer.tsx` holds play, pause, speed and whole-match state.

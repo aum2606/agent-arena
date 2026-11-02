@@ -24,7 +24,9 @@ build-backend = "uv_build"
 
 [dependency-groups]
 api = [
+    "arq>=0.28.0",
     "fastapi>=0.162.0",
+    "psycopg[binary]>=3.3.6",
     "uvicorn>=0.54.0",
 ]
 dev = [
@@ -71,4 +73,12 @@ ignore_names = [
     "name_a",
     "name_b",
     "max_hp",
+    # The arq worker finds its settings class and reads these attributes by name (D-032).
+    "WorkerSettings",
+    "functions",
+    "on_startup",
+    "redis_settings",
+    "max_jobs",
+    "max_tries",
+    "job_timeout",
 ]

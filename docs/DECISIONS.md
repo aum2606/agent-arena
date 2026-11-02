@@ -699,3 +699,44 @@ skip, on a slow device.
 **Alternatives considered:** sprite art (none exists; replaceable later); deriving the steps from the
 raw log events (more API surface for no extra information); a canvas-free CSS animation (the spec
 chose Pixi and the later effects need it).
+
+## D-032 · 2026-11-02 · Matches in Postgres, played by an arq worker
+
+**Decision:** One `matches` table (migration `0001_matches.sql`) holds each match: id, status
+(`queued`, `running`, `finished`, `failed`), the two fighter names, a summary (winner, reason, final
+HP, turn count), the whole battle log as JSONB, an error message and timestamps. `POST /matches`
+(two fighter names from `config/fighters.toml`) saves a queued row and enqueues `play_match`; it
+answers 202, or 422 for an unknown or identical pair, 429 when `MAX_QUEUED` (5) matches already wait,
+503 when the queue is down (the row is then failed, not left waiting). `GET /matches/{id}` reports
+status and error. The worker (`arq arena_api.jobs.WorkerSettings`) plays one match at a time
+(`max_jobs = 1`, so the free tiers are not hit harder) and never retries (`max_tries = 1`: a retry
+would play and pay for the match twice). Provider and config errors fail the match with their message;
+any other error fails it and is re-raised. A worker that starts first fails matches a dead worker left
+`running`. `GET /replays` and `GET /replays/{id}` now read finished rows; the file-based replay source
+(`ARENA_LOGS_DIR`) is gone, replaced by `python -m arena_api.import_logs FOLDER [--prefix P]`, which
+validates each log and skips ids already present. Migrations are numbered `.sql` files applied by
+`db.migrate()` (both API and worker run it on start, serialised by an advisory lock).
+
+**Dependencies (new, in the `api` group):** `psycopg[binary]` 3 (Postgres driver) and `arq`, which
+brings `redis` (the spec's queue; fits the async API). No ORM and no Alembic: one table, and Alembic
+would pull in SQLAlchemy only to run a few `CREATE` statements. Move to Alembic when the schema grows.
+
+**Deviations from the spec:** problem and answer bodies are not in object storage, the whole log is
+in the `log` column (about 6 KB per match); revisit when size matters. The `turns` and `problems`
+tables wait for ranking and the novelty check.
+
+**Tests:** database tests use a throwaway database on the compose Postgres (`tests/conftest.py`) and
+skip with a message when it is not running; set `TEST_DATABASE_URL` to use another server. The
+worker job runs with a scripted LLM, the queue is a stub (FastAPI dependency override); no network.
+
+**Security note:** there is no sign-in until slice 6, so anyone who can reach the API can start
+matches that spend the provider keys. The compose ports are bound to localhost and the queue is
+capped; do not expose the API beyond localhost before slice 6.
+
+**Linter configuration:** `[tool.vulture] ignore_names` gains `WorkerSettings` and its attributes
+(`functions`, `on_startup`, `redis_settings`, `max_jobs`, `max_tries`, `job_timeout`): arq finds them
+by name.
+
+**Alternatives considered:** keeping file logs as a second source (two stores for good, and the
+file tests stayed file-bound); SQLAlchemy and Alembic now (too much for one table); Celery (heavier,
+not async); storing logs in object storage now (a new service for 6 KB rows).

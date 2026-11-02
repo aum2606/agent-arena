@@ -1,18 +1,11 @@
-import json
-import logging
-import os
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from arena.damage import BACKFIRE_FACTOR, BASE_DAMAGE, DIFFICULTY, STARTING_HP
 
-logger = logging.getLogger(__name__)
-
-DEFAULT_LOGS_DIR = "runs/logs"
-# Ids become file names, so anything that could leave the logs folder is rejected.
-_ID = re.compile(r"[A-Za-z0-9_-]+")
+# Match ids appear in URLs; anything else is rejected before it reaches the database.
+VALID_ID = re.compile(r"[A-Za-z0-9_-]+")
 
 
 class ReplayError(Exception):
@@ -82,10 +75,6 @@ class Replay:
     max_hp: float  # what a full health bar means
 
 
-def logs_dir() -> Path:
-    return Path(os.environ.get("ARENA_LOGS_DIR", DEFAULT_LOGS_DIR))
-
-
 def _damage_math(outcome: str, damage: float, score: float | None) -> str:
     if outcome == "block":
         return "no damage"
@@ -131,9 +120,9 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
     )
 
 
-def _parse(replay_id: str, path: Path) -> Replay:
+def parse_replay(replay_id: str, raw: dict[str, Any]) -> Replay:
+    """The reveal-panel view of a battle log (schema 1 or 2)."""
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
         turns = [_turn_view(t) for t in raw["turns"]]
         ended: dict[str, Any] = next(
             (e for e in raw["turns"][-1]["events"] if e["type"] == "match_end"), {}
@@ -141,7 +130,7 @@ def _parse(replay_id: str, path: Path) -> Replay:
         header = raw.get("fighters")  # schema 2 only
         fighter_a = FighterInfo(**header["a"]) if header else None
         fighter_b = FighterInfo(**header["b"]) if header else None
-    except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
         raise ReplayError(f"replay {replay_id!r} is unreadable: {exc!r}") from exc
     summary = ReplaySummary(
         id=replay_id,
@@ -154,20 +143,3 @@ def _parse(replay_id: str, path: Path) -> Replay:
         name_b=fighter_b.name if fighter_b else None,
     )
     return Replay(summary, turns, fighter_a, fighter_b, STARTING_HP)
-
-
-def list_replays(directory: Path) -> list[ReplaySummary]:
-    found: list[ReplaySummary] = []
-    for path in sorted(directory.glob("*.json")):
-        try:
-            found.append(_parse(path.stem, path).summary)
-        except ReplayError as exc:
-            logger.warning("skipping %s: %s", path.name, exc)
-    return found
-
-
-def get_replay(directory: Path, replay_id: str) -> Replay | None:
-    path = directory / f"{replay_id}.json"
-    if not _ID.fullmatch(replay_id) or not path.is_file():
-        return None
-    return _parse(replay_id, path)

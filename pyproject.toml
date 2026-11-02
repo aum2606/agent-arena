@@ -70,4 +70,5 @@ ignore_names = [
     "first_attempt",
     "name_a",
     "name_b",
+    "max_hp",
 ]

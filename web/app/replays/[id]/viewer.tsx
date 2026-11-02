@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   resultText,
@@ -10,6 +10,8 @@ import {
   type ReplaySummary,
   type Turn,
 } from "../../../lib/api";
+import { planMatch } from "../../../lib/choreography";
+import { StageView } from "./stage-view";
 
 function Row({
   label,
@@ -82,10 +84,42 @@ function Fighter({ label, info }: { label: string; info: FighterInfo | null }) {
   );
 }
 
+type Status = "idle" | "playing" | "paused";
+
 export function Viewer({ replay }: { replay: Replay }) {
   const [selected, setSelected] = useState(0);
+  const [status, setStatus] = useState<Status>("idle");
+  const [wholeMatch, setWholeMatch] = useState(false);
+  const [fast, setFast] = useState(false);
+  const [runId, setRunId] = useState(0);
   const { summary } = replay;
   const turn = replay.turns[selected];
+  const plans = useMemo(() => planMatch(replay.turns, replay.max_hp), [replay]);
+  const names = useMemo(
+    () => ({ a: sideLabel(summary, "a"), b: sideLabel(summary, "b") }),
+    [summary],
+  );
+  const last = replay.turns.length - 1;
+
+  function playTurn(index: number) {
+    setSelected(index);
+    setWholeMatch(false);
+    setStatus("playing");
+    setRunId((id) => id + 1);
+  }
+
+  function playMatch() {
+    setSelected(0);
+    setWholeMatch(true);
+    setStatus("playing");
+    setRunId((id) => id + 1);
+  }
+
+  function turnEnded() {
+    if (wholeMatch && selected < last) setSelected(selected + 1);
+    else setStatus("idle");
+  }
+
   return (
     <>
       <p>{resultText(summary)}</p>
@@ -93,35 +127,40 @@ export function Viewer({ replay }: { replay: Replay }) {
         <Fighter label="A" info={replay.fighter_a} />
         <Fighter label="B" info={replay.fighter_b} />
       </div>
-      <div className="hp">
-        <label>
-          {sideLabel(summary, "a")}: {turn.hp_a} HP
-          <meter min={0} max={100} value={turn.hp_a} />
-        </label>
-        <label>
-          {sideLabel(summary, "b")}: {turn.hp_b} HP
-          <meter min={0} max={100} value={turn.hp_b} />
-        </label>
+      <StageView
+        plan={plans[selected]}
+        names={names}
+        maxHp={replay.max_hp}
+        playing={status === "playing"}
+        speed={fast ? 2 : 1}
+        runId={runId}
+        onEnd={turnEnded}
+      />
+      <div className="nav">
+        <button onClick={playMatch}>Play match</button>
+        <button onClick={() => playTurn(selected)}>Replay turn</button>
+        <button
+          disabled={status === "idle"}
+          onClick={() => setStatus(status === "paused" ? "playing" : "paused")}
+        >
+          {status === "paused" ? "Resume" : "Pause"}
+        </button>
+        <button aria-pressed={fast} onClick={() => setFast(!fast)}>
+          {fast ? "2×" : "1×"}
+        </button>
       </div>
       <div className="timeline" role="group" aria-label="Turns">
         {replay.turns.map((t, i) => (
-          <button key={t.n} aria-pressed={i === selected} onClick={() => setSelected(i)}>
+          <button key={t.n} aria-pressed={i === selected} onClick={() => playTurn(i)}>
             {t.n} · {t.attacker.toUpperCase()} · <span className={t.outcome}>{t.outcome}</span>
           </button>
         ))}
       </div>
+      <p className="muted">
+        {sideLabel(summary, "a")}: {turn.hp_a} HP · {sideLabel(summary, "b")}: {turn.hp_b} HP after
+        this turn
+      </p>
       <RevealPanel turn={turn} summary={summary} />
-      <div className="nav">
-        <button disabled={selected === 0} onClick={() => setSelected(selected - 1)}>
-          Previous
-        </button>
-        <button
-          disabled={selected === replay.turns.length - 1}
-          onClick={() => setSelected(selected + 1)}
-        >
-          Next
-        </button>
-      </div>
     </>
   );
 }

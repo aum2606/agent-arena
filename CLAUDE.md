@@ -13,6 +13,8 @@ Goal: prove the game rules are balanced before any UI exists.
 - Out of scope: web app, database, Docker, renderer, code domain, difficulty scorer, ratings.
 - Gate: over 100+ simulated matches, neither role (attacker/defender) wins more than 70% of turns.
   When reached: report results, tag `v0.1.0-prototype`, and stop.
+  **Status: closed by owner override on 2026-11-02 without reaching it (D-026); no tag. Phase 1
+  starts only after its plan is approved.**
 
 ## Game rules (Phase 0)
 - 2 fighters, 100 HP each. Fighter = {name, provider, model, persona} from `config/fighters.toml`.

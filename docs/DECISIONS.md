@@ -522,3 +522,35 @@ without a retry.
 **Alternatives considered:** run the snippet first on every attack and ask the attacker to confirm
 (an extra call on every attack, slow on the free tiers); take the answer from the snippet (rejected in
 D-021); prompt-only tweaks (unlikely to remove a guessing error).
+
+## D-026 · 2026-11-02 · Phase 0 closed without passing the gate
+
+**Decision:** At the owner's request Phase 0 is closed with the balance gate not met. No
+`v0.1.0-prototype` tag is created, because the tag name implies a pass. Phase 1 (MVP, see
+`docs/PRODUCT_SPEC.md`) may be planned; no Phase 1 code is written until its plan is approved. This
+overrides the CLAUDE.md rule "stop at the gate" once, on the owner's explicit instruction.
+
+**Why:** Free-tier limits (Groq 429s and tokens-per-minute caps, Gemini 503s) made live runs
+take 15 minutes or more per match and abort partway, so the 100-match gate could not be measured
+within reasonable time or at all. The last trial (D-025 retry) never produced a match.
+
+**Final numbers (attacker's share of turns; the gate needs 30% to 70%):**
+- Gate run, 48 matches: attacker 3.8%, defender 96.2%, backfires 26.4%.
+- Outcome feedback (D-023), 10 matches: attacker 6.7%, backfires 48.3%.
+- Defender token cap (D-024), 8 matches: attacker 16.7%, backfires 52%.
+- Retry on a failed self-check (D-025): implemented and unit-tested, not measured live.
+
+**What Phase 0 established:**
+- The engine, battle log, stats and scripted-fighter simulator work (163 tests).
+- Verified attacks are problems a strong model also solves, so the defender wins about 95% of them.
+- Backfires are about half of all turns; 78-83% are a stated answer that differs from the snippet's
+  output, because the attacker never sees its snippet run (fixed in code by D-025, unmeasured).
+- Results depend on problem difficulty relative to skill (D-020 to D-022), which Phase 0 fixes at 1.0.
+  The Phase 1 difficulty scorer is the intended lever.
+- Results from small free-tier models do not establish balance for stronger models.
+
+**Open for Phase 1:** re-run the 100-match gate with the D-025 retry once model access is not limited
+by free tiers (bring-your-own keys), and treat it as a blocking check before any ranked play.
+
+**Alternatives considered:** keep trying on the free tiers (rejected by the owner); tag the engine
+milestone anyway (rejected: it would misreport the gate result).

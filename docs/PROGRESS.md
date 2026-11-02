@@ -2,8 +2,9 @@
 
 Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 
-**Status: gate NOT reached. The run was stopped at 48 of 100 matches (owner's call) with the
-defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
+**Status: CLOSED by owner override on 2026-11-02 without passing the gate (D-026). Best live
+result: attacker 16.7% / defender 83.3% of turns (8 matches); 48-match gate run: 3.8% / 96.2%. The
+D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 
 ## Checklist
 - [x] 0. Bootstrap (git, uv, tooling, pre-commit, docs skeleton)
@@ -16,12 +17,17 @@ defender winning 96.2% of turns. No `v0.1.0-prototype` tag yet.**
 - [x] 7. cli `match`
 - [x] 8. stats + cli `sim`
 - [x] 9. live smoke test
-- [ ] 10. gate run: stopped at 48/100, gate failing (see below); tag `v0.1.0-prototype` pending
+- [ ] 10. gate run: not passed; Phase 0 closed without it (D-026), no tag
 
 ## Current task
 None in progress.
 
 ## Next task
+Plan Phase 1 (MVP) from `docs/PRODUCT_SPEC.md` and get the plan approved. No Phase 1 code before
+that. Carry over from Phase 0: the difficulty scorer, bring-your-own API keys, and re-measuring the
+gate (with the D-025 retry) once model access is not limited by free tiers.
+
+## Last Phase 0 experiments
 Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):
 attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite
 backfires 21 of 30, gpt-oss 8 of 30. Matches 6-10 backfire less than 1-5 (11 vs 18 of 30), but 10

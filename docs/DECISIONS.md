@@ -629,3 +629,35 @@ raw. `runs/logs` mixes several runs; `runs/logs_gate48` is the clean 48-match ga
 **Alternatives considered:** deriving the turn view in the web app (needs a JS test framework);
 reading files from the web app (breaks the rule that the web never touches storage); returning the raw
 log and letting the page work it out (every consumer repeats the logic).
+
+## D-030 · 2026-11-02 · Battle log schema 2: header, attempts on events, lowercase sides
+
+**Decision:** The battle log gains `schema: 2` and a `fighters` header with `a` and `b`, each
+`{name, provider, model, persona}` (`BattleLog.record_fighters`, called first by `run_match`). Events
+now carry the attack itself: `attack_verified` has `problem`, `answer` and `code` (the snippet);
+`attack_retry` (D-025) has the same three for the first attempt, next to its `reason`; `backfire`
+has them for the last attempt whenever the reply parsed. A reply that could not be parsed or timed
+out has nothing to show, so its `backfire` stays `actor` and `reason` only. Sides stay lowercase
+`a`/`b`, including the `hp` event's keys. The API's replay response adds `code` and `first_attempt`
+per turn, `fighter_a`/`fighter_b` on a replay and `name_a`/`name_b` on a summary; schema 1 logs
+still load and give `null` for the new fields, and the page falls back to "Fighter A/B".
+
+**Why:** The slice 2 viewer could not name the fighters, show a backfired problem or show what a
+retry changed. The persona is hidden during a match and shown in the replay afterwards (spec), and a
+log file only exists after the match.
+
+**Sides stay `a`/`b`:** the spec's example uses `A`/`B`, but it is only an example. The engine, stats,
+tests and every stored log use `a`/`b`; changing it would touch all of them for no gain.
+
+**Not added yet, on purpose:** `fx` (renderer, slice 4), `problem_id` (persistence, slice 5),
+`difficulty` (scorer, slice 7), `domain` (second domain, slice 10). Each is added by the slice that
+uses it.
+
+**Consequences:** logs are larger (the snippet is stored). The persona is in every log file, which is
+fine for local files; before replays are public (later slices) the API must withhold it until the
+match is over. New response fields that only the web reads (`code`, `first_attempt`, `name_a`,
+`name_b`) were added to the `[tool.vulture] ignore_names` list.
+
+**Alternatives considered:** uppercase sides to match the spec example (rejected, above); a separate
+file for attempts (more files for no reader); storing attempts only for backfires (the viewer also
+needs the first attempt of a retry that then succeeded).

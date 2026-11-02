@@ -34,7 +34,15 @@ Verify = Callable[[str, str, float], Verification]
 
 
 class _Backfire(Exception):
-    pass
+    """The attack failed; `attack` is the last parsed attempt, if any (for the log)."""
+
+    def __init__(self, reason: str, attack: Attack | None = None) -> None:
+        super().__init__(reason)
+        self.attack = attack
+
+
+def _attempt(attack: Attack) -> dict[str, str]:
+    return {"problem": attack.problem, "answer": attack.answer, "code": attack.snippet}
 
 
 def _other(side: Side) -> Side:
@@ -79,13 +87,13 @@ def _pose_attack(
     check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
     if check.passed:
         return attack
-    log.emit("attack_retry", actor=side, reason=check.reason)
+    log.emit("attack_retry", actor=side, reason=check.reason, **_attempt(attack))
     system, user = prompts
     retry_prompts = (system, correction_prompt(user, attack, check.reason))
     attack = _draft(attacker, side, retry_prompts, complete, settings, log)
     check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
     if not check.passed:
-        raise _Backfire(check.reason)
+        raise _Backfire(check.reason, attack)
     return attack
 
 
@@ -144,11 +152,16 @@ def play_turn(
         prompts = attack_prompts(fighter, topic, used_problems, recent_outcomes)
         attack = _pose_attack(fighter, attacker_side, prompts, complete, verify, settings, log)
     except _Backfire as exc:
-        log.emit("backfire", actor=attacker_side, reason=str(exc))
+        log.emit(
+            "backfire",
+            actor=attacker_side,
+            reason=str(exc),
+            **(_attempt(exc.attack) if exc.attack else {}),
+        )
         amount = backfire_damage(BASE_DAMAGE, DIFFICULTY)
         return _hit(log, turn, attacker_side, attacker_side, amount)
     used_problems.append(attack.problem)
-    log.emit("attack_verified", actor=attacker_side, problem=attack.problem, answer=attack.answer)
+    log.emit("attack_verified", actor=attacker_side, **_attempt(attack))
     log.emit("defend_start", actor=defender_side)
     score = _defend(fighters[defender_side], defender_side, attack, complete, settings, log)
     if score == 1.0:
@@ -168,6 +181,7 @@ def run_match(
     history: dict[Side, list[Outcome]] | None = None,
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
+    log.record_fighters(fighter_a, fighter_b)
     used_problems: list[str] = []
     # Each fighter's own attack outcomes, earlier matches first (copied: the caller's stay intact).
     outcomes: dict[Side, list[Outcome]] = {"a": [], "b": []}

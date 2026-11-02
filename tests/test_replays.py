@@ -67,13 +67,25 @@ def backfire_turn(n: int, attacker: str, *, retried: bool) -> dict[str, Any]:
     return turn(n, events)
 
 
-def write_log(directory: Path, name: str, turns: list[dict[str, Any]]) -> None:
+FIGHTERS = {
+    "a": {"name": "alice", "provider": "groq", "model": "model-a", "persona": "You are bold."},
+    "b": {"name": "bob", "provider": "gemini", "model": "model-b", "persona": "You are careful."},
+}
+
+
+def write_log(
+    directory: Path,
+    name: str,
+    turns: list[dict[str, Any]],
+    fighters: dict[str, dict[str, str]] | None = None,
+) -> None:
     turns[-1]["events"].append(
         {"t": 1, "type": "match_end", "winner": "b", "reason": "decision", "turns": len(turns)}
     )
-    (directory / f"{name}.json").write_text(
-        json.dumps({"match_id": name, "turns": turns}), encoding="utf-8"
-    )
+    log: dict[str, Any] = {"match_id": name, "turns": turns}
+    if fighters:  # schema 2 (D-030); older logs have neither key
+        log |= {"schema": 2, "fighters": fighters}
+    (directory / f"{name}.json").write_text(json.dumps(log), encoding="utf-8")
 
 
 @pytest.fixture
@@ -102,6 +114,8 @@ def test_lists_replays_with_their_result(logs: Path, client: TestClient) -> None
         "hp_a": 100.0,
         "hp_b": 80.0,
         "turn_count": 2,
+        "name_a": None,
+        "name_b": None,
     }
 
 
@@ -115,6 +129,7 @@ def test_replay_turns_carry_what_the_reveal_panel_shows(logs: Path, client: Test
         "damage_math": "20 × 1 × (1 − 0) = 20", "problem": "hard?", "stated_answer": "7",
         "defender_answer": "8", "score": 0.0, "timed_out": False, "retried": False,
         "failure_reason": None, "hp_a": 100.0, "hp_b": 80.0, "duration_ms": 3000,
+        "code": None, "first_attempt": None,
     }  # fmt: skip
     assert (turns[1]["outcome"], turns[1]["damage"], turns[1]["damage_math"]) == (
         "block", 0.0, "no damage",
@@ -176,3 +191,59 @@ def test_missing_logs_folder_lists_nothing(
     monkeypatch.setenv("ARENA_LOGS_DIR", str(tmp_path / "absent"))
 
     assert client.get("/replays").json() == []
+
+
+def attempt_fields(problem: str, answer: str) -> dict[str, str]:
+    return {"problem": problem, "answer": answer, "code": f"print({answer})"}
+
+
+def test_schema_2_log_names_the_fighters_and_reveals_their_personas(
+    logs: Path, client: TestClient
+) -> None:
+    write_log(logs, "m1", [block_turn(1, "a", "b")], FIGHTERS)
+
+    (summary,) = client.get("/replays").json()
+    replay = client.get("/replays/m1").json()
+
+    assert (summary["name_a"], summary["name_b"]) == ("alice", "bob")
+    assert replay["fighter_a"] == FIGHTERS["a"]
+    assert replay["fighter_b"]["persona"] == "You are careful."
+
+
+def test_old_logs_without_a_header_have_no_fighters(logs: Path, client: TestClient) -> None:
+    write_log(logs, "m1", [block_turn(1, "a", "b")])
+
+    replay = client.get("/replays/m1").json()
+
+    assert (replay["fighter_a"], replay["fighter_b"]) == (None, None)
+
+
+def test_verified_turn_shows_the_attackers_code(logs: Path, client: TestClient) -> None:
+    verified = block_turn(1, "a", "b")
+    verified["events"][1]["code"] = "print(42)"
+    write_log(logs, "m1", [verified], FIGHTERS)
+
+    (shown,) = client.get("/replays/m1").json()["turns"]
+
+    assert (shown["code"], shown["first_attempt"]) == ("print(42)", None)
+
+
+def test_backfired_turn_shows_the_final_attempt_and_the_first_one(
+    logs: Path, client: TestClient
+) -> None:
+    failed = backfire_turn(1, "a", retried=True)
+    failed["events"][1] |= attempt_fields("first try", "41")
+    failed["events"][2] |= attempt_fields("second try", "40")
+    write_log(logs, "m1", [failed], FIGHTERS)
+
+    (shown,) = client.get("/replays/m1").json()["turns"]
+
+    assert (shown["problem"], shown["stated_answer"], shown["code"]) == (
+        "second try", "40", "print(40)",
+    )  # fmt: skip
+    assert shown["first_attempt"] == {
+        "problem": "first try",
+        "answer": "41",
+        "code": "print(41)",
+        "reason": "mismatch: snippet printed '2/3', stated '5/4'",
+    }

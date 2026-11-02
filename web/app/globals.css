@@ -50,5 +50,9 @@ th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: lef
 .panel h2 { margin: 0; font-size: 18px; }
 .panel dt { margin-top: 10px; color: var(--muted); font-size: 14px; }
 .panel dd { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mono { font-family: ui-monospace, monospace; font-size: 14px; }
+.fighters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.fighters summary { cursor: pointer; }
+.fighters p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .nav { display: flex; gap: 8px; margin-top: 12px; }
 .nav button { padding: 6px 12px; font: inherit; }

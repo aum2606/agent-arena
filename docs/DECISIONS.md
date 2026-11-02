@@ -569,3 +569,32 @@ model calls, so free-tier limits cannot block it.
 
 **Alternatives considered:** code domain earlier (largest security surface, Linux-only sandbox) or
 dropped from the MVP (owner kept it, last).
+
+## D-028 · 2026-11-02 · Phase 1 foundation: one repo, FastAPI, Next.js, Docker Compose
+
+**Decision:** One repository holds the engine (`src/arena/`), the API (`src/arena_api/`, same
+`pyproject.toml`, so the existing ruff, mypy strict, vulture and pytest cover it) and the web app
+(`web/`). `docker-compose.yml` starts Postgres 16, Redis 7, the API and the web app, with ports bound
+to localhost; Postgres and Redis are unused until slice 5. The Postgres password has a local-only
+default (`arena-dev`), overridable with `POSTGRES_PASSWORD`. CI (GitHub Actions) is deferred: the repo
+has no remote, so a workflow would never run; pre-commit still runs the Python checks.
+The web app is hand-written (no `create-next-app`) and checked with `tsc --noEmit` and `next build`;
+no web test framework until there is logic to test.
+
+**Dependencies (new):**
+- Python, in a new uv dependency group `api` (on by default, excluded from the Docker image's dev
+  tools): `fastapi`, `uvicorn`. Serves the API; the spec's chosen stack.
+- Web: `next` (16, since 15.x had an audit finding fixed only in 16), `react`, `react-dom`,
+  `typescript`, `@types/node`, `@types/react`. The spec's chosen frontend; `npm audit` reports 0.
+- No `httpx` was needed: FastAPI's test client works with the installed `httpx2`.
+
+**Linter configuration:** `[tool.vulture] ignore_decorators = ["@app.*"]`. FastAPI registers route
+handlers through the decorator and nothing calls them, so vulture reports them as unused. This is a
+decorator pattern, not a blanket ignore; dead code elsewhere is still reported.
+
+**Packaging:** `[tool.uv.build-backend] module-name = ["arena", "arena_api"]` so both packages are in
+the built project; `default-groups = ["dev", "api"]` keeps `uv sync` unchanged for development.
+
+**Alternatives considered:** separate repos for web and API (rejected by the owner); a shared
+workspace with separate Python projects (more config than one `pyproject` for no gain yet); database
+drivers and a Redis client now (YAGNI until slice 5).

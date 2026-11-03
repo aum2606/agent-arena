@@ -55,16 +55,6 @@ export interface Replay {
   max_hp: number;
 }
 
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
-
-/** The parsed JSON, or null when the API answers 404. Anything else is an error. */
-export async function getJson<T>(path: string): Promise<T | null> {
-  const response = await fetch(`${API_URL}${path}`, { cache: "no-store" });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`API ${path} returned ${response.status}`);
-  return response.json();
-}
-
 /** The fighter's name, or "Fighter A"/"Fighter B" for older logs that have none. */
 export function sideLabel(summary: ReplaySummary, side: Side): string {
   return (side === "a" ? summary.name_a : summary.name_b) ?? `Fighter ${side.toUpperCase()}`;

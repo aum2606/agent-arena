@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getJson, type Replay } from "../../../lib/api";
+import type { Replay } from "../../../lib/api";
+import { getJson } from "../../../lib/server-api";
 import { Viewer } from "./viewer";
 
 export const dynamic = "force-dynamic";

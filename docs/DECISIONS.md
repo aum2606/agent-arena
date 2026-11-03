@@ -940,3 +940,30 @@ prompt change, or changing the gate metric) waits for the measurement and the ow
 **Alternatives considered:** running with the panel (about double the quota and time for no change to
 the verdict); judging on the point estimate (a run near 70% would be called a pass or fail on noise);
 a fixed 100 matches regardless of what 50 show (spends free-tier quota on a run that cannot pass).
+
+## D-038 · 2026-11-03 · `arena sim` waits out an overloaded provider and replays the match
+
+**Decision:** `LlmClient` raises `LlmUnavailable` (a subclass of `LlmError`) when a provider's
+retries run out on a 429 or 5xx, or when it cannot be reached; every other provider error (a 401 for a
+bad key, a 400, an empty reply) stays a plain `LlmError`. `arena sim` catches `LlmUnavailable` from a
+match, waits `SIM_COOLDOWN_S` (300 s), and replays that same match, up to `SIM_MATCH_ATTEMPTS` (3)
+attempts in all; after the last it stops with the error as before. The replay starts clean: a fresh
+`BattleLog` and a fresh `Random(i)`, so it is the same pairing and topics as an undisturbed match, and
+nothing from the failed attempt is saved. Plain `LlmError`s do not wait. Callers that catch `LlmError`
+(the worker, `arena match`) are unaffected. The two numbers are constants in `cli.py`.
+
+**Why:** the first two slice 8 gate attempts (15:40 and 15:56 on 2026-11-03) each died inside match 1
+because Gemini kept answering 503 "overloaded" for longer than the client's own eight retries (about
+nine minutes), although a probe between them was answered. Each attempt saved nothing. Matches are
+independent apart from the outcome feedback built from saved results, so replaying one is safe.
+
+**Bounds:** at most two waits of 5 minutes per match, so a real outage costs about ten minutes of
+waiting and then stops; "never retry forever" holds. A 401 or 400 does not wait, so a bad key fails at
+once.
+
+**Not done:** the same wait for `arena match` (one match, run by hand) and for the worker (a user is
+waiting on the status page; it fails the match and shows the reason).
+
+**Alternatives considered:** raising `max_retries` or the backoff in `config/fighters.toml` (it would
+also slow every user-facing call, and a 401 would still be retried); swapping the Gemini fighter (a
+different experiment); waiting and rerunning by hand (needs someone present).

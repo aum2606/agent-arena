@@ -6,9 +6,10 @@ import pytest
 from arena import cli
 from arena.cli import format_summary, main
 from arena.config import Provider, Settings
-from arena.llm import Completion, LlmError
+from arena.llm import Completion, LlmError, LlmUnavailable
 from arena.models import Fighter, MatchRecord, MatchResult, TurnResult
 from arena.prompts import ATTACK_REQUEST
+from arena.stats import load_records
 
 CONFIG = """
 [settings]
@@ -342,3 +343,93 @@ def test_no_panel_flag_skips_the_scoring(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert "difficulty" not in events
     assert "ref-1" not in PanelRecordingClient.askers
+
+
+class FlakyClient(StubClient):
+    failures_left = 0  # shared on purpose so the test can set it
+
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        if FlakyClient.failures_left > 0:
+            FlakyClient.failures_left -= 1
+            raise LlmUnavailable("gemini HTTP 503 after 8 retries")
+        return super().complete(fighter, system, user, max_tokens)
+
+
+@pytest.fixture
+def sleeps(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Replaces the cooldown sleep so tests do not wait; returns the waits that were asked for."""
+    waited: list[float] = []
+    monkeypatch.setattr(cli, "sleep", waited.append)
+    return waited
+
+
+def test_sim_waits_and_replays_a_match_when_a_provider_is_overloaded(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sleeps: list[float],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", FlakyClient)
+    FlakyClient.failures_left = 1
+    out = tmp_path / "sim.jsonl"
+
+    assert sim(config_path, out, 2) == 0
+
+    assert sleeps == [cli.SIM_COOLDOWN_S]
+    records = load_records(out)
+    assert len(records) == 2 and all(len(r.turns) == 6 for r in records)
+    printed = capsys.readouterr().out
+    assert "[1/2]" in printed and "[2/2]" in printed
+
+
+def test_a_replayed_match_is_the_same_pairing_as_an_undisturbed_one(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sleeps: list[float],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", FlakyClient)
+    FlakyClient.failures_left = 0
+    sim(config_path, tmp_path / "clean.jsonl", 1)
+    FlakyClient.failures_left = 2
+    sim(config_path, tmp_path / "flaky.jsonl", 1)
+
+    clean, flaky = (
+        load_records(tmp_path / "clean.jsonl")[0],
+        load_records(tmp_path / "flaky.jsonl")[0],
+    )
+
+    assert (flaky.fighter_a, flaky.fighter_b) == (clean.fighter_a, clean.fighter_b)
+    assert sleeps == [cli.SIM_COOLDOWN_S] * 2
+
+
+def test_sim_gives_up_after_its_attempts_and_saves_nothing_unfinished(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sleeps: list[float],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", FlakyClient)
+    FlakyClient.failures_left = 999
+    out = tmp_path / "sim.jsonl"
+
+    assert sim(config_path, out, 2) == 1
+
+    assert sleeps == [cli.SIM_COOLDOWN_S] * (cli.SIM_MATCH_ATTEMPTS - 1)
+    assert "503" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_sim_does_not_wait_for_an_error_that_waiting_would_not_fix(
+    config_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sleeps: list[float],
+) -> None:
+    monkeypatch.setattr(cli, "LlmClient", FailingClient)
+
+    assert sim(config_path, tmp_path / "sim.jsonl", 1) == 1
+
+    assert sleeps == []

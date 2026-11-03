@@ -4,12 +4,13 @@ import random
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from time import sleep
 
 from dotenv import load_dotenv
 
 from arena.battle_log import BattleLog
 from arena.config import ConfigError, load_config
-from arena.llm import LlmClient, LlmError
+from arena.llm import LlmClient, LlmError, LlmUnavailable
 from arena.models import MatchRecord, Outcome, Side
 from arena.orchestrator import run_match
 from arena.stats import (
@@ -29,7 +30,13 @@ from arena.synthetic import (
     sweep,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_CONFIG = Path("config/fighters.toml")
+# A free-tier provider can stay overloaded for longer than the client's own retries last, so a
+# sim waits and replays that match, a few times, before it stops (D-038).
+SIM_COOLDOWN_S = 300.0
+SIM_MATCH_ATTEMPTS = 3
 RUNS_DIR = Path("runs")
 
 
@@ -93,24 +100,39 @@ def _sim(args: argparse.Namespace) -> None:
     client = LlmClient(config.providers, config.settings)
     # Seeding by match index keeps the pairing identical when a sim is resumed.
     for i in range(len(records), args.n):
-        rng = random.Random(i)
-        a, b = rng.sample(names, 2)
         match_id = f"sim_{i:04d}"
-        log = BattleLog(match_id)
-        history: dict[Side, list[Outcome]] = {
-            "a": attack_outcomes(records, a),
-            "b": attack_outcomes(records, b),
-        }
-        record = run_match(
-            config.fighters[a],
-            config.fighters[b],
-            client.complete,
-            config.settings,
-            log,
-            rng,
-            history=history,
-            panel=() if args.no_panel else config.panel,
-        )
+        for attempt in range(1, SIM_MATCH_ATTEMPTS + 1):
+            rng = random.Random(i)  # fresh each attempt, so a replay is the same pairing and topics
+            a, b = rng.sample(names, 2)
+            log = BattleLog(match_id)
+            history: dict[Side, list[Outcome]] = {
+                "a": attack_outcomes(records, a),
+                "b": attack_outcomes(records, b),
+            }
+            try:
+                record = run_match(
+                    config.fighters[a],
+                    config.fighters[b],
+                    client.complete,
+                    config.settings,
+                    log,
+                    rng,
+                    history=history,
+                    panel=() if args.no_panel else config.panel,
+                )
+                break
+            except LlmUnavailable as exc:
+                if attempt == SIM_MATCH_ATTEMPTS:
+                    raise
+                logger.warning(
+                    "%s: %s; waiting %.0f s, then replaying the match (attempt %d of %d)",
+                    match_id,
+                    exc,
+                    SIM_COOLDOWN_S,
+                    attempt + 1,
+                    SIM_MATCH_ATTEMPTS,
+                )
+                sleep(SIM_COOLDOWN_S)
         log.write(RUNS_DIR / "logs" / f"{match_id}.json")
         append_record(args.out, record)
         records.append(record)

@@ -22,6 +22,10 @@ class LlmTimeout(LlmError):
     pass
 
 
+class LlmUnavailable(LlmError):
+    """The provider is busy or unreachable (retries ran out); trying again later may work."""
+
+
 @dataclass(frozen=True)
 class Completion:
     text: str
@@ -72,7 +76,7 @@ class LlmClient:
                 # 429 and 5xx (e.g. Gemini 503 "overloaded") are transient: back off and retry.
                 problem = "rate limited" if exc.status_code == 429 else f"HTTP {exc.status_code}"
                 if attempt == s.max_retries:
-                    raise LlmError(
+                    raise LlmUnavailable(
                         f"{fighter.provider} {problem} after {s.max_retries} retries"
                     ) from exc
                 delay = s.backoff_base_s * 2**attempt * random.uniform(0.5, 1.5)
@@ -81,7 +85,7 @@ class LlmClient:
             except openai.APITimeoutError as exc:
                 raise LlmTimeout(f"{fighter.provider} timed out") from exc
             except openai.APIConnectionError as exc:
-                raise LlmError(f"cannot reach {fighter.provider}: {exc}") from exc
+                raise LlmUnavailable(f"cannot reach {fighter.provider}: {exc}") from exc
             except openai.APIStatusError as exc:
                 raise LlmError(
                     f"{fighter.provider} returned HTTP {exc.status_code}: {exc.message}"

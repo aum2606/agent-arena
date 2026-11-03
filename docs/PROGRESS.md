@@ -9,7 +9,7 @@ D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 ## Phase 1 slices (D-027, details in `docs/PLAN_PHASE1.md`)
 - [x] 1 foundation (compose verified: api :8100, web :3100 shows API ok)  - [x] 2 text replay viewer (48 logs listed and replayed in the browser; names and backfired problems wait for slice 3)  - [x] 3 log schema v2 (names, personas, code and attempts in logs; old logs still load)  - [x] 4 PixiJS renderer (drawn shapes; retry, windup, projectile, think, hit, backfire seen live; block, timeout, KO not yet seen)
 - [x] 5 persistence + workers (a real match queued through the API finished: first live run with the D-025 retry; 48 gate logs imported)  - [x] 6 auth, fighters, BYO keys (sign-in, versioned fighters, encrypted keys, sparring, pages; a real spar with a real key is untried)  - [x] 7 difficulty scorer (panel of three; one live match: ~4,300 tokens and 3 calls per scored problem, difficulties 0.5 to 1.5; D-036)
-- [ ] 8 balance re-check (blocks 9)  - [ ] 9 ranked + Elo  - [ ] 10 code domain + sandbox
+- [~] 8 balance re-check (blocks 9): method fixed (D-037), 100-match run into `runs/gate2.jsonl` in progress  - [ ] 9 ranked + Elo  - [ ] 10 code domain + sandbox
 - [ ] 11 launch hardening
 
 ## Phase 0 checklist

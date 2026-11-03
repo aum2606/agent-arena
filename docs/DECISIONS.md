@@ -909,3 +909,34 @@ defender, and one attack backfired, so no damage was dealt by a scored problem i
 defenders); running the three calls one after another (a turn would wait three times as long); counting
 panel provider errors as failures (a rate limit would raise difficulty); a non-linear scale (no data
 to justify one yet).
+
+## D-037 · 2026-11-03 · How the slice 8 balance re-check is run
+
+**Decision:** The 100-match gate re-check (CLAUDE.md: slice 8 must pass, or the rules be changed and
+logged, before ranked play) runs as `arena sim --n 100 --no-panel --out runs/gate2.jsonl`, with the
+D-025 retry, the D-023 outcome feedback and the 2048-token defender budget (D-024) as shipped, on the
+free tiers.
+
+- **No panel:** the gate counts which role wins each turn, and difficulty only scales how much a hit
+  deals, so scoring problems cannot change a turn's outcome. Skipping it roughly halves the calls and
+  avoids the Groq rate-limit contention seen in the one panel match (D-036).
+- **Verdict on intervals:** `format_stats` now prints 95% Wilson intervals for both roles and the hit
+  rate among attacks that reached a defender (backfires excluded), and the gate verdict follows the
+  interval: PASS when the dominant role's upper bound is at most 70%, FAIL when its lower bound is above
+  70%, INCONCLUSIVE when the interval straddles 70%. A run under 100 matches is INCOMPLETE and says
+  "cannot pass" once the dominant role's lower bound exceeds 70%, which is the early-stop signal: the
+  run is checked at 50 matches (about 300 turns) and stopped if it cannot pass, to spare free-tier
+  quota.
+- **Defender token logging:** `Completion.output_tokens` is the total minus the prompt, so hidden
+  reasoning counts (Gemini's `completion_tokens` leaves its thinking out), and a defender's
+  `defend_result` and cut-off `timeout` events carry it. The panel measurement showed defenders spending
+  about 1,000 to 2,000 tokens a problem, so the defender budget is a strong lever; with the token
+  counts logged, the share of defenses a tighter cap would have cut off can be computed from the run
+  itself, without another run, before any rule is changed.
+
+**Not decided here:** what to change if the gate fails. That choice (a deliberate defender budget, a
+prompt change, or changing the gate metric) waits for the measurement and the owner.
+
+**Alternatives considered:** running with the panel (about double the quota and time for no change to
+the verdict); judging on the point estimate (a run near 70% would be called a pass or fail on noise);
+a fixed 100 matches regardless of what 50 show (spends free-tier quota on a run that cannot pass).

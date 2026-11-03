@@ -1,4 +1,5 @@
 import json
+import math
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -11,6 +12,16 @@ GATE_MIN_MATCHES = 100
 
 class ResultsError(Exception):
     pass
+
+
+def wilson_interval(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% confidence interval for a rate; wide when n is small, (0, 1) when there is no data."""
+    if n == 0:
+        return 0.0, 1.0
+    p = successes / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return max(centre - margin, 0.0), min(centre + margin, 1.0)
 
 
 @dataclass(frozen=True)
@@ -32,6 +43,21 @@ class Stats:
     @property
     def defender_win_rate(self) -> float:
         return (self.blocks + self.backfires) / self.turns
+
+    @property
+    def attacker_interval(self) -> tuple[float, float]:
+        return wilson_interval(self.hits, self.turns)
+
+    @property
+    def defender_interval(self) -> tuple[float, float]:
+        low, high = self.attacker_interval  # the defender wins every turn the attacker does not
+        return 1 - high, 1 - low
+
+    @property
+    def verified_hit_rate(self) -> float | None:
+        """Hits among attacks that reached a defender (backfires are not counted)."""
+        reached = self.hits + self.blocks
+        return self.hits / reached if reached else None
 
     @property
     def backfire_rate(self) -> float:
@@ -68,15 +94,37 @@ def compute_stats(records: list[MatchRecord]) -> Stats:
 
 
 def _gate(stats: Stats) -> str:
-    if stats.matches < GATE_MIN_MATCHES:
-        return f"INCOMPLETE ({stats.matches}/{GATE_MIN_MATCHES} matches)"
-    dominant, rate = max(
-        [("attacker", stats.attacker_win_rate), ("defender", stats.defender_win_rate)],
+    dominant, rate, (low, high) = max(
+        [
+            ("attacker", stats.attacker_win_rate, stats.attacker_interval),
+            ("defender", stats.defender_win_rate, stats.defender_interval),
+        ],
         key=lambda role: role[1],
     )
-    if rate <= GATE_MAX_ROLE_WIN_RATE:
+    # Judged on the interval, not the point estimate, so a run near 70% is not called either way.
+    over, under = low > GATE_MAX_ROLE_WIN_RATE, high <= GATE_MAX_ROLE_WIN_RATE
+    interval = f"95% interval {low:.0%}-{high:.0%}"
+    if stats.matches < GATE_MIN_MATCHES:
+        text = f"INCOMPLETE ({stats.matches}/{GATE_MIN_MATCHES} matches)"
+        if over:
+            text += f"; cannot pass: {dominant} wins at least {low:.0%} of turns"
+        return text
+    if under:
         return "PASS"
-    return f"FAIL ({dominant} wins {rate:.1%} of turns)"
+    if over:
+        return f"FAIL ({dominant} wins {rate:.1%} of turns, {interval})"
+    return f"INCONCLUSIVE ({dominant} wins {rate:.1%} of turns, {interval})"
+
+
+def _reached_lines(stats: Stats) -> list[str]:
+    rate = stats.verified_hit_rate
+    a_low, a_high = stats.attacker_interval
+    d_low, d_high = stats.defender_interval
+    lines = [f"95% intervals: attacker {a_low:.1%}-{a_high:.1%}, defender {d_low:.1%}-{d_high:.1%}"]
+    if rate is not None:
+        reached = stats.hits + stats.blocks
+        lines.insert(0, f"Attacks that reached a defender: {reached}, hit rate {rate:.1%}")
+    return lines
 
 
 def format_stats(stats: Stats) -> str:
@@ -90,6 +138,7 @@ def format_stats(stats: Stats) -> str:
             f"Average damage per turn: {stats.average_damage_per_turn:.1f}",
             f"Average match length: {stats.average_match_length:.1f} turns",
             f"Endings: KO {stats.kos}, decision {stats.decisions}, draw {stats.draws}",
+            *_reached_lines(stats),
             f"Gate: {_gate(stats)} (neither role above "
             f"{GATE_MAX_ROLE_WIN_RATE:.0%} of turns over {GATE_MIN_MATCHES}+ matches)",
         ]

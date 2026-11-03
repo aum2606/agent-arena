@@ -240,3 +240,21 @@ def test_the_token_count_is_none_when_the_provider_does_not_report_it(
     h = harness(lambda _: chat_response("hi"))
 
     assert h.client.complete(FIGHTER, "s", "u", 64).tokens is None
+
+
+def test_output_tokens_count_everything_after_the_prompt_including_hidden_reasoning(
+    harness: type[Harness],
+) -> None:
+    # Gemini's completion_tokens leaves out its thinking; total minus prompt is what a cap limits.
+    usage = {"prompt_tokens": 30, "completion_tokens": 20, "total_tokens": 100}
+    h = harness(lambda _: chat_response("hi", usage=usage))
+
+    completion = h.client.complete(FIGHTER, "s", "u", 64)
+
+    assert (completion.tokens, completion.output_tokens) == (100, 70)
+
+
+def test_output_tokens_are_none_without_usage(harness: type[Harness]) -> None:
+    h = harness(lambda _: chat_response("hi"))
+
+    assert h.client.complete(FIGHTER, "s", "u", 64).output_tokens is None

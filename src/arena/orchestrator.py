@@ -112,15 +112,24 @@ def _defend(
     except LlmTimeout:
         reply = None
     if reply is None or reply.truncated:
-        log.emit("timeout", actor=side)
+        log.emit("timeout", actor=side, output_tokens=reply.output_tokens if reply else None)
         return 0.0
     try:
         given = parse_defense(reply.text)
     except ParseError as exc:
-        log.emit("defend_result", actor=side, score=0.0, answer=None, reason=str(exc))
+        log.emit(
+            "defend_result",
+            actor=side,
+            score=0.0,
+            answer=None,
+            reason=str(exc),
+            output_tokens=reply.output_tokens,
+        )
         return 0.0
     score = 1.0 if answers_match(given, attack.answer) else 0.0
-    log.emit("defend_result", actor=side, score=score, answer=given)
+    log.emit(
+        "defend_result", actor=side, score=score, answer=given, output_tokens=reply.output_tokens
+    )
     return score
 
 

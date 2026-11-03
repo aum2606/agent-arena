@@ -39,7 +39,8 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 ```bash
 uv sync                                   # install deps
 uv run arena match --a <fighter> --b <fighter>   # add --no-panel to skip difficulty scoring (D-036)
-uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl; --no-panel too
+uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl; --no-panel too; waits out
+                                          # an overloaded provider and replays the match (D-038)
 uv run arena synth --matches 100          # balance sweep with scripted fighters, no network (D-020)
 uv run arena synth --compare-rules        # answer-rule comparison by difficulty (D-021)
 uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)

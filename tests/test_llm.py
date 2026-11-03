@@ -5,7 +5,7 @@ import httpx2
 import pytest
 
 from arena.config import ConfigError, Provider, Settings
-from arena.llm import LlmClient, LlmError, LlmTimeout
+from arena.llm import LlmClient, LlmError, LlmTimeout, LlmUnavailable
 from arena.models import Fighter
 
 SETTINGS = Settings(
@@ -258,3 +258,31 @@ def test_output_tokens_are_none_without_usage(harness: type[Harness]) -> None:
     h = harness(lambda _: chat_response("hi"))
 
     assert h.client.complete(FIGHTER, "s", "u", 64).output_tokens is None
+
+
+def test_running_out_of_retries_on_a_busy_provider_is_unavailable_not_just_an_error(
+    harness: type[Harness],
+) -> None:
+    h = harness(lambda _: rate_limited())
+
+    with pytest.raises(LlmUnavailable, match="rate limited"):
+        h.client.complete(FIGHTER, "s", "u", 64)
+
+
+def test_a_provider_that_cannot_be_reached_is_unavailable(harness: type[Harness]) -> None:
+    def down(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("no route", request=request)
+
+    with pytest.raises(LlmUnavailable, match="cannot reach groq"):
+        harness(down).client.complete(FIGHTER, "s", "u", 64)
+
+
+def test_a_rejected_request_is_a_plain_error_that_waiting_would_not_fix(
+    harness: type[Harness],
+) -> None:
+    h = harness(lambda _: httpx2.Response(401, json={"error": {"message": "bad key"}}))
+
+    with pytest.raises(LlmError) as raised:
+        h.client.complete(FIGHTER, "s", "u", 64)
+
+    assert not isinstance(raised.value, LlmUnavailable)

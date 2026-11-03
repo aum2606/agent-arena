@@ -73,6 +73,9 @@ saved records.
 - `auth` / `accounts` (Phase 1): GitHub sign-in (`/auth/github/login` and `/callback`), a session cookie whose
   token is stored hashed, `current_user` for protected routes, and a local-only dev sign-in. The web app
   forwards `/api/*` to the API so the cookie stays same-site.
+- `fighters` / `fighter_routes` / `secret_box` (Phase 1): a signed-in user's fighters, each a list of
+  numbered versions (provider from `config/fighters.toml`, model, persona, encrypted API key). Responses
+  carry only the last four characters of the key; the worker decrypts it to play that fighter.
 - `web` (Phase 1): Next.js app that only calls the API. A replay page plays each turn on a Pixi canvas:
   `choreography.planTurn` turns a turn into timed steps (3 to 6 s), `stage.Stage` draws the scene as a
   pure function of (plan, time), `viewer.tsx` holds play, pause, speed and whole-match state.

@@ -775,3 +775,37 @@ SameSite=Lax); sign-in rate limiting; deleting expired session rows.
 **Alternatives considered:** `authlib` or `itsdangerous` signed-cookie sessions (a dependency for
 about 40 lines and no revocation); letting the browser call the API directly (cookies and CORS);
 storing the session token unhashed (a database leak would be account takeover).
+
+## D-034 · 2026-11-03 · Fighters with versions and encrypted bring-your-own keys
+
+**Decision:** A signed-in user owns up to 10 fighters (`MAX_FIGHTERS_PER_USER`). `fighters` holds the
+name (unique per owner) and `daily_match_cap`; `fighter_versions` holds each numbered version:
+provider, model, persona, the API key encrypted, and its last four characters (`key_hint`). Every
+edit (`POST /fighters/{id}/versions`) adds a version and starts it unverified; leaving the key out
+keeps the saved one. Providers must be one of the `[providers.*]` in `config/fighters.toml`, so a user
+cannot point the server at an arbitrary URL. Routes: `GET /fighters`, `POST /fighters`,
+`GET /fighters/{id}`, `POST /fighters/{id}/versions`, `GET /fighters/options` (providers and the
+Aggressive, Defensive and Counter-puncher persona templates). Someone else's fighter is a 404.
+Responses never include the key, only `key_hint`; no log line prints it.
+
+**Key encryption:** Fernet (AES-128-CBC with an HMAC) with a server secret `KEY_ENCRYPTION_SECRET`
+from the environment. Without it, saving a fighter answers 503 and says why; a changed secret makes
+saved keys undecryptable (reported, not crashed on). The secret is not rotated or stored with the
+data. This protects a copied database, not a compromised server.
+
+**Dependency (new, `api` group):** `cryptography` (Fernet). Writing our own cipher is not an option.
+
+**Spend cap:** `daily_match_cap` (default 10, 1 to 50) is a limit on matches per fighter per day, the
+only cap the engine can enforce today. It is stored here; sparring and later ranked play enforce it
+(6c). It is not a token or dollar cap: nothing tracks usage yet. What bounds the cost of one match is
+`turn_max_tokens`/`defender_max_tokens` times the number of calls.
+
+**Not done:** tools, strategy settings, avatars and weight classes (no engine support yet, or later
+slices); key rotation; deleting a fighter or a key.
+
+**Linter configuration:** `[tool.vulture] ignore_names` gains `verified` and `version`, which only the
+API's JSON output reads.
+
+**Alternatives considered:** one key per user instead of per fighter (the spec stores a key reference per
+version, and a user may want a different provider per fighter); letting users type any base URL
+(server-side request forgery); a secrets manager (a service to run for one value).

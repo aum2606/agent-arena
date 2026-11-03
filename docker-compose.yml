@@ -6,6 +6,7 @@ x-api-env: &api-env
   DATABASE_URL: postgresql://arena:${POSTGRES_PASSWORD:-arena-dev}@postgres:5432/arena
   REDIS_URL: redis://redis:6379
   FIGHTERS_CONFIG: /app/config/fighters.toml
+  KEY_ENCRYPTION_SECRET: ${KEY_ENCRYPTION_SECRET:-} # encrypts users' API keys at rest (D-034)
 
 services:
   postgres:

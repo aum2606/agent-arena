@@ -130,3 +130,22 @@ def current_version(fighter_id: int) -> Version | None:
             (fighter_id,),
         ).fetchone()
     return _version_from(row)
+
+
+def version(fighter_id: int, number: int) -> Version | None:
+    with store.connect() as conn:
+        row = conn.execute(
+            "SELECT fighter_id, version, provider, model, persona, api_key_encrypted, key_hint "
+            "FROM fighter_versions WHERE fighter_id = %s AND version = %s",
+            (fighter_id, number),
+        ).fetchone()
+    return _version_from(row)
+
+
+def mark_verified(fighter_id: int, number: int) -> None:
+    with store.connect() as conn:
+        conn.execute(
+            "UPDATE fighter_versions SET verified_at = now() "
+            "WHERE fighter_id = %s AND version = %s",
+            (fighter_id, number),
+        )

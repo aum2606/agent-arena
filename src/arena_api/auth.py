@@ -73,6 +73,11 @@ def current_user(token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = No
     return user
 
 
+def optional_user(token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None) -> User | None:
+    """The signed-in user, or None for a visitor."""
+    return accounts.user_for_token(token) if token else None
+
+
 @router.get("/config")
 def config() -> dict[str, bool]:
     return {"github": bool(os.environ.get("GITHUB_CLIENT_ID")), "dev_login": dev_login_enabled()}

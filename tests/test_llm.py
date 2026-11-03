@@ -179,3 +179,44 @@ def test_missing_api_key_names_the_variable(
     monkeypatch.delenv("GROQ_API_KEY")
     with pytest.raises(ConfigError, match="GROQ_API_KEY"):
         harness(lambda _: chat_response()).client.complete(FIGHTER, "s", "u", 64)
+
+
+def _client_with_keys(requests: list[httpx2.Request], keys: dict[str, str]) -> LlmClient:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        requests.append(request)
+        return chat_response()
+
+    return LlmClient(
+        PROVIDERS,
+        SETTINGS,
+        http_client=httpx2.Client(transport=httpx2.MockTransport(handle)),
+        sleep=lambda _: None,
+        keys=keys,
+    )
+
+
+def test_a_fighters_own_key_is_used_and_others_still_get_the_servers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "server-key")
+    requests: list[httpx2.Request] = []
+    client = _client_with_keys(requests, {"alpha": "their-key"})
+
+    client.complete(FIGHTER, "s", "u", 64)
+    client.complete(Fighter("beta", "groq", "some-model", "persona"), "s", "u", 64)
+
+    assert [r.headers["authorization"] for r in requests] == [
+        "Bearer their-key",
+        "Bearer server-key",
+    ]
+
+
+def test_a_fighters_own_key_works_when_the_server_has_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    requests: list[httpx2.Request] = []
+
+    _client_with_keys(requests, {"alpha": "their-key"}).complete(FIGHTER, "s", "u", 64)
+
+    assert requests[0].headers["authorization"] == "Bearer their-key"

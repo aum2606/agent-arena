@@ -32,6 +32,7 @@ class Config:
     settings: Settings
     providers: dict[str, Provider]
     fighters: dict[str, Fighter]
+    house_bot: str | None = None  # the fighter users spar against
 
 
 def _build[T](cls: type[T], raw: Any, what: str) -> T:
@@ -62,4 +63,7 @@ def load_config(path: Path) -> Config:
         if fighter.name in fighters:
             raise ConfigError(f"duplicate fighter {fighter.name!r}")
         fighters[fighter.name] = fighter
-    return Config(settings, providers, fighters)
+    house_bot = data.get("house_bot")
+    if house_bot is not None and house_bot not in fighters:
+        raise ConfigError(f"house_bot {house_bot!r} is not one of the configured fighters")
+    return Config(settings, providers, fighters, house_bot)

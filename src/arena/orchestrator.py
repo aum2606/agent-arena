@@ -179,6 +179,7 @@ def run_match(
     rng: random.Random,
     verify: Verify = verify_attack,
     history: dict[Side, list[Outcome]] | None = None,
+    max_turns: int = MAX_TURNS,
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
     log.record_fighters(fighter_a, fighter_b)
@@ -213,7 +214,7 @@ def run_match(
         log.emit("hp", a=hp["a"], b=hp["b"])
         if hp[result.target] <= 0:
             log.emit("knockout", target=result.target)
-        outcome = match_result(hp["a"], hp["b"], turn, MAX_TURNS)
+        outcome = match_result(hp["a"], hp["b"], turn, max_turns)
         if outcome is not None:
             log.emit("match_end", winner=outcome.winner, reason=outcome.reason, turns=turn)
             return MatchRecord(fighter_a.name, fighter_b.name, turns, hp["a"], hp["b"], outcome)

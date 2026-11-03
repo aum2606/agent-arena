@@ -67,6 +67,8 @@ def sample_log() -> Callable[..., dict[str, Any]]:
 
 
 CONFIG_TOML = """
+house_bot = "house"
+
 [settings]
 turn_time_limit_s = 30.0
 turn_max_tokens = 256

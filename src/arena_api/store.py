@@ -16,6 +16,15 @@ class MatchRow:
     fighter_a: str | None
     fighter_b: str | None
     error: str | None
+    mode: str = "sim"  # sim (imports, config fighters) or sparring
+    requested_by: int | None = None
+    fighter_id: int | None = None
+    fighter_version: int | None = None
+
+
+_MATCH_COLUMNS = (
+    "id, status, fighter_a, fighter_b, error, mode, requested_by, fighter_id, fighter_version"
+)
 
 
 def connect() -> psycopg.Connection[dict[str, Any]]:
@@ -23,26 +32,67 @@ def connect() -> psycopg.Connection[dict[str, Any]]:
     return psycopg.connect(database_url(), row_factory=dict_row)
 
 
-def create_match(match_id: str, fighter_a: str, fighter_b: str) -> None:
+def create_match(
+    match_id: str,
+    fighter_a: str,
+    fighter_b: str,
+    mode: str = "sim",
+    requested_by: int | None = None,
+    fighter_id: int | None = None,
+    fighter_version: int | None = None,
+) -> None:
     with connect() as conn:
         conn.execute(
-            "INSERT INTO matches (id, status, fighter_a, fighter_b) VALUES (%s, 'queued', %s, %s)",
-            (match_id, fighter_a, fighter_b),
+            "INSERT INTO matches (id, status, fighter_a, fighter_b, mode, requested_by, "
+            "fighter_id, fighter_version) VALUES (%s, 'queued', %s, %s, %s, %s, %s, %s)",
+            (match_id, fighter_a, fighter_b, mode, requested_by, fighter_id, fighter_version),
         )
 
 
 def get_match(match_id: str) -> MatchRow | None:
     with connect() as conn:
         row = conn.execute(
-            "SELECT id, status, fighter_a, fighter_b, error FROM matches WHERE id = %s",
+            f"SELECT {_MATCH_COLUMNS} FROM matches WHERE id = %s",
             (match_id,),
         ).fetchone()
     return MatchRow(**row) if row else None
 
 
+def spars_for_fighter(fighter_id: int, limit: int = 10) -> list[MatchRow]:
+    """The fighter's latest sparring matches, newest first."""
+    with connect() as conn:
+        rows = conn.execute(
+            f"SELECT {_MATCH_COLUMNS} FROM matches WHERE fighter_id = %s AND mode = 'sparring' "
+            "ORDER BY created_at DESC, id DESC LIMIT %s",
+            (fighter_id, limit),
+        ).fetchall()
+    return [MatchRow(**row) for row in rows]
+
+
 def count_queued() -> int:
     with connect() as conn:
         row = conn.execute("SELECT count(*) AS n FROM matches WHERE status = 'queued'").fetchone()
+    return int(row["n"]) if row else 0
+
+
+def count_recent_for_fighter(fighter_id: int) -> int:
+    """Matches this fighter was queued for in the last day, whatever became of them."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM matches WHERE fighter_id = %s "
+            "AND created_at > now() - interval '1 day'",
+            (fighter_id,),
+        ).fetchone()
+    return int(row["n"]) if row else 0
+
+
+def count_recent_spars(user_id: int) -> int:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM matches WHERE requested_by = %s AND mode = 'sparring' "
+            "AND created_at > now() - interval '1 day'",
+            (user_id,),
+        ).fetchone()
     return int(row["n"]) if row else 0
 
 
@@ -116,10 +166,12 @@ def insert_finished(match_id: str, log: dict[str, Any], summary: ReplaySummary) 
 
 
 def list_finished() -> list[ReplaySummary]:
+    """The public replay list: sparring matches are private to their owner and not in it."""
     with connect() as conn:
         rows = conn.execute(
             "SELECT id, winner, reason, hp_a, hp_b, turn_count, fighter_a AS name_a, "
-            "fighter_b AS name_b FROM matches WHERE status = 'finished' ORDER BY id"
+            "fighter_b AS name_b FROM matches WHERE status = 'finished' AND mode = 'sim' "
+            "ORDER BY id"
         ).fetchall()
     return [ReplaySummary(**row) for row in rows]
 

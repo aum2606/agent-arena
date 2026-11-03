@@ -15,6 +15,7 @@ from arena.config import load_config
 from arena_api import store
 from arena_api.auth import router as auth_router
 from arena_api.db import fighters_config_path, migrate, redis_url
+from arena_api.fighter_routes import router as fighter_router
 from arena_api.replays import VALID_ID, Replay, ReplayError, ReplaySummary, parse_replay
 
 # Until sign-in exists (slice 6) anyone who can reach the API can spend the provider keys, so only
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Agent Arena", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(fighter_router)
 
 
 def get_queue(request: Request) -> ArqRedis:

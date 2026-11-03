@@ -28,6 +28,8 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - Battle log events: attack_start, attack_retry, attack_verified, backfire, defend_start, defend_result,
   hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start). The log has a
   header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030).
+- Sparring (D-035): a user's fighter vs the `house_bot` from `config/fighters.toml`, 3 turns, with the user's
+  own key for their side; the engine's `run_match(max_turns=...)` takes the length.
 - Rule or number changes must be logged in `docs/DECISIONS.md`.
 
 ## Commands
@@ -40,7 +42,7 @@ uv run arena synth --compare-rules        # answer-rule comparison by difficulty
 uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)
 docker compose up -d postgres redis      # needed by the database tests, which skip without it
 export DATABASE_URL=postgresql://arena:arena-dev@127.0.0.1:5442/arena   # local-only default (D-028)
-uv run uvicorn arena_api.app:app --reload # API on :8000 (D-028); POST /matches queues, GET /replays lists
+uv run uvicorn arena_api.app:app --reload # API on :8000 (D-028); POST /fighters/{id}/spar queues a spar
 uv run arq arena_api.jobs.WorkerSettings  # the match worker; needs the provider keys in the environment
 uv run python -m arena_api.import_logs runs/logs_gate48 --prefix gate48-   # load old logs (D-032)
 cd web && npm install && npm run dev      # web app on :3000; `npm run typecheck`, `npm test`, `npm run build`
@@ -57,7 +59,7 @@ Update this section if commands change.
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  cli.py   (the game engine)
-src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py secret_box.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
+src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
 tests/          one test file per module, no network calls

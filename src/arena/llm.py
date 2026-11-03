@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 import httpx2
@@ -37,15 +37,17 @@ class LlmClient:
         settings: Settings,
         http_client: httpx2.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        keys: Mapping[str, str] | None = None,
     ) -> None:
         self._providers = providers
         self._settings = settings
         self._http_client = http_client
         self._sleep = sleep
+        self._keys = keys or {}  # fighter name -> that fighter's own key (bring-your-own)
         self._clients: dict[str, openai.OpenAI] = {}
 
     def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
-        client = self._client(fighter.provider)
+        client = self._client(fighter)
         s = self._settings
         for attempt in range(s.max_retries + 1):
             try:
@@ -84,17 +86,19 @@ class LlmClient:
         choice = response.choices[0]
         return Completion(choice.message.content or "", choice.finish_reason == "length")
 
-    def _client(self, provider: str) -> openai.OpenAI:
-        if provider not in self._clients:
-            spec = self._providers[provider]
-            key = os.environ.get(spec.api_key_env)
+    def _client(self, fighter: Fighter) -> openai.OpenAI:
+        own_key = self._keys.get(fighter.name)
+        slot = fighter.name if own_key else fighter.provider
+        if slot not in self._clients:
+            spec = self._providers[fighter.provider]
+            key = own_key or os.environ.get(spec.api_key_env)
             if not key:
                 raise ConfigError(f"{spec.api_key_env} is not set (see .env.example)")
             # max_retries=0: retrying is handled here so the limit and backoff are configurable.
-            self._clients[provider] = openai.OpenAI(
+            self._clients[slot] = openai.OpenAI(
                 base_url=spec.base_url,
                 api_key=key,
                 max_retries=0,
                 http_client=self._http_client,
             )
-        return self._clients[provider]
+        return self._clients[slot]

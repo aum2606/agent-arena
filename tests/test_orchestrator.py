@@ -484,3 +484,18 @@ def test_backfire_without_a_parsed_attack_has_no_attempt_fields() -> None:
 
     backfire = log.to_dict()["turns"][0]["events"][1]
     assert set(backfire) == {"t", "type", "actor", "reason"}
+
+
+def test_a_shorter_match_ends_after_max_turns_with_the_higher_hp_winning() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("0")] * 3, "bob": [answer("42")] * 3},
+    )
+    log = BattleLog("m1")
+
+    record = run_match(A, B, llm, SETTINGS, log, random.Random(0), max_turns=2)
+
+    assert [t.attacker for t in record.turns] == ["a", "b"]
+    assert record.result.reason == "decision"
+    last = log.to_dict()["turns"][-1]["events"][-1]
+    assert (last["type"], last["turns"]) == ("match_end", 2)

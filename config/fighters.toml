@@ -1,3 +1,6 @@
+# The fighter users spar against: it spends the server's free-tier keys (D-035).
+house_bot = "gemini-lite"
+
 [settings]
 turn_time_limit_s = 60.0
 turn_max_tokens = 4096

@@ -809,3 +809,51 @@ API's JSON output reads.
 **Alternatives considered:** one key per user instead of per fighter (the spec stores a key reference per
 version, and a user may want a different provider per fighter); letting users type any base URL
 (server-side request forgery); a secrets manager (a service to run for one value).
+
+## D-035 · 2026-11-03 · Sparring against the house bot, owned by the user who asked
+
+**Decision:** `POST /fighters/{id}/spar` (owner only) queues a sparring match between the fighter's
+latest version and the `house_bot` named at the top of `config/fighters.toml` (`gemini-lite`;
+`Config.house_bot`, which must be a configured fighter). It answers 202, or 404 for someone else's
+fighter, 422 if the fighter's provider left the config, 429 when the fighter reached its
+`daily_match_cap` or the user reached `MAX_SPARS_PER_USER_PER_DAY` (5) or the queue holds
+`MAX_QUEUED` (5), 503 without a house bot or when Redis is down. Caps count matches created in the
+last 24 hours, whatever happened to them. In the match the user's fighter is named `handle/name`
+(unique, so its key cannot be applied to another fighter) and plays side A with the user's own key;
+the house bot uses the server's keys. The worker builds one `LlmClient(keys=...)` per match, so a key
+lives only as long as its match; `LlmClient` takes an optional `keys` map (fighter name to key) and
+falls back to the provider's environment key. A spar lasts `SPARRING_TURNS = 3` (the spec's "3 unranked
+rounds"; a round is a turn, D-006): `run_match` gained an optional `max_turns`, default `MAX_TURNS`,
+so nothing else changes. `matches` gained `mode` (`sim` or `sparring`), `requested_by`, `fighter_id`
+and `fighter_version` (migration 0004). The old open `POST /matches` is removed: the only way to start
+a match through the API is now a spar by a signed-in owner, which closes the D-032 hole (anyone who
+could reach the API could spend the server's keys). `GET /matches/{id}` is for the requester only.
+
+**Verified:** a version is marked verified (`verified_at`) when its spar finished and the fighter
+replied at least once (a verified attack, a retry or a defense answer). A key that the provider rejects
+fails the match instead; a fighter whose every call times out finishes but stays unverified. A new
+version starts unverified. Verification is a check that key and model work, not a rating.
+
+**Privacy:** a sparring replay contains the owner's persona, so `GET /replays/{id}` opens it only for
+its owner (404 for anyone else) and the public `GET /replays` lists only `sim` matches. Provider
+errors can echo a rejected key, so the worker replaces the key with `[key]` in any error it stores.
+
+**Web:** `/fighters` (mine), `/fighters/new`, and `/fighters/{id}` with a spar button, the spar list
+(status refreshes every 5 s while one is waiting or playing, links to the replay when finished) and an
+edit form that saves a new version. A signed-out visitor to a protected page is sent to `/login`. The
+API key field is write-only.
+
+**Checked live:** in the compose stack, dev sign-in, creating a fighter with a dummy key, and a spar:
+the worker used the user's key against Groq, which answered 401, and the page showed
+`failed: groq returned HTTP 401 ... Invalid API Key`; the database held a Fernet token (not the key),
+no log line or page contained the key. The success path (a finished spar marking the version
+verified) is covered by tests with a scripted LLM, not run live: that needs a real provider key, which
+is the owner's to enter.
+
+**Not done:** a real spar with a real key; per-token or dollar caps; deleting fighters or keys;
+publishing and rating (slice 9); the GitHub sign-in against github.com (needs an OAuth app).
+
+**Alternatives considered:** sparring over the full 6 turns (twice the cost on the user's key and the
+house bot's free tier); letting any signed-in user start config-fighter matches (the same abuse hole
+as before); a global key per provider shared by all users (the point of this slice is that users bring
+their own).

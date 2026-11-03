@@ -80,3 +80,16 @@ def test_duplicate_fighter_name(tmp_path: Path) -> None:
 def test_fighter_missing_field(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="fighter"):
         load_config(write(tmp_path, VALID.replace('model = "some-model"\n', "")))
+
+
+def test_house_bot_names_a_fighter_and_is_optional(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, VALID)).house_bot is None
+
+    config = load_config(write(tmp_path, 'house_bot = "alpha"\n' + VALID))
+
+    assert config.house_bot == "alpha"
+
+
+def test_house_bot_must_be_a_configured_fighter(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="house_bot"):
+        load_config(write(tmp_path, 'house_bot = "nobody"\n' + VALID))

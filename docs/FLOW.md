@@ -65,11 +65,13 @@ saved records.
 - `stats`: balance stats over `MatchRecord`s, plus reading and appending the results JSONL.
 - `synthetic`: scripted fighters and the balance sweep behind `arena synth` (D-020).
 - `orchestrator`: `play_turn` and `run_match`, the only module that sequences a match.
-- `arena_api` (Phase 1): FastAPI app plus an arq worker. `POST /matches` saves a `queued` row in
-  Postgres (`store.py`) and enqueues `play_match`; the worker (`jobs.py`) marks it running, calls
-  `run_match` in a thread and stores the log and summary (or the failure reason). `GET /replays` and
-  `GET /replays/{id}` read finished rows; `replays.parse_replay` turns a log's events into one
-  reveal-panel record per turn. `import_logs` loads old log files. `db.migrate` applies `migrations/`.
+- `arena_api` (Phase 1): FastAPI app plus an arq worker. `POST /fighters/{id}/spar` (`fighter_routes`) saves a
+  `queued` sparring row in Postgres (`store.py`, `match_routes`) and enqueues `play_match`; the worker
+  (`jobs.py`) decrypts the owner's key, builds a one-match `LlmClient` with it, calls `run_match` (3 turns) in a
+  thread and stores the log and summary (or the failure reason, with the key scrubbed); a spar where the
+  fighter replied marks that version verified. `GET /replays` lists public (sim) matches; a sparring replay opens
+  only for its owner. `replays.parse_replay` turns a log's events into one reveal-panel record per turn.
+  `import_logs` loads old log files. `db.migrate` applies `migrations/`.
 - `auth` / `accounts` (Phase 1): GitHub sign-in (`/auth/github/login` and `/callback`), a session cookie whose
   token is stored hashed, `current_user` for protected routes, and a local-only dev sign-in. The web app
   forwards `/api/*` to the API so the cookie stays same-site.

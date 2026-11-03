@@ -93,3 +93,36 @@ def test_house_bot_names_a_fighter_and_is_optional(tmp_path: Path) -> None:
 def test_house_bot_must_be_a_configured_fighter(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="house_bot"):
         load_config(write(tmp_path, 'house_bot = "nobody"\n' + VALID))
+
+
+PANEL = """
+[[panel]]
+name = "ref-1"
+provider = "groq"
+model = "model-1"
+persona = "a careful solver"
+
+[[panel]]
+name = "ref-2"
+provider = "groq"
+model = "model-2"
+persona = "a careful solver"
+"""
+
+
+def test_panel_is_a_list_of_reference_solvers_and_optional(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, VALID)).panel == ()
+
+    config = load_config(write(tmp_path, VALID + PANEL))
+
+    assert [m.name for m in config.panel] == ["ref-1", "ref-2"]
+    assert config.panel[1] == Fighter("ref-2", "groq", "model-2", "a careful solver")
+
+
+def test_panel_members_need_a_known_provider_and_unique_names(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="unknown provider 'nowhere'"):
+        load_config(
+            write(tmp_path, VALID + PANEL.replace('provider = "groq"', 'provider = "nowhere"'))
+        )
+    with pytest.raises(ConfigError, match="duplicate panel member 'ref-1'"):
+        load_config(write(tmp_path, VALID + PANEL.replace("ref-2", "ref-1")))

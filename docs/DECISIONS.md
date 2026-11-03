@@ -857,3 +857,55 @@ publishing and rating (slice 9); the GitHub sign-in against github.com (needs an
 house bot's free tier); letting any signed-in user start config-fighter matches (the same abuse hole
 as before); a global key per provider shared by all users (the point of this slice is that users bring
 their own).
+
+## D-036 · 2026-11-03 · Difficulty from a reference panel
+
+**Decision:** After an attack passes its own check, a panel of reference models (`[[panel]]` entries in
+`config/fighters.toml`, each a fighter-shaped provider, model and persona) solves the problem, all at
+the same time, with the defender's prompt and `defender_max_tokens`. Each answer is checked with
+`answers_match`. Difficulty is `0.5 + 1.5 × failed / answered` (`damage.difficulty_from_panel`; range
+`DIFFICULTY_MIN` 0.5 to `DIFFICULTY_MAX` 2.0, the spec's), and `damage = 20 × difficulty × (1 − score)`.
+A member that times out, is cut off at the token cap, or gives no parseable answer counts as failing,
+as a defender would. A member that hits a provider error (rate limit, outage) is left out of the count;
+if none answers the difficulty stays `DIFFICULTY` (1.0). Backfires are never scored (nothing verified)
+and still cost `20 × 1.0 × 0.5`. `run_match(panel=...)` takes the panel (default empty = 1.0 as before);
+`arena match` and `arena sim` pass `config.panel` unless `--no-panel`. Sparring and the worker pass no
+panel, to spare the server's free-tier quota; ranked play (slice 9) will. A new `difficulty` event
+follows `attack_verified`: `value`, `failed`, `answered`, `tokens` and each member's `result`
+(`solved`, `failed`, `error`) and `tokens`. `Completion` gained `tokens` (the provider's
+`usage.total_tokens`, None if not reported) and the `Complete` alias moved to `llm.py` so the scorer and
+the orchestrator can share it without an import cycle. The replay API adds `difficulty`,
+`panel_failed` and `panel_answered` per turn and its damage arithmetic uses the logged difficulty (old
+logs show 1.0); the page shows "Difficulty 1.5 (2 of 3 reference models failed it)". No new dependencies.
+
+**Panel chosen:** `gemini-3.5-flash-lite` (Gemini), `openai/gpt-oss-20b` and `qwen/qwen3.8-27b` (Groq):
+three families, none of them the two fighter models, so difficulty is not just difficulty for the
+fighters. Tried first with the server's free-tier keys: `gemma-4-31b-it` answered correctly but took
+37 to 55 s a call (the 60 s turn limit would turn it into a false failure), `gemini-2.5-flash-lite`
+returned 404, the chosen three answered in 3 to 9 s. Two members share Groq's 8000 tokens-per-minute
+budget with the Groq fighter, which is the weak point (below).
+
+**Measured live** (one match, gemini-lite vs gpt-oss, `runs/m_20261103T082617.json`, free tiers): five
+problems were scored; difficulties 0.5, 1.0, 0.5, 1.5, 1.0, so the scale does spread. Cost per scored
+problem: 3 extra calls and about 4,300 tokens in total (3,250 to 6,060), roughly 1,450 per member.
+Panel time was 7.5 to 9 s for three problems, 32 s for one and 372 s for one (Groq rate limits: 13
+retry warnings in the run); the match took about 8.5 minutes, 372 s of it that single wait. Per
+member, failures: qwen 2 of 5, gpt-oss-20b 1, gemini 1. Every scored problem was still blocked by the
+defender, and one attack backfired, so no damage was dealt by a scored problem in this sample.
+
+**Known limits:**
+- The panel cannot tell a hard problem from an ill-posed one: a broken problem every model fails
+  scores 2.0 and its defender takes double damage. A consensus check (members agreeing with each
+  other against the attacker's answer) would flag it; not built.
+- The turn-based gate (D-026, "neither role wins over 70% of turns") does not move with difficulty:
+  a block deals no damage at any difficulty. Slice 8 needs a damage- or HP-based measure, or to feed
+  difficulty back to attackers (as D-023 does with outcomes), and that is the owner's call.
+- Free-tier cost: the panel adds roughly three calls per verified problem and rate-limit waits on
+  Groq; a 100-match run will be slow. `gpt-oss-20b` was rejected as a fighter earlier (D-014, token
+  cap); as a panel member a cut-off counts as failing, which could inflate difficulty.
+- Novelty penalty (the spec's embedding check) is not part of this slice.
+
+**Alternatives considered:** reusing the two fighter models in the panel (correlated with the
+defenders); running the three calls one after another (a turn would wait three times as long); counting
+panel provider errors as failures (a rate limit would raise difficulty); a non-linear scale (no data
+to justify one yet).

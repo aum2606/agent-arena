@@ -1,4 +1,5 @@
 import random
+from typing import Any
 
 import pytest
 
@@ -499,3 +500,75 @@ def test_a_shorter_match_ends_after_max_turns_with_the_higher_hp_winning() -> No
     assert record.result.reason == "decision"
     last = log.to_dict()["turns"][-1]["events"][-1]
     assert (last["type"], last["turns"]) == ("match_end", 2)
+
+
+PANEL = tuple(Fighter(f"ref-{i}", "p", "m", "a careful solver") for i in (1, 2, 3))
+
+
+def with_panel(replies: list[str], defender: str) -> FakeLlm:
+    """alice always attacks with 6 * 7; bob defends with `defender`; each ref gets `replies`."""
+    return FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer(defender)] * 3, "bob": [answer(defender)] * 3}
+        | {m.name: [answer(r) for r in replies] for m in PANEL},
+    )
+
+
+def first_turn(llm: FakeLlm) -> tuple[list[dict[str, Any]], float]:
+    log = BattleLog("m1")
+    record = run_match(A, B, llm, SETTINGS, log, random.Random(0), panel=PANEL)
+    return log.to_dict()["turns"][0]["events"], record.turns[0].damage
+
+
+def test_a_hard_problem_hits_harder_and_is_logged_with_the_panel_result() -> None:
+    events, damage_dealt = first_turn(with_panel(["0"] * 6, defender="0"))
+
+    assert [e["type"] for e in events] == [
+        "attack_start", "attack_verified", "difficulty", "defend_start", "defend_result",
+        "hit", "hp",
+    ]  # fmt: skip
+    difficulty = events[2]
+    assert (difficulty["value"], difficulty["failed"], difficulty["answered"]) == (2.0, 3, 3)
+    assert [m["name"] for m in difficulty["panel"]] == ["ref-1", "ref-2", "ref-3"]
+    assert difficulty["tokens"] == 0
+    assert damage_dealt == 40.0 and events[5]["damage"] == 40.0
+
+
+def test_an_easy_problem_hits_softer() -> None:
+    events, damage_dealt = first_turn(with_panel(["42"] * 6, defender="0"))
+
+    assert events[2]["value"] == 0.5
+    assert damage_dealt == 10.0
+
+
+def test_a_blocked_attack_is_still_scored_but_deals_nothing() -> None:
+    events, damage_dealt = first_turn(with_panel(["0"] * 6, defender="42"))
+
+    assert [e["type"] for e in events][2:4] == ["difficulty", "defend_start"]
+    assert damage_dealt == 0.0
+
+
+def test_a_backfire_is_not_scored_and_costs_the_default() -> None:
+    liar = good_attack(code="print(41)")
+    llm = FakeLlm(
+        attacks={"alice": [liar] * 6, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3}
+        | {m.name: [answer("42")] * 3 for m in PANEL},  # bob's attacks still get scored
+    )
+
+    events, damage_dealt = first_turn(llm)
+
+    assert "difficulty" not in [e["type"] for e in events]
+    assert damage_dealt == 10.0
+
+
+def test_without_a_panel_nothing_is_scored() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("0")] * 3, "bob": [answer("0")] * 3},
+    )
+
+    _, log = play(llm)
+
+    assert all("difficulty" not in event_types(log, n) for n in range(1, 4))
+    assert log.to_dict()["turns"][0]["events"][4]["damage"] == 20.0

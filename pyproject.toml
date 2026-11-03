@@ -75,6 +75,8 @@ ignore_names = [
     "name_b",
     "max_hp",
     "verified",
+    "panel_failed",
+    "panel_answered",
     "version",
     # The arq worker finds its settings class and reads these attributes by name (D-032).
     "WorkerSettings",

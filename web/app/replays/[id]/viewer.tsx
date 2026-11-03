@@ -60,6 +60,14 @@ function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) 
           label={`${sideLabel(summary, defender)}'s answer`}
           value={turn.timed_out ? "timed out or cut off" : turn.defender_answer}
         />
+        <Row
+          label="Difficulty"
+          value={
+            turn.difficulty === null
+              ? null
+              : `${turn.difficulty} (${turn.panel_failed} of ${turn.panel_answered} reference models failed it)`
+          }
+        />
         <Row label="Defender's score" value={turn.score} />
         <Row label="Damage" value={turn.damage_math} />
         <Row

@@ -34,6 +34,9 @@ export interface Turn {
   hp_a: number;
   hp_b: number;
   duration_ms: number;
+  difficulty: number | null;
+  panel_failed: number | null;
+  panel_answered: number | null;
 }
 
 export interface ReplaySummary {

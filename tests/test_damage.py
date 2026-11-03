@@ -4,11 +4,14 @@ from arena.damage import (
     BACKFIRE_FACTOR,
     BASE_DAMAGE,
     DIFFICULTY,
+    DIFFICULTY_MAX,
+    DIFFICULTY_MIN,
     MAX_TURNS,
     STARTING_HP,
     apply_damage,
     backfire_damage,
     damage,
+    difficulty_from_panel,
     match_result,
 )
 from arena.models import MatchResult
@@ -70,3 +73,24 @@ def test_decision_goes_to_higher_hp() -> None:
 
 def test_equal_hp_after_last_turn_is_a_draw() -> None:
     assert match_result(80.0, 80.0, turns_played=6, max_turns=6) == MatchResult(None, "decision")
+
+
+def test_difficulty_range_is_the_specs() -> None:
+    assert (DIFFICULTY_MIN, DIFFICULTY_MAX) == (0.5, 2.0)
+    assert DIFFICULTY_MIN <= DIFFICULTY <= DIFFICULTY_MAX
+
+
+@pytest.mark.parametrize(
+    ("failed", "answered", "expected"),
+    [(0, 3, 0.5), (1, 3, 1.0), (2, 3, 1.5), (3, 3, 2.0), (1, 2, 1.25), (0, 1, 0.5), (1, 1, 2.0)],
+)
+def test_difficulty_grows_with_the_share_of_the_panel_that_failed(
+    failed: int, answered: int, expected: float
+) -> None:
+    assert difficulty_from_panel(failed, answered) == expected
+
+
+@pytest.mark.parametrize(("failed", "answered"), [(1, 0), (0, 0), (-1, 3), (4, 3)])
+def test_impossible_panel_counts_are_rejected(failed: int, answered: int) -> None:
+    with pytest.raises(ValueError, match="panel"):
+        difficulty_from_panel(failed, answered)

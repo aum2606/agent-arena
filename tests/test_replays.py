@@ -123,6 +123,7 @@ def test_replay_turns_carry_what_the_reveal_panel_shows(database: str, client: T
         "defender_answer": "8", "score": 0.0, "timed_out": False, "retried": False,
         "failure_reason": None, "hp_a": 100.0, "hp_b": 80.0, "duration_ms": 3000,
         "code": None, "first_attempt": None,
+        "difficulty": None, "panel_failed": None, "panel_answered": None,
     }  # fmt: skip
     assert (turns[1]["outcome"], turns[1]["damage"], turns[1]["damage_math"]) == (
         "block", 0.0, "no damage",
@@ -240,3 +241,28 @@ def test_replay_carries_the_starting_hp_for_the_health_bars(
     write_log("m1", [block_turn(1, "a", "b")])
 
     assert client.get("/replays/m1").json()["max_hp"] == 100.0
+
+
+def scored_hit_turn() -> dict[str, Any]:
+    scored = hit_turn(1, "a", "b")
+    scored["events"].insert(
+        2,
+        {
+            "t": 850, "type": "difficulty", "value": 1.5, "failed": 2, "answered": 3, "tokens": 120,
+            "panel": [{"name": "ref-1", "result": "solved"}, {"name": "ref-2", "result": "failed"}],
+        },
+    )  # fmt: skip
+    scored["events"][5]["damage"] = 30.0
+    return scored
+
+
+def test_a_scored_turn_shows_the_difficulty_and_uses_it_in_the_damage_arithmetic(
+    database: str, client: TestClient
+) -> None:
+    write_log("m1", [scored_hit_turn()])
+
+    (shown,) = client.get("/replays/m1").json()["turns"]
+
+    assert (shown["difficulty"], shown["panel_failed"], shown["panel_answered"]) == (1.5, 2, 3)
+    assert shown["damage"] == 30.0
+    assert shown["damage_math"] == "20 × 1.5 × (1 − 0) = 30"

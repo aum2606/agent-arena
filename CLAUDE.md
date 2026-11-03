@@ -23,9 +23,11 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
   or timeout → one retry that shows the attacker the real result (D-025); failing again →
   **backfire**: attacker takes half the damage (D-013).
 - Defender answers within time/token budget. Checked with SymPy equality. score = 1 or 0.
-- `damage = base × difficulty × (1 − score)`, base = 20, difficulty = 1.0 (fixed in Phase 0).
+- `damage = base × difficulty × (1 − score)`, base = 20. Difficulty is 0.5 to 2.0 from the reference panel
+  (`[[panel]]` in `config/fighters.toml`; the share of members that fail the problem, D-036), or 1.0 when no
+  panel is used (backfires, sparring, `--no-panel`).
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
-- Battle log events: attack_start, attack_retry, attack_verified, backfire, defend_start, defend_result,
+- Battle log events: attack_start, attack_retry, attack_verified, difficulty, backfire, defend_start, defend_result,
   hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start). The log has a
   header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030).
 - Sparring (D-035): a user's fighter vs the `house_bot` from `config/fighters.toml`, 3 turns, with the user's
@@ -35,8 +37,8 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 ## Commands
 ```bash
 uv sync                                   # install deps
-uv run arena match --a <fighter> --b <fighter>
-uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl
+uv run arena match --a <fighter> --b <fighter>   # add --no-panel to skip difficulty scoring (D-036)
+uv run arena sim --n 100                  # resumable; appends to runs/*.jsonl; --no-panel too
 uv run arena synth --matches 100          # balance sweep with scripted fighters, no network (D-020)
 uv run arena synth --compare-rules        # answer-rule comparison by difficulty (D-021)
 uv run arena synth --adaptive             # closed-loop attacker by step and start (D-022)
@@ -58,7 +60,7 @@ Update this section if commands change.
 ## Layout (planned — adjust only with a DECISIONS entry)
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
-                orchestrator.py  battle_log.py  stats.py  cli.py   (the game engine)
+                orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root

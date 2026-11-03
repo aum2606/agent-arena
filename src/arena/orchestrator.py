@@ -1,5 +1,5 @@
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 from arena.battle_log import BattleLog
@@ -14,7 +14,7 @@ from arena.damage import (
     damage,
     match_result,
 )
-from arena.llm import Completion, LlmTimeout
+from arena.llm import Complete, Completion, LlmTimeout
 from arena.models import Attack, Fighter, MatchRecord, Outcome, Side, TurnResult
 from arena.prompts import (
     TOPICS,
@@ -25,10 +25,9 @@ from arena.prompts import (
     parse_attack,
     parse_defense,
 )
+from arena.scorer import score_problem
 from arena.verifier import Verification, answers_match, verify_attack
 
-# (fighter, system prompt, user prompt, max tokens)
-Complete = Callable[[Fighter, str, str, int], Completion]
 # (stated answer, snippet, timeout in seconds); the synthetic simulator swaps in a fast stand-in.
 Verify = Callable[[str, str, float], Verification]
 
@@ -142,6 +141,7 @@ def play_turn(
     topic: str,
     used_problems: list[str],
     recent_outcomes: list[Outcome],
+    panel: Sequence[Fighter] = (),
 ) -> TurnResult:
     """Plays one turn; a verified problem is appended to `used_problems`."""
     defender_side = _other(attacker_side)
@@ -162,12 +162,26 @@ def play_turn(
         return _hit(log, turn, attacker_side, attacker_side, amount)
     used_problems.append(attack.problem)
     log.emit("attack_verified", actor=attacker_side, **_attempt(attack))
+    difficulty = DIFFICULTY
+    if panel:
+        scored = score_problem(panel, attack, complete, settings)
+        difficulty = scored.difficulty
+        log.emit(
+            "difficulty",
+            value=scored.difficulty,
+            failed=scored.failed,
+            answered=scored.answered,
+            tokens=scored.tokens,
+            panel=[
+                {"name": m.name, "result": m.result, "tokens": m.tokens} for m in scored.members
+            ],
+        )
     log.emit("defend_start", actor=defender_side)
     score = _defend(fighters[defender_side], defender_side, attack, complete, settings, log)
     if score == 1.0:
         log.emit("block", actor=defender_side)
         return TurnResult(turn, attacker_side, "block", defender_side, 0.0)
-    return _hit(log, turn, attacker_side, defender_side, damage(BASE_DAMAGE, DIFFICULTY, 0.0))
+    return _hit(log, turn, attacker_side, defender_side, damage(BASE_DAMAGE, difficulty, 0.0))
 
 
 def run_match(
@@ -180,6 +194,7 @@ def run_match(
     verify: Verify = verify_attack,
     history: dict[Side, list[Outcome]] | None = None,
     max_turns: int = MAX_TURNS,
+    panel: Sequence[Fighter] = (),
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
     log.record_fighters(fighter_a, fighter_b)
@@ -207,6 +222,7 @@ def run_match(
             topic,
             used_problems,
             outcomes[attacker_side],
+            panel,
         )
         turns.append(result)
         outcomes[attacker_side].append(result.outcome)

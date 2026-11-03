@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -293,3 +294,51 @@ def test_sim_feeds_earlier_matches_back_into_attacker_prompts(
     # every attack in match 1 was blocked, so the next match's first attacks report 3 blocks each
     assert "blocked by your opponent (too easy): 3" in second_match[0]
     assert "blocked by your opponent (too easy): 3" in second_match[1]
+
+
+PANEL_CONFIG = (
+    CONFIG
+    + """
+[[panel]]
+name = "ref-1"
+provider = "p"
+model = "m"
+persona = "a careful solver"
+"""
+)
+
+
+class PanelRecordingClient(StubClient):
+    askers: list[str] = []  # shared on purpose so the test can read it
+
+    def complete(self, fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        PanelRecordingClient.askers.append(fighter.name)
+        return super().complete(fighter, system, user, max_tokens)
+
+
+def run_match_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *extra: str) -> list[str]:
+    monkeypatch.setattr(cli, "RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr(cli, "LlmClient", PanelRecordingClient)
+    PanelRecordingClient.askers = []
+    path = tmp_path / "fighters.toml"
+    path.write_text(PANEL_CONFIG, encoding="utf-8")
+    assert main(["match", "--a", "alice", "--b", "bob", "--config", str(path), *extra]) == 0
+    (log_file,) = (tmp_path / "runs").glob("m_*.json")
+    turns = json.loads(log_file.read_text(encoding="utf-8"))["turns"]
+    return [e["type"] for t in turns for e in t["events"]]
+
+
+def test_match_scores_each_verified_problem_with_the_configured_panel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = run_match_command(tmp_path, monkeypatch)
+
+    assert events.count("difficulty") == 6
+    assert PanelRecordingClient.askers.count("ref-1") == 6
+
+
+def test_no_panel_flag_skips_the_scoring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    events = run_match_command(tmp_path, monkeypatch, "--no-panel")
+
+    assert "difficulty" not in events
+    assert "ref-1" not in PanelRecordingClient.askers

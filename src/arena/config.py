@@ -33,6 +33,7 @@ class Config:
     providers: dict[str, Provider]
     fighters: dict[str, Fighter]
     house_bot: str | None = None  # the fighter users spar against
+    panel: tuple[Fighter, ...] = ()  # reference solvers that score problem difficulty (D-036)
 
 
 def _build[T](cls: type[T], raw: Any, what: str) -> T:
@@ -66,4 +67,14 @@ def load_config(path: Path) -> Config:
     house_bot = data.get("house_bot")
     if house_bot is not None and house_bot not in fighters:
         raise ConfigError(f"house_bot {house_bot!r} is not one of the configured fighters")
-    return Config(settings, providers, fighters, house_bot)
+    panel: list[Fighter] = []
+    for raw in data.get("panel", []):
+        member = _build(Fighter, raw, "panel member")
+        if member.provider not in providers:
+            raise ConfigError(
+                f"panel member {member.name!r} has unknown provider {member.provider!r}"
+            )
+        if any(member.name == other.name for other in panel):
+            raise ConfigError(f"duplicate panel member {member.name!r}")
+        panel.append(member)
+    return Config(settings, providers, fighters, house_bot, tuple(panel))

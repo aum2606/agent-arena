@@ -11,6 +11,7 @@ export async function SiteHeader() {
       <span className="grow" />
       {user ? (
         <>
+          <Link href="/fighters">My fighters</Link>
           <span className="muted">{user.handle}</span>
           <SignOut />
         </>

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
@@ -13,9 +14,10 @@ async function request(path: string): Promise<Response> {
   return fetch(`${API_URL}${path}`, { cache: "no-store", headers: { cookie } });
 }
 
-/** The parsed JSON, or null when the API answers 404. Anything else is an error. */
+/** The parsed JSON, or null on a 404; a 401 sends the visitor to sign in. Anything else is an error. */
 export async function getJson<T>(path: string): Promise<T | null> {
   const response = await request(path);
+  if (response.status === 401) redirect("/login");
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`API ${path} returned ${response.status}`);
   return response.json();

@@ -10,9 +10,9 @@ from arq.connections import RedisSettings
 from arena.battle_log import BattleLog
 from arena.config import Config, ConfigError, load_config
 from arena.damage import MAX_TURNS
-from arena.llm import LlmClient, LlmError
+from arena.llm import Complete, LlmClient, LlmError
 from arena.models import Fighter
-from arena.orchestrator import Complete, run_match
+from arena.orchestrator import run_match
 from arena_api import fighters, store
 from arena_api.db import fighters_config_path, migrate, redis_url
 from arena_api.replays import parse_replay

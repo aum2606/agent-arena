@@ -26,6 +26,12 @@ class LlmTimeout(LlmError):
 class Completion:
     text: str
     truncated: bool  # hit the token cap
+    tokens: int | None = None  # what the provider billed for the call, if it says
+
+
+# (fighter, system prompt, user prompt, max tokens); the orchestrator and scorer call this, and the
+# synthetic simulator swaps in a fast stand-in.
+Complete = Callable[[Fighter, str, str, int], Completion]
 
 
 class LlmClient:
@@ -84,7 +90,8 @@ class LlmClient:
             raise LlmError(f"{fighter.provider} returned no choices")
         self._sleep(s.call_delay_s)
         choice = response.choices[0]
-        return Completion(choice.message.content or "", choice.finish_reason == "length")
+        tokens = response.usage.total_tokens if response.usage else None
+        return Completion(choice.message.content or "", choice.finish_reason == "length", tokens)
 
     def _client(self, fighter: Fighter) -> openai.OpenAI:
         own_key = self._keys.get(fighter.name)

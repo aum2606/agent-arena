@@ -3,7 +3,9 @@ from arena.models import MatchResult
 MAX_TURNS = 6  # a round is one turn (D-006)
 STARTING_HP = 100.0
 BASE_DAMAGE = 20.0
-DIFFICULTY = 1.0  # fixed in Phase 0; a difficulty scorer comes later
+DIFFICULTY = 1.0  # used when a problem is not scored by the panel, and for backfires
+DIFFICULTY_MIN = 0.5  # every panel member solved it
+DIFFICULTY_MAX = 2.0  # every member failed it
 BACKFIRE_FACTOR = 0.5  # share of normal damage an attacker takes on a backfire (D-013)
 
 
@@ -17,6 +19,13 @@ def damage(base: float, difficulty: float, score: float) -> float:
 def backfire_damage(base: float, difficulty: float) -> float:
     """Damage the attacker takes when its own problem fails verification."""
     return base * difficulty * BACKFIRE_FACTOR
+
+
+def difficulty_from_panel(failed: int, answered: int) -> float:
+    """Linear from DIFFICULTY_MIN to DIFFICULTY_MAX in the share of answering members failing."""
+    if answered <= 0 or not 0 <= failed <= answered:
+        raise ValueError(f"bad panel counts: {failed} failed of {answered} answered")
+    return DIFFICULTY_MIN + (DIFFICULTY_MAX - DIFFICULTY_MIN) * failed / answered
 
 
 def apply_damage(hp: float, amount: float) -> float:

@@ -21,10 +21,15 @@ PROVIDERS = {"groq": Provider("https://groq.test/v1", "GROQ_API_KEY")}
 FIGHTER = Fighter("alpha", "groq", "some-model", "persona")
 
 
-def chat_response(content: str | None = "hello", finish_reason: str = "stop") -> httpx2.Response:
+def chat_response(
+    content: str | None = "hello",
+    finish_reason: str = "stop",
+    usage: dict[str, int] | None = None,
+) -> httpx2.Response:
     return httpx2.Response(
         200,
         json={
+            **({"usage": usage} if usage else {}),
             "id": "c1",
             "object": "chat.completion",
             "created": 0,
@@ -220,3 +225,18 @@ def test_a_fighters_own_key_works_when_the_server_has_none(
     _client_with_keys(requests, {"alpha": "their-key"}).complete(FIGHTER, "s", "u", 64)
 
     assert requests[0].headers["authorization"] == "Bearer their-key"
+
+
+def test_the_providers_token_count_is_kept_when_it_reports_one(harness: type[Harness]) -> None:
+    usage = {"prompt_tokens": 30, "completion_tokens": 12, "total_tokens": 42}
+    h = harness(lambda _: chat_response("hi", usage=usage))
+
+    assert h.client.complete(FIGHTER, "s", "u", 64).tokens == 42
+
+
+def test_the_token_count_is_none_when_the_provider_does_not_report_it(
+    harness: type[Harness],
+) -> None:
+    h = harness(lambda _: chat_response("hi"))
+
+    assert h.client.complete(FIGHTER, "s", "u", 64).tokens is None

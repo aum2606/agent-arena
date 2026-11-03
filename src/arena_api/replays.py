@@ -52,6 +52,9 @@ class TurnView:
     hp_a: float
     hp_b: float
     duration_ms: int
+    difficulty: float | None  # from the panel; None when the problem was not scored (D-036)
+    panel_failed: int | None
+    panel_answered: int | None
 
 
 @dataclass(frozen=True)
@@ -75,12 +78,12 @@ class Replay:
     max_hp: float  # what a full health bar means
 
 
-def _damage_math(outcome: str, damage: float, score: float | None) -> str:
+def _damage_math(outcome: str, damage: float, score: float | None, difficulty: float) -> str:
     if outcome == "block":
         return "no damage"
     if outcome == "backfire":
         return f"{BASE_DAMAGE:g} × {DIFFICULTY:g} × {BACKFIRE_FACTOR:g} = {damage:g}"
-    return f"{BASE_DAMAGE:g} × {DIFFICULTY:g} × (1 − {score or 0.0:g}) = {damage:g}"
+    return f"{BASE_DAMAGE:g} × {difficulty:g} × (1 − {score or 0.0:g}) = {damage:g}"
 
 
 def _turn_view(raw: dict[str, Any]) -> TurnView:
@@ -91,6 +94,7 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
     # The attempt that ended the turn: the verified one, or the backfired one if it was logged.
     shown = first.get("attack_verified") or (first["backfire"] if outcome == "backfire" else {})
     retry = first.get("attack_retry")
+    scored = first.get("difficulty")
     defended = first.get("defend_result")
     hit = first.get("hit")
     hp = first["hp"]
@@ -102,7 +106,7 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
         outcome=outcome,
         target=hit["target"] if hit else None,
         damage=damage,
-        damage_math=_damage_math(outcome, damage, score),
+        damage_math=_damage_math(outcome, damage, score, scored["value"] if scored else DIFFICULTY),
         problem=shown.get("problem"),
         stated_answer=shown.get("answer"),
         code=shown.get("code"),
@@ -117,6 +121,9 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
         hp_a=hp["a"],
         hp_b=hp["b"],
         duration_ms=events[-1]["t"],
+        difficulty=scored["value"] if scored else None,
+        panel_failed=scored["failed"] if scored else None,
+        panel_answered=scored["answered"] if scored else None,
     )
 
 

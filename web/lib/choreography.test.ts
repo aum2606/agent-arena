@@ -25,6 +25,9 @@ function turn(over: Partial<Turn> = {}): Turn {
     hp_a: 100,
     hp_b: 100,
     duration_ms: 1000,
+    difficulty: null,
+    panel_failed: null,
+    panel_answered: null,
     ...over,
   };
 }

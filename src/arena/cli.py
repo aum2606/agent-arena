@@ -73,6 +73,7 @@ def _match(args: argparse.Namespace) -> None:
         config.settings,
         log,
         random.Random(),
+        panel=() if args.no_panel else config.panel,
     )
     path = RUNS_DIR / f"{match_id}.json"
     log.write(path)
@@ -108,6 +109,7 @@ def _sim(args: argparse.Namespace) -> None:
             log,
             rng,
             history=history,
+            panel=() if args.no_panel else config.panel,
         )
         log.write(RUNS_DIR / "logs" / f"{match_id}.json")
         append_record(args.out, record)
@@ -141,10 +143,12 @@ def main(argv: list[str] | None = None) -> int:
     match.add_argument("--a", required=True, help="fighter name (attacks first)")
     match.add_argument("--b", required=True, help="fighter name")
     match.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    match.add_argument("--no-panel", action="store_true", help="skip the difficulty panel")
     match.set_defaults(run=_match)
     sim = commands.add_parser("sim", help="run many matches and print balance stats")
     sim.add_argument("--n", type=int, required=True, help="total matches wanted, incl. saved ones")
     sim.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    sim.add_argument("--no-panel", action="store_true", help="skip the difficulty panel")
     sim.add_argument("--out", type=Path, default=RUNS_DIR / "sim.jsonl", help="results file")
     sim.set_defaults(run=_sim)
     synth = commands.add_parser("synth", help="balance sweep with scripted fighters, no LLM calls")

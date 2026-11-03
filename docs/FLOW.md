@@ -8,6 +8,7 @@ sequenceDiagram
     participant L as llm
     participant V as verifier
     participant D as damage
+    participant S as scorer
     participant G as battle_log
 
     C->>O: run_match(a, b, llm.complete, log, rng, verify)
@@ -25,7 +26,12 @@ sequenceDiagram
         alt parse error, timeout or failed check
             O->>G: backfire, hit (attacker is target, half damage)
         else verified
-            O->>G: attack_verified, defend_start
+            O->>G: attack_verified
+            opt panel configured (D-036)
+                O->>S: score_problem(panel, attack): each member solves it like a defender, in parallel
+                O->>G: difficulty (value 0.5-2.0, who failed, tokens)
+            end
+            O->>G: defend_start
             O->>P: defense_prompts(defender, problem)
             O->>L: complete(defender, defender_max_tokens)
             O->>P: parse_defense(reply)
@@ -55,7 +61,8 @@ saved records.
 ## Modules
 
 - `models`: dataclasses (`Fighter`, `Attack`, `TurnResult`, `MatchRecord`, `MatchResult`).
-- `damage`: pure rule functions and the Phase 0 constants (HP, base damage, max turns).
+- `damage`: pure rule functions and the constants (HP, base damage, max turns, difficulty range and its mapping from the panel).
+- `scorer`: `score_problem` asks the reference panel to solve a verified problem (parallel, defender budget) and returns the difficulty.
 - `verifier`: SymPy answer equality and the snippet runner (subprocess, timeout, temp dir).
 - `battle_log`: per-turn event list with `t` in ms, a schema 2 header (fighters with personas), JSON writer.
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.

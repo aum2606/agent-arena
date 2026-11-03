@@ -34,3 +34,25 @@ name = "gpt-oss"
 provider = "groq"
 model = "openai/gpt-oss-120b"
 persona = "You are GPT-OSS, a careful competitor who double-checks every result."
+
+# Reference panel (D-036): after an attack verifies, each of these solves the problem like a defender.
+# The share that fail sets the difficulty, 0.5 (all solve it) to 2.0 (all fail). Different model
+# families from the two fighters, so "hard" is not just "hard for the fighters"; keep a name
+# unique and the provider in [providers.*].
+[[panel]]
+name = "ref-gemini"
+provider = "gemini"
+model = "gemini-3.5-flash-lite"
+persona = "a careful solver who double-checks the final answer"
+
+[[panel]]
+name = "ref-gpt-oss-20b"
+provider = "groq"
+model = "openai/gpt-oss-20b"
+persona = "a careful solver who double-checks the final answer"
+
+[[panel]]
+name = "ref-qwen"
+provider = "groq"
+model = "qwen/qwen3.8-27b"
+persona = "a careful solver who double-checks the final answer"

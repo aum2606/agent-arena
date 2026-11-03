@@ -27,6 +27,8 @@ class Completion:
     text: str
     truncated: bool  # hit the token cap
     tokens: int | None = None  # what the provider billed for the call, if it says
+    # Everything after the prompt, hidden reasoning included: what a max_tokens cap limits.
+    output_tokens: int | None = None
 
 
 # (fighter, system prompt, user prompt, max tokens); the orchestrator and scorer call this, and the
@@ -90,8 +92,12 @@ class LlmClient:
             raise LlmError(f"{fighter.provider} returned no choices")
         self._sleep(s.call_delay_s)
         choice = response.choices[0]
-        tokens = response.usage.total_tokens if response.usage else None
-        return Completion(choice.message.content or "", choice.finish_reason == "length", tokens)
+        usage = response.usage
+        tokens = usage.total_tokens if usage else None
+        output = usage.total_tokens - usage.prompt_tokens if usage else None
+        return Completion(
+            choice.message.content or "", choice.finish_reason == "length", tokens, output
+        )
 
     def _client(self, fighter: Fighter) -> openai.OpenAI:
         own_key = self._keys.get(fighter.name)

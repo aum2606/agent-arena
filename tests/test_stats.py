@@ -11,6 +11,7 @@ from arena.stats import (
     compute_stats,
     format_stats,
     load_records,
+    wilson_interval,
 )
 
 type Outcome = Literal["hit", "block", "backfire"]
@@ -126,3 +127,51 @@ def test_attack_outcomes_for_an_unknown_fighter_is_empty() -> None:
     assert (
         attack_outcomes([record(["hit"], MatchResult("a", "decision"), (80.0, 60.0))], "zed") == []
     )
+
+
+def test_wilson_interval_brackets_the_rate_and_widens_with_less_data() -> None:
+    low, high = wilson_interval(50, 100)
+    assert (round(low, 3), round(high, 3)) == (0.404, 0.596)
+    assert wilson_interval(0, 10)[0] == 0.0
+    assert round(wilson_interval(0, 10)[1], 3) == 0.278
+    assert wilson_interval(0, 0) == (0.0, 1.0)
+
+
+def test_attacks_that_reached_a_defender_exclude_backfires() -> None:
+    stats = compute_stats(many(2, ["hit", "block", "block", "backfire"]))
+
+    assert stats.verified_hit_rate == pytest.approx(2 / 6)
+    assert compute_stats(many(1, ["backfire"])).verified_hit_rate is None
+
+
+def test_the_report_gives_95_percent_intervals_and_the_verified_hit_rate() -> None:
+    lines = format_stats(compute_stats(many(2, ["hit", "block", "block", "backfire"]))).splitlines()
+
+    assert "Attacks that reached a defender: 6, hit rate 33.3%" in lines
+    assert any(line.startswith("95% intervals: attacker ") for line in lines)
+
+
+def test_gate_is_inconclusive_when_the_interval_straddles_70_percent() -> None:
+    hits_70 = ["hit"] * 7 + ["block"] * 3
+    text = format_stats(compute_stats(many(100, hits_70)))
+
+    assert "Gate: INCONCLUSIVE" in text
+
+
+def test_gate_fail_message_gives_the_interval() -> None:
+    text = format_stats(compute_stats(many(100, ["hit", "hit", "hit", "block"])))
+
+    assert "Gate: FAIL (attacker wins 75.0% of turns, 95% interval" in text
+
+
+def test_an_incomplete_run_says_when_it_can_no_longer_pass() -> None:
+    mostly_blocked = ["block"] * 5 + ["hit"]
+    text = format_stats(compute_stats(many(40, mostly_blocked)))
+
+    assert "Gate: INCOMPLETE (40/100 matches); cannot pass: defender wins at least" in text
+
+
+def test_an_incomplete_run_that_could_still_pass_does_not_say_otherwise() -> None:
+    text = format_stats(compute_stats(many(40, ["hit", "block"])))
+
+    assert "cannot pass" not in text

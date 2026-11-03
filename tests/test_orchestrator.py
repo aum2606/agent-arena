@@ -572,3 +572,36 @@ def test_without_a_panel_nothing_is_scored() -> None:
 
     assert all("difficulty" not in event_types(log, n) for n in range(1, 4))
     assert log.to_dict()["turns"][0]["events"][4]["damage"] == 20.0
+
+
+def defense_events(llm: FakeLlm) -> list[dict[str, Any]]:
+    _, log = play(llm)
+    return log.to_dict()["turns"][0]["events"]
+
+
+def test_a_defense_logs_the_output_tokens_it_used() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={
+            "bob": [Completion("<answer>42</answer>", False, 300, 250)] * 3,
+            "alice": [answer("42")] * 3,
+        },
+    )
+
+    result = next(e for e in defense_events(llm) if e["type"] == "defend_result")
+
+    assert result["output_tokens"] == 250
+
+
+def test_a_cut_off_defense_logs_that_it_hit_the_cap() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+        defenses={
+            "bob": [Completion("<answer>42</answer>", True, 300, 128)] * 3,
+            "alice": [answer("42")] * 3,
+        },
+    )
+
+    timeout = next(e for e in defense_events(llm) if e["type"] == "timeout")
+
+    assert timeout["output_tokens"] == 128

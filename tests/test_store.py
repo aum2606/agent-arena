@@ -4,7 +4,7 @@ from typing import Any
 import psycopg
 
 from arena_api import store
-from arena_api.db import database_url, migrate
+from arena_api.db import MIGRATIONS, database_url, migrate
 from arena_api.replays import parse_replay
 
 type SampleLog = Callable[..., dict[str, Any]]
@@ -112,4 +112,4 @@ def test_migrating_twice_changes_nothing(database: str) -> None:
 
     with psycopg.connect(database_url()) as conn:
         names = [r[0] for r in conn.execute("SELECT name FROM schema_migrations")]
-    assert names == ["0001_matches.sql"]
+    assert names == sorted(p.name for p in MIGRATIONS.glob("*.sql"))

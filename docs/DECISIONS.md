@@ -740,3 +740,38 @@ by name.
 **Alternatives considered:** keeping file logs as a second source (two stores for good, and the
 file tests stayed file-bound); SQLAlchemy and Alembic now (too much for one table); Celery (heavier,
 not async); storing logs in object storage now (a new service for 6 KB rows).
+
+## D-033 · 2026-11-03 · Sign-in: GitHub OAuth, database sessions, same-origin proxy
+
+**Decision:** Users sign in with GitHub (OAuth web flow written against the existing `httpx2` client,
+no auth library). `GET /auth/github/login` redirects to GitHub with a random `state` that is also
+set in a short-lived HttpOnly cookie; `GET /auth/github/callback` refuses the request unless the two
+match, exchanges the code, reads the GitHub id and login, creates or finds the user (the handle follows
+GitHub's current login) and starts a session. A session is a random token in an HttpOnly,
+SameSite=Lax cookie (`Secure` when `PUBLIC_URL` is https); the database keeps only its SHA-256, so a
+leaked table hands out no sessions, and logout deletes the row (14-day expiry). `GET /auth/me`,
+`POST /auth/logout`, `GET /auth/config` and the `current_user` dependency (401 when signed out) are
+the surface later routes use. Tables `users` and `sessions` (migration 0002). The web app forwards
+`/api/*` to the API (a Next.js rewrite whose target `API_URL` is baked in at build), so the browser
+talks to one origin and the cookie is same-site; server components forward the cookie themselves
+(`web/lib/server-api.ts`). New env: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `PUBLIC_URL`. No new
+dependencies.
+
+**Local dev sign-in (hazard):** `POST /auth/dev {handle}` signs in as any handle, with no password.
+It answers 404 unless `ARENA_DEV_LOGIN=1`. Only `docker-compose.yml` turns it on (default 1 there)
+so the whole flow can be tried without registering an OAuth app. Running the API anywhere reachable
+with this flag on lets anyone sign in as anyone; it must be 0 or unset outside a local machine.
+
+**Why database sessions and a proxy:** sessions can be revoked, need no signing library, and keep
+the secret server-side; the proxy avoids cross-origin cookies and CORS entirely.
+
+**Not done:** Google sign-in (the spec's second provider; add when someone needs it); CSRF tokens
+(state-changing routes take JSON bodies, which a cross-site form cannot send, and the cookie is
+SameSite=Lax); sign-in rate limiting; deleting expired session rows.
+
+**Needs you for real sign-in:** register a GitHub OAuth app with callback
+`http://127.0.0.1:3100/api/auth/github/callback` and put its id and secret in `.env`.
+
+**Alternatives considered:** `authlib` or `itsdangerous` signed-cookie sessions (a dependency for
+about 40 lines and no revocation); letting the browser call the API directly (cookies and CORS);
+storing the session token unhashed (a database leak would be account takeover).

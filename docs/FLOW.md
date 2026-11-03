@@ -70,6 +70,9 @@ saved records.
   `run_match` in a thread and stores the log and summary (or the failure reason). `GET /replays` and
   `GET /replays/{id}` read finished rows; `replays.parse_replay` turns a log's events into one
   reveal-panel record per turn. `import_logs` loads old log files. `db.migrate` applies `migrations/`.
+- `auth` / `accounts` (Phase 1): GitHub sign-in (`/auth/github/login` and `/callback`), a session cookie whose
+  token is stored hashed, `current_user` for protected routes, and a local-only dev sign-in. The web app
+  forwards `/api/*` to the API so the cookie stays same-site.
 - `web` (Phase 1): Next.js app that only calls the API. A replay page plays each turn on a Pixi canvas:
   `choreography.planTurn` turns a turn into timed steps (3 to 6 s), `stage.Stage` draws the scene as a
   pure function of (plan, time), `viewer.tsx` holds play, pause, speed and whole-match state.

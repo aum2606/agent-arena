@@ -57,7 +57,7 @@ module = ["sympy", "sympy.*"]
 ignore_missing_imports = true # sympy ships no type stubs (D-007)
 
 [tool.vulture]
-ignore_decorators = ["@app.*"] # FastAPI registers route handlers by decorator, never by call (D-028)
+ignore_decorators = ["@app.*", "@router.*"] # FastAPI registers route handlers by decorator, never by call (D-028)
 # Response fields of arena_api.replays: FastAPI serialises them and nothing reads them (D-029).
 ignore_names = [
     "damage_math",

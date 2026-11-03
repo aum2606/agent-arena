@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { getJson, resultText, type ReplaySummary } from "../lib/api";
+import { resultText, type ReplaySummary } from "../lib/api";
+import { getJson } from "../lib/server-api";
 
 // Rendered per request so the list reflects the API now, not at build time.
 export const dynamic = "force-dynamic";

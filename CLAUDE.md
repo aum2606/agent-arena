@@ -57,7 +57,7 @@ Update this section if commands change.
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  cli.py   (the game engine)
-src/arena_api/  app.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
+src/arena_api/  app.py auth.py accounts.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
 tests/          one test file per module, no network calls

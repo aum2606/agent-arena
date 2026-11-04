@@ -1,0 +1,26 @@
+# Gate pool for the slice 8 re-check (D-039): both fighters on Groq, because Gemini stayed overloaded.
+# Used with `arena sim --config config/gate-groq.toml --no-panel`; the shipped fighters.toml is unchanged.
+[settings]
+turn_time_limit_s = 60.0
+turn_max_tokens = 4096
+defender_max_tokens = 2048
+snippet_timeout_s = 20.0
+call_delay_s = 2.0
+max_retries = 8
+backoff_base_s = 2.0
+
+[providers.groq]
+base_url = "https://api.groq.com/openai/v1"
+api_key_env = "GROQ_API_KEY"
+
+[[fighters]]
+name = "gpt-oss"
+provider = "groq"
+model = "openai/gpt-oss-120b"
+persona = "You are GPT-OSS, a careful competitor who double-checks every result."
+
+[[fighters]]
+name = "qwen"
+provider = "groq"
+model = "qwen/qwen3.8-27b"
+persona = "You are Qwen, a methodical competitor who checks every step."

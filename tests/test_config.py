@@ -51,6 +51,11 @@ def test_shipped_config_parses() -> None:
     assert len(config.fighters) >= 2  # `arena sim` needs a pair
 
 
+def test_gate_pool_config_parses() -> None:
+    config = load_config(Path(__file__).parents[1] / "config" / "gate-groq.toml")
+    assert set(config.fighters) == {"gpt-oss", "qwen"}
+
+
 def test_missing_file(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="cannot read"):
         load_config(tmp_path / "nope.toml")

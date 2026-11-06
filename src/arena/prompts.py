@@ -25,8 +25,9 @@ Design backwards: start from a structure whose answer you can derive with certai
 it in a multi-step setup with a twist. Your snippet only confirms what you already derived.
 
 To avoid that:
-- Work the problem out step by step before the tags and check your result by hand. Only the \
-tags at the end of your reply are used.
+- Keep your working brief, a few lines, and check your result by hand before the tags. Your \
+reply is cut off after a fixed length, and a reply cut off before the tags costs you the \
+turn. Only the tags at the end of your reply are used.
 - Write the Python snippet first, then state exactly what it will print as your answer. Never \
 state an answer you have not derived from the snippet's logic.
 - The snippet prints only the final value, fully evaluated: a number or a simplified \
@@ -108,6 +109,11 @@ def attack_prompts(
     return f"{fighter.persona}\n\n{ATTACKER_RULES}", "\n\n".join(parts)
 
 
+def _with_note(user: str, note: str) -> str:
+    # The reply format stays last, as in the first prompt.
+    return f"{user.removesuffix(ATTACK_REQUEST)}{note}\n\n{ATTACK_REQUEST}"
+
+
 def correction_prompt(user: str, attack: Attack, reason: str) -> str:
     """`user` (an attack prompt) plus how `attack` failed its check, for the one retry (D-025)."""
     note = (
@@ -121,7 +127,22 @@ def correction_prompt(user: str, attack: Attack, reason: str) -> str:
         "written. This is your only retry: if the corrected attempt fails too, you take the "
         "damage."
     )
-    return f"{user.removesuffix(ATTACK_REQUEST)}{note}\n\n{ATTACK_REQUEST}"
+    return _with_note(user, note)
+
+
+def unparsed_prompt(user: str, truncated: bool) -> str:
+    """`user` plus why the first reply was unusable, for the one retry (D-040)."""
+    why = (
+        "was cut off before it reached the tags"
+        if truncated
+        else "could not be read: the problem, code and answer tags were missing or empty"
+    )
+    note = (
+        f"Your previous reply {why}. Keep your working brief, a few lines, and write the three "
+        "tags as soon as you have the problem, the code and the answer. This is your only "
+        "retry: if the next reply fails too, you take the damage."
+    )
+    return _with_note(user, note)
 
 
 def defense_prompts(fighter: Fighter, problem: str) -> tuple[str, str]:

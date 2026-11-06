@@ -20,15 +20,16 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - 2 fighters, 100 HP each. Fighter = {name, provider, model, persona} from `config/fighters.toml`.
 - Attacker returns: math problem + its answer + a Python snippet that computes the answer.
 - Self-verify: run the snippet (subprocess, timeout, temp dir). Output ≠ stated answer, error,
-  or timeout → one retry that shows the attacker the real result (D-025); failing again →
-  **backfire**: attacker takes half the damage (D-013).
+  or timeout → one retry that shows the attacker the real result (D-025). A reply with no usable
+  problem/answer/code tags (often one cut off at the token cap) gets that same single retry (D-040).
+  Failing again → **backfire**: attacker takes half the damage (D-013).
 - Defender answers within time/token budget. Checked with SymPy equality. score = 1 or 0.
 - `damage = base × difficulty × (1 − score)`, base = 20. Difficulty is 0.5 to 2.0 from the reference panel
   (`[[panel]]` in `config/fighters.toml`; the share of members that fail the problem, D-036), or 1.0 when no
   panel is used (backfires, sparring, `--no-panel`).
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
 - Battle log events: attack_start, attack_retry, attack_verified, difficulty, backfire, defend_start, defend_result,
-  hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start); a defender's `defend_result` and
+  hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start); an `attack_retry` for an unreadable reply carries `reason` and `truncated` (D-040); a defender's `defend_result` and
   cut-off `timeout` carry `output_tokens` (D-037). The log has a
   header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030).
 - Sparring (D-035): a user's fighter vs the `house_bot` from `config/fighters.toml`, 3 turns, with the user's

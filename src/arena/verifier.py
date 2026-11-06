@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # convert_xor so "x^2" means a power, as models often write it.
 _TRANSFORMATIONS = (*standard_transformations, convert_xor)
+# Standard math spellings that SymPy lacks: a defender writing arcsin against a stated asin was
+# scored wrong for the same value.
+_ALIASES = {"arcsin": sympy.asin, "arccos": sympy.acos, "arctan": sympy.atan}
 
 
 @dataclass(frozen=True)
@@ -25,8 +28,8 @@ def answers_match(a: str, b: str) -> bool:
     """Exact/symbolic equality. Unparseable text never matches."""
     try:
         diff = sympy.simplify(
-            parse_expr(a, transformations=_TRANSFORMATIONS)
-            - parse_expr(b, transformations=_TRANSFORMATIONS)
+            parse_expr(a, local_dict=_ALIASES, transformations=_TRANSFORMATIONS)
+            - parse_expr(b, local_dict=_ALIASES, transformations=_TRANSFORMATIONS)
         )
     except Exception as exc:  # parse_expr raises many types on arbitrary model text
         logger.info("answer comparison failed (%r vs %r): %s", a, b, exc)

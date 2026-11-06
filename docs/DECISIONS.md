@@ -1026,3 +1026,35 @@ hits in the 22 matches were defenders cut off at 2048 tokens. The gate metric is
 **Alternatives considered:** only softening the prompt (the live check shows it does not remove the
 failures); a larger `turn_max_tokens` (rejected in D-019); retrying twice (the one-retry contract of
 D-025 holds).
+
+## D-041 · 2026-11-06 · The gate metric stays; answer matching accepts arcsin, arccos, arctan
+
+**Decision:** The slice 8 gate keeps its metric (D-037): the share of turns each role wins, where a
+defender cut off at its token budget is a hit (D-024 set that budget on purpose to weaken the
+defender). The 100-match re-check runs on the Groq pool (D-039) with the attacker retry (D-040), as
+`arena sim --n 50 --no-panel --config config/gate-groq.toml --out runs/gate4.jsonl`, then on to 100 if
+the 50-match check allows. The report should also show how many hits were cut-offs and how many were
+finished wrong answers, taken from the logs (`timeout` against `defend_result`), so a pass can be read
+for what it is. Separately, `answers_match` now accepts `arcsin`, `arccos` and `arctan` for SymPy's
+`asin`, `acos` and `atan`: a defender who wrote `100*arcsin(3/5) - 48` against a stated
+`100*asin(3/5) - 48` was scored wrong for the same value.
+
+**Why:** the owner chose to keep the metric when shown the alternatives, on 22 matches of
+`runs/gate3.jsonl`: current metric, attacker 24.2% of turns (95% interval 17.7-32.2%); cut-offs left out
+of the turns, 5.7% (2.6-11.8%); verified attacks only, 38.6% hit rate (28.8-49.3%), or 10.5%
+(4.9-21.1%) with cut-offs left out. The budget is part of the rules, so a cut-off is a legitimate hit.
+
+**Correction to D-040:** its last paragraph says all 32 hits in those 22 matches were defenders cut off
+at 2048 tokens. That is wrong: 26 were cut-offs (`timeout`, qwen 22, gpt-oss 4) and 6 were finished
+replies scored wrong, of which one was the `arcsin` notation (now fixed), one had no `<answer>` tag and
+one answered an attacker problem whose stated answer was the word `redesign`. At most 3 look like
+genuine misses. D-040's retry change is unaffected.
+
+**Known weakness, accepted:** a pass on this metric would be mostly "the defender ran out of budget",
+which favours concise models (the D-019 caveat). The 6 finished-wrong hits are 7% of 83 verified
+attacks, so the problems are still easy for a defender that finishes. Not addressed here: the attacker
+accepting a non-numeric answer such as `redesign`, and a defender reply with no `<answer>` tag.
+
+**Alternatives considered:** leaving cut-offs out of the turns (the gate would fail clearly at about
+6-10%, which says problems are too easy and points at a prompt or rules change); verified attacks only
+(drops backfires, which the attacker caused).

@@ -9,6 +9,7 @@ from arena.prompts import (
     defense_prompts,
     parse_attack,
     parse_defense,
+    unparsed_prompt,
 )
 
 TOPIC = "number theory"
@@ -91,10 +92,11 @@ def test_attack_rules_warn_against_unevaluated_output() -> None:
     assert "doit()" in system
 
 
-def test_attack_rules_allow_working_before_the_tags() -> None:
+def test_attack_rules_ask_for_brief_working_because_a_cut_off_reply_costs_the_turn() -> None:
     system, _ = attack_prompts(FIGHTER, TOPIC, [])
 
-    assert "step by step" in system
+    assert "brief" in system and "cut off" in system
+    assert "step by step" not in system
 
 
 def test_both_roles_are_told_how_to_write_constants() -> None:
@@ -187,3 +189,14 @@ def test_correction_prompt_shows_the_failed_attack_and_why_it_failed() -> None:
     assert text.endswith(ATTACK_REQUEST)  # the reply format stays last, as in the first prompt
     for part in ("What is 6 * 7?", "print(42)", "41", "snippet printed '42', stated '41'"):
         assert part in text
+
+
+@pytest.mark.parametrize("truncated, expected", [(True, "cut off"), (False, "could not be read")])
+def test_unparsed_prompt_says_why_the_reply_was_unusable(truncated: bool, expected: str) -> None:
+    user = attack_prompts(FIGHTER, TOPIC, [])[1]
+
+    text = unparsed_prompt(user, truncated)
+
+    assert text.startswith(user.removesuffix(ATTACK_REQUEST))
+    assert text.endswith(ATTACK_REQUEST)
+    assert expected in text and "brief" in text

@@ -992,3 +992,37 @@ applies.
 **Alternatives considered:** waiting for Gemini and resuming (open-ended); gpt-oss-20b as the second
 fighter (same family as gpt-oss-120b, so a weaker test of role balance); an OpenRouter `:free` model
 (unreliable in D-011); counting the 14 saved matches (mixes two pairings).
+
+## D-040 · 2026-11-06 · An unreadable attacker reply gets the one retry
+
+**Decision:** A first attacker reply with no usable `<problem>`, `<answer>` and `<code>` tags is retried
+once, as a failed snippet check already is (D-025): `attack_retry` is logged with `reason` and
+`truncated` (the reply hit the token cap), and the retry prompt (`unparsed_prompt`) says whether the
+reply was cut off or unreadable and asks for brief working with the tags written early. There is still
+one retry per attack, so an unreadable draft followed by a wrong snippet backfires. A timeout still gets
+no retry. The attacker rules now ask for brief working ("a few lines") and warn that a reply cut off
+before the tags costs the turn, in place of "work the problem out step by step".
+
+**Why:** In the first 22 gate matches on the Groq pool (D-039), 33 of the 49 backfires were a missing
+tag, and `_draft` treated a cut-off reply as a backfire on the spot, with no retry. A live check of 24
+attacker calls (12 per fighter, `turn_max_tokens` 4096) found 5 failures, all cut off at the cap: two
+qwen replies of 9,600 and 13,900 characters of working, and three gpt-oss replies with no visible text
+at all (the cap went to hidden reasoning). The prompt told them to work step by step first.
+
+**Measured after the change (the same 24 calls, retry included):** first drafts failed 6 of 24 (qwen 5,
+gpt-oss 1; 3 of the 6 cut off), and the retry recovered all 6, so 0 of 24 attacks failed to produce a
+readable reply (5 of 24 before). The first-draft rate did not fall (6 of 24 against 5 of 24): gpt-oss
+improved (3 of 12 to 1 of 12), while 3 qwen failures were short replies that were not cut off (39, 146
+and 556 tokens) and had not appeared before. With 12 calls a fighter that is within noise, so the prompt
+change is not shown to help; the retry is what works. The gate logs will show it: `truncated` is on
+every such retry.
+
+**Not done:** raising `turn_max_tokens` (Groq counts max_tokens toward its 8000 tokens-per-minute limit,
+D-019), a per-model reasoning-effort setting, and the defender cap, which is a separate problem: all 32
+hits in the 22 matches were defenders cut off at 2048 tokens. The gate metric is untouched.
+
+**Cost:** an unreadable draft now costs a second call, which slows the run on Groq's limits.
+
+**Alternatives considered:** only softening the prompt (the live check shows it does not remove the
+failures); a larger `turn_max_tokens` (rejected in D-019); retrying twice (the one-retry contract of
+D-025 holds).

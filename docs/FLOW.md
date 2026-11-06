@@ -18,9 +18,9 @@ sequenceDiagram
         O->>L: complete(attacker)
         O->>P: parse_attack(reply)
         O->>V: verify_attack(answer, snippet)
-        opt failed check (D-025)
-            O->>G: attack_retry
-            O->>P: correction_prompt(attack, real result)
+        opt failed check (D-025) or unreadable reply, often cut off at the cap (D-040)
+            O->>G: attack_retry (reason; truncated when the reply had no tags)
+            O->>P: correction_prompt(attack, real result) or unparsed_prompt(truncated)
             O->>L: complete(attacker), parse_attack, verify_attack again
         end
         alt parse error, timeout or failed check

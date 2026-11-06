@@ -15,6 +15,9 @@ TIMEOUT_S = 5.0
         ("sqrt(8)", "2*sqrt(2)"),
         ("x**2 - 1", "(x - 1)*(x + 1)"),
         ("x^2", "x**2"),
+        ("100*arcsin(3/5) - 48", "100*asin(3/5) - 48"),
+        ("arccos(1/2)", "pi/3"),
+        ("arctan(1)", "pi/4"),
     ],
 )
 def test_answers_match_equal(a: str, b: str) -> None:

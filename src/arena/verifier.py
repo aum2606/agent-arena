@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import subprocess
@@ -24,8 +25,19 @@ class Verification:
     reason: str
 
 
+def _canonical(text: str) -> str:
+    # Comparing the text, not the values: in Python 1 == True, in JSON they differ.
+    return json.dumps(json.loads(text), sort_keys=True)
+
+
 def answers_match(a: str, b: str) -> bool:
-    """Exact/symbolic equality. Unparseable text never matches."""
+    """Exact/symbolic equality; two JSON lists (code strike outputs) match if equal as JSON.
+    Unparseable text never matches."""
+    if a.lstrip().startswith("[") and b.lstrip().startswith("["):
+        try:
+            return _canonical(a) == _canonical(b)
+        except ValueError:
+            return False
     try:
         diff = sympy.simplify(
             parse_expr(a, local_dict=_ALIASES, transformations=_TRANSFORMATIONS)

@@ -3,6 +3,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal
 
 from arena.battle_log import BattleLog
+from arena.codestrike import harness
 from arena.config import Settings
 from arena.damage import (
     BASE_DAMAGE,
@@ -15,14 +16,16 @@ from arena.damage import (
     match_result,
 )
 from arena.llm import Complete, Completion, LlmTimeout
-from arena.models import Attack, Fighter, MatchRecord, Outcome, Side, TurnResult
+from arena.models import Attack, Domain, Fighter, MatchRecord, Outcome, Side, TurnResult
 from arena.prompts import (
+    CODE_TOPICS,
     TOPICS,
     ParseError,
     attack_prompts,
     correction_prompt,
     defense_prompts,
     parse_attack,
+    parse_code_defense,
     parse_defense,
     unparsed_prompt,
 )
@@ -31,6 +34,8 @@ from arena.verifier import Verification, answers_match, verify_attack
 
 # (stated answer, snippet, timeout in seconds); the synthetic simulator swaps in a fast stand-in.
 Verify = Callable[[str, str, float], Verification]
+
+_REASON_CHARS = 500  # how much of a failed code check a defend_result keeps
 
 
 class _Backfire(Exception):
@@ -50,7 +55,17 @@ class _Unparsed(_Backfire):
 
 
 def _attempt(attack: Attack) -> dict[str, str]:
-    return {"problem": attack.problem, "answer": attack.answer, "code": attack.snippet}
+    fields = {"problem": attack.problem, "answer": attack.answer, "code": attack.snippet}
+    if attack.domain == "code":
+        fields |= {"domain": attack.domain, "tests": attack.inputs}
+    return fields
+
+
+def _check(attack: Attack, verify: Verify, settings: Settings) -> Verification:
+    """A math attack passes if its snippet prints the stated answer; a code attack if its reference
+    solution, run on its tests, prints the stated outputs."""
+    snippet = harness(attack.snippet, attack.inputs) if attack.domain == "code" else attack.snippet
+    return verify(attack.answer, snippet, settings.snippet_timeout_s)
 
 
 def _other(side: Side) -> Side:
@@ -64,6 +79,7 @@ def _draft(
     complete: Complete,
     settings: Settings,
     log: BattleLog,
+    domain: Domain,
 ) -> Attack:
     """One attacker reply, parsed. A timeout or malformed reply raises _Backfire."""
     try:
@@ -72,7 +88,7 @@ def _draft(
         log.emit("timeout", actor=side)
         raise _Backfire(str(exc)) from exc
     try:
-        return parse_attack(reply.text)
+        return parse_attack(reply.text, domain)
     except ParseError as exc:
         raise _Unparsed(str(exc), reply.truncated) from exc
 
@@ -85,6 +101,7 @@ def _pose_attack(
     verify: Verify,
     settings: Settings,
     log: BattleLog,
+    domain: Domain,
 ) -> Attack:
     """Get a verified attack or raise _Backfire. Other provider errors abort the match.
 
@@ -94,18 +111,18 @@ def _pose_attack(
     """
     system, user = prompts
     try:
-        attack = _draft(attacker, side, prompts, complete, settings, log)
+        attack = _draft(attacker, side, prompts, complete, settings, log, domain)
     except _Unparsed as exc:
         log.emit("attack_retry", actor=side, reason=str(exc), truncated=exc.truncated)
         retry_user = unparsed_prompt(user, exc.truncated)
     else:
-        check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
+        check = _check(attack, verify, settings)
         if check.passed:
             return attack
         log.emit("attack_retry", actor=side, reason=check.reason, **_attempt(attack))
         retry_user = correction_prompt(user, attack, check.reason)
-    attack = _draft(attacker, side, (system, retry_user), complete, settings, log)
-    check = verify(attack.answer, attack.snippet, settings.snippet_timeout_s)
+    attack = _draft(attacker, side, (system, retry_user), complete, settings, log, domain)
+    check = _check(attack, verify, settings)
     if not check.passed:
         raise _Backfire(check.reason, attack)
     return attack
@@ -116,13 +133,18 @@ def _defend(
     side: Side,
     attack: Attack,
     complete: Complete,
+    verify: Verify,
     settings: Settings,
     log: BattleLog,
 ) -> float:
-    """Returns the defender's score: 1.0 for a correct answer, else 0.0."""
+    """Returns the defender's score: 1.0 for a correct answer (or code passing every hidden test),
+    else 0.0."""
+    code = attack.domain == "code"
     try:
         reply: Completion | None = complete(
-            defender, *defense_prompts(defender, attack.problem), settings.defender_max_tokens
+            defender,
+            *defense_prompts(defender, attack.problem, attack.domain),
+            settings.defender_max_tokens,
         )
     except LlmTimeout:
         reply = None
@@ -130,7 +152,7 @@ def _defend(
         log.emit("timeout", actor=side, output_tokens=reply.output_tokens if reply else None)
         return 0.0
     try:
-        given = parse_defense(reply.text)
+        given = parse_code_defense(reply.text) if code else parse_defense(reply.text)
     except ParseError as exc:
         log.emit(
             "defend_result",
@@ -141,9 +163,21 @@ def _defend(
             output_tokens=reply.output_tokens,
         )
         return 0.0
-    score = 1.0 if answers_match(given, attack.answer) else 0.0
+    extra: dict[str, str] = {}
+    if code:
+        check = verify(attack.answer, harness(given, attack.inputs), settings.snippet_timeout_s)
+        score = 1.0 if check.passed else 0.0
+        if not check.passed:
+            extra["reason"] = check.reason[:_REASON_CHARS]
+    else:
+        score = 1.0 if answers_match(given, attack.answer) else 0.0
     log.emit(
-        "defend_result", actor=side, score=score, answer=given, output_tokens=reply.output_tokens
+        "defend_result",
+        actor=side,
+        score=score,
+        answer=given,
+        output_tokens=reply.output_tokens,
+        **extra,
     )
     return score
 
@@ -166,6 +200,7 @@ def play_turn(
     used_problems: list[str],
     recent_outcomes: list[Outcome],
     panel: Sequence[Fighter] = (),
+    domain: Domain = "math",
 ) -> TurnResult:
     """Plays one turn; a verified problem is appended to `used_problems`."""
     defender_side = _other(attacker_side)
@@ -173,8 +208,10 @@ def play_turn(
     log.emit("attack_start", actor=attacker_side)
     try:
         fighter = fighters[attacker_side]
-        prompts = attack_prompts(fighter, topic, used_problems, recent_outcomes)
-        attack = _pose_attack(fighter, attacker_side, prompts, complete, verify, settings, log)
+        prompts = attack_prompts(fighter, topic, used_problems, recent_outcomes, domain)
+        attack = _pose_attack(
+            fighter, attacker_side, prompts, complete, verify, settings, log, domain
+        )
     except _Backfire as exc:
         log.emit(
             "backfire",
@@ -187,7 +224,8 @@ def play_turn(
     used_problems.append(attack.problem)
     log.emit("attack_verified", actor=attacker_side, **_attempt(attack))
     difficulty = DIFFICULTY
-    if panel:
+    # The panel scores math only: code problems keep difficulty 1.0 (D-045).
+    if panel and attack.domain == "math":
         scored = score_problem(panel, attack, complete, settings)
         difficulty = scored.difficulty
         log.emit(
@@ -201,7 +239,7 @@ def play_turn(
             ],
         )
     log.emit("defend_start", actor=defender_side)
-    score = _defend(fighters[defender_side], defender_side, attack, complete, settings, log)
+    score = _defend(fighters[defender_side], defender_side, attack, complete, verify, settings, log)
     if score == 1.0:
         log.emit("block", actor=defender_side)
         return TurnResult(turn, attacker_side, "block", defender_side, 0.0)
@@ -234,7 +272,11 @@ def run_match(
     while True:
         turn += 1
         attacker_side: Side = "a" if turn % 2 == 1 else "b"
-        topic = rng.choice(TOPICS)
+        # Drawn only when code strikes are on, so existing seeded runs keep their topics.
+        domain: Domain = "math"
+        if settings.code_share > 0 and rng.random() < settings.code_share:
+            domain = "code"
+        topic = rng.choice(CODE_TOPICS if domain == "code" else TOPICS)
         result = play_turn(
             turn,
             attacker_side,
@@ -247,6 +289,7 @@ def run_match(
             used_problems,
             outcomes[attacker_side],
             panel,
+            domain,
         )
         turns.append(result)
         outcomes[attacker_side].append(result.outcome)

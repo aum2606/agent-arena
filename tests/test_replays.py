@@ -122,7 +122,7 @@ def test_replay_turns_carry_what_the_reveal_panel_shows(database: str, client: T
         "damage_math": "20 × 1 × (1 − 0) = 20", "problem": "hard?", "stated_answer": "7",
         "defender_answer": "8", "score": 0.0, "timed_out": False, "retried": False,
         "failure_reason": None, "hp_a": 100.0, "hp_b": 80.0, "duration_ms": 3000,
-        "code": None, "first_attempt": None,
+        "code": None, "domain": "math", "tests": None, "first_attempt": None,
         "difficulty": None, "panel_failed": None, "panel_answered": None,
     }  # fmt: skip
     assert (turns[1]["outcome"], turns[1]["damage"], turns[1]["damage_math"]) == (
@@ -266,3 +266,47 @@ def test_a_scored_turn_shows_the_difficulty_and_uses_it_in_the_damage_arithmetic
     assert (shown["difficulty"], shown["panel_failed"], shown["panel_answered"]) == (1.5, 2, 3)
     assert shown["damage"] == 30.0
     assert shown["damage_math"] == "20 × 1.5 × (1 − 0) = 30"
+
+
+def code_turn(n: int = 1) -> dict[str, Any]:
+    return turn(
+        n,
+        [
+            {"t": 0, "type": "attack_start", "actor": "a"},
+            {
+                "t": 900,
+                "type": "attack_verified",
+                "actor": "a",
+                "problem": "Add with solve(a, b).",
+                "answer": "[3, 7]",
+                "code": "def solve(a, b):\n    return a + b",
+                "domain": "code",
+                "tests": "[[1, 2], [3, 4]]",
+            },
+            {"t": 900, "type": "defend_start", "actor": "b"},
+            {
+                "t": 2100,
+                "type": "defend_result",
+                "actor": "b",
+                "score": 0.0,
+                "answer": "def solve(a, b):\n    return a - b",
+                "reason": "mismatch: snippet printed '[-1, -1]'",
+            },
+            {"t": 2100, "type": "hit", "target": "b", "damage": 20.0},
+            {"t": 2100, "type": "hp", "a": 100.0, "b": 80.0},
+            {"t": 2100, "type": "match_end", "winner": "a", "reason": "decision", "turns": 1},
+        ],
+    )
+
+
+def test_a_code_turn_shows_its_domain_and_hidden_tests() -> None:
+    (view,) = parse_replay("m1", {"turns": [code_turn()]}).turns
+
+    assert (view.domain, view.tests) == ("code", "[[1, 2], [3, 4]]")
+    assert view.defender_answer is not None and view.defender_answer.startswith("def solve")
+
+
+def test_older_and_math_turns_are_math_without_tests() -> None:
+    (view,) = parse_replay("m1", {"turns": [block_turn(1, "a", "b")]}).turns
+
+    assert (view.domain, view.tests) == ("math", None)

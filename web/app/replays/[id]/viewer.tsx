@@ -34,6 +34,7 @@ function Row({
 function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) {
   const defender = turn.attacker === "a" ? "b" : "a";
   const first = turn.first_attempt;
+  const code = turn.domain === "code";
   return (
     <section className="panel" aria-label={`Turn ${turn.n} details`}>
       <h2>
@@ -53,12 +54,18 @@ function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) 
           <Row label="First attempt" value="failed its check; retried once (details not logged)" />
         )}
         <Row label={first ? "Final problem" : "Problem"} value={turn.problem} />
-        <Row label="Attacker's stated answer" value={turn.stated_answer} />
-        <Row label="Attacker's code" value={turn.code} mono />
+        <Row
+          label={code ? "Expected outputs (stated by the attacker)" : "Attacker's stated answer"}
+          value={turn.stated_answer}
+          mono={code}
+        />
+        <Row label={code ? "Reference solution" : "Attacker's code"} value={turn.code} mono />
+        <Row label="Hidden tests (inputs)" value={turn.tests} mono />
         <Row label="Failed its own check" value={turn.failure_reason} />
         <Row
-          label={`${sideLabel(summary, defender)}'s answer`}
+          label={`${sideLabel(summary, defender)}'s ${code ? "code" : "answer"}`}
           value={turn.timed_out ? "timed out or cut off" : turn.defender_answer}
+          mono={code && !turn.timed_out}
         />
         <Row
           label="Difficulty"

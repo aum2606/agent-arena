@@ -182,3 +182,18 @@ def test_gvisor_contains_a_fork_bomb_and_a_memory_hog(gvisor: None) -> None:
     assert "allocated" not in run_sandboxed(hog, 20.0).stdout
     run = run_sandboxed(fork, 10.0)
     assert run.timed_out or run.returncode != 0
+
+
+def test_gvisor_runs_a_code_strike_harness(gvisor: None) -> None:
+    from arena.codestrike import harness
+
+    tests = "[[1, 2], [3, 4]]"
+    good = "def solve(a, b):\n    return a + b"
+    loop = "def solve(a, b):\n    while True:\n        pass"
+    connect = "socket.create_connection(('1.1.1.1', 53), timeout=3)"
+    sneaky = f"def solve(a, b):\n    import socket\n    {connect}"
+
+    assert sandboxed_verify("[3, 7]", harness(good, tests), 20.0).passed
+    assert not sandboxed_verify("[3, 8]", harness(good, tests), 20.0).passed
+    assert "timeout" in sandboxed_verify("[3, 7]", harness(loop, tests), 3.0).reason
+    assert not sandboxed_verify("[3, 7]", harness(sneaky, tests), 20.0).passed

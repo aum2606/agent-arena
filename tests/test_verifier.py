@@ -18,6 +18,9 @@ TIMEOUT_S = 5.0
         ("100*arcsin(3/5) - 48", "100*asin(3/5) - 48"),
         ("arccos(1/2)", "pi/3"),
         ("arctan(1)", "pi/4"),
+        ("[3, 7]", "[3,7]"),
+        ("[[1, 2], []]", "[[1,2],[]]"),
+        ('["a", null, true]', '["a",null,true]'),
     ],
 )
 def test_answers_match_equal(a: str, b: str) -> None:
@@ -26,7 +29,16 @@ def test_answers_match_equal(a: str, b: str) -> None:
 
 @pytest.mark.parametrize(
     ("a", "b"),
-    [("3", "4"), ("x + 1", "x + 2"), ("", "1"), ("2 +", "2"), ("not an answer(", "1")],
+    [
+        ("3", "4"),
+        ("x + 1", "x + 2"),
+        ("", "1"),
+        ("2 +", "2"),
+        ("not an answer(", "1"),
+        ("[3, 7]", "[3, 8]"),
+        ("[3, 7]", "[3, 7, 1]"),
+        ("[1, 2]", "[1, 2"),
+    ],
 )
 def test_answers_match_different_or_unparseable(a: str, b: str) -> None:
     assert not answers_match(a, b)

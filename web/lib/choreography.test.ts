@@ -16,6 +16,8 @@ function turn(over: Partial<Turn> = {}): Turn {
     problem: "p",
     stated_answer: "1",
     code: "print(1)",
+    domain: "math",
+    tests: null,
     defender_answer: "1",
     score: 1,
     timed_out: false,

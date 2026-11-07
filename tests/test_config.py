@@ -131,3 +131,18 @@ def test_panel_members_need_a_known_provider_and_unique_names(tmp_path: Path) ->
         )
     with pytest.raises(ConfigError, match="duplicate panel member 'ref-1'"):
         load_config(write(tmp_path, VALID + PANEL.replace("ref-2", "ref-1")))
+
+
+def test_code_share_defaults_to_math_only_and_can_be_set(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, VALID)).settings.code_share == 0.0
+    shared = VALID.replace("max_retries = 5\n", "max_retries = 5\ncode_share = 0.25\n")
+
+    assert load_config(write(tmp_path, shared)).settings.code_share == 0.25
+
+
+@pytest.mark.parametrize("value", ["-0.1", "1.5"])
+def test_code_share_is_a_share(tmp_path: Path, value: str) -> None:
+    text = VALID.replace("max_retries = 5\n", f"max_retries = 5\ncode_share = {value}\n")
+
+    with pytest.raises(ConfigError, match="code_share"):
+        load_config(write(tmp_path, text))

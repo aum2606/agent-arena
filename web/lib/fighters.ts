@@ -22,6 +22,20 @@ export interface MatchStatus {
   fighter_b: string | null;
   error: string | null;
   fighter_version: number | null;
+  /** Ranked, once finished: how the requester's rating moved. */
+  rating_delta: number | null;
+}
+
+export interface LeaderboardRow {
+  handle: string;
+  name: string;
+  rating: number;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  /** The last five results, newest first: W, D or L. */
+  form: string;
 }
 
 /** The message from an API error body (a string, or a list of validation problems). */

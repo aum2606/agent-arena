@@ -1,55 +1,21 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import FIGHTER, SignIn, StubQueue, make_fighter
 from redis.exceptions import ConnectionError as RedisConnectionError
 
 from arena_api import store
 from arena_api.app import app
 from arena_api.fighter_routes import MAX_SPARS_PER_USER_PER_DAY
-from arena_api.match_routes import MAX_QUEUED, get_queue
-
-type SignIn = Callable[[str], TestClient]
-
-FIGHTER: dict[str, Any] = {
-    "name": "rex",
-    "provider": "groq",
-    "model": "llama-test",
-    "persona": "You are a careful competitor.",
-    "api_key": "gsk_test_abcdefghij1234",
-}
-
-
-class StubQueue:
-    def __init__(self) -> None:
-        self.jobs: list[tuple[str, tuple[Any, ...]]] = []
-        self.error: Exception | None = None
-
-    async def enqueue_job(self, function: str, *args: Any) -> None:
-        if self.error:
-            raise self.error
-        self.jobs.append((function, args))
-
-
-@pytest.fixture
-def queue() -> Iterator[StubQueue]:
-    stub = StubQueue()
-    app.dependency_overrides[get_queue] = lambda: stub
-    yield stub
-    app.dependency_overrides.clear()
+from arena_api.match_routes import MAX_QUEUED
 
 
 @pytest.fixture(autouse=True)
 def setup(config_file: object, encryption: None, queue: StubQueue) -> None:
     """Spar tests need the provider config, a key secret and a stand-in queue."""
-
-
-def make_fighter(client: TestClient, **changes: Any) -> int:
-    response = client.post("/fighters", json=FIGHTER | changes)
-    assert response.status_code == 201
-    return int(response.json()["id"])
 
 
 def spar(client: TestClient, fighter_id: int) -> Any:

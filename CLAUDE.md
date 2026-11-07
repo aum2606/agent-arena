@@ -12,8 +12,7 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - Slice order approved 2026-11-02 (D-027): 11 slices, one at a time. Do not start a later slice.
 - In scope: only the current slice, after its short plan is approved (see Workflow).
 - Out of MVP scope: live spectating, tournaments, remote agents, 3D avatars, paid plans.
-- Blocking check: slice 8 (100-match balance re-check) must pass, or the rules be changed and
-  logged, before slice 9 (ranked play).
+- Slice 8 (100-match balance re-check) was waived by the owner on 2026-11-07 (D-042); slice 9 is built.
 - New dependencies need a DECISIONS entry first. "Runtime deps today" below is the engine's.
 
 ## Game rules (Phase 0)
@@ -64,7 +63,7 @@ Update this section if commands change.
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
-src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
+src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
 tests/          one test file per module, no network calls

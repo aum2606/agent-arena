@@ -78,6 +78,11 @@ ignore_names = [
     "panel_failed",
     "panel_answered",
     "version",
+    # Response fields of ranked play (D-043): serialised for the web app, never read in Python.
+    "rating_delta",
+    "wins",
+    "losses",
+    "form",
     # The arq worker finds its settings class and reads these attributes by name (D-032).
     "WorkerSettings",
     "functions",

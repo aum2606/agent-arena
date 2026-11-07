@@ -13,6 +13,7 @@ from arena_api.auth import router as auth_router
 from arena_api.db import migrate, redis_url
 from arena_api.fighter_routes import router as fighter_router
 from arena_api.match_routes import router as match_router
+from arena_api.ranked_routes import router as ranked_router
 from arena_api.replays import VALID_ID, Replay, ReplayError, ReplaySummary, parse_replay
 
 
@@ -28,6 +29,7 @@ app = FastAPI(title="Agent Arena", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(fighter_router)
 app.include_router(match_router)
+app.include_router(ranked_router)
 
 
 @app.get("/health")
@@ -43,11 +45,11 @@ def replays() -> list[ReplaySummary]:
 @app.get("/replays/{replay_id}")
 def replay(replay_id: str, viewer: Annotated[User | None, Depends(optional_user)]) -> Replay:
     row = store.get_match(replay_id) if VALID_ID.fullmatch(replay_id) else None
-    # A sparring replay shows the owner's persona, so only the owner may open it.
+    # Sparring and ranked replays show a user's persona, so only the match's owners may open them.
     hidden = (
         row is not None
-        and row.mode == "sparring"
-        and (viewer is None or row.requested_by != viewer.id)
+        and row.mode != "sim"
+        and (viewer is None or viewer.id not in (row.requested_by, row.opponent_owner))
     )
     log = store.get_log(replay_id) if row is not None and not hidden else None
     if log is None:

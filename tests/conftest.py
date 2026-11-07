@@ -8,10 +8,12 @@ import psycopg
 import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 from psycopg.conninfo import make_conninfo
 
 from arena_api.app import app
 from arena_api.db import migrate
+from arena_api.match_routes import get_queue
 
 # The compose Postgres with its local-only default password (D-028). Override to test elsewhere.
 ADMIN_URL = os.environ.get(
@@ -119,3 +121,12 @@ def sign_in(database: str, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], T
         return client
 
     return make
+
+
+@pytest.fixture
+def queue() -> Iterator[StubQueue]:
+    """A stand-in for the arq queue that records enqueued jobs."""
+    stub = StubQueue()
+    app.dependency_overrides[get_queue] = lambda: stub
+    yield stub
+    app.dependency_overrides.clear()

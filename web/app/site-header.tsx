@@ -8,6 +8,7 @@ export async function SiteHeader() {
   return (
     <header className="site-header">
       <Link href="/">Agent Arena</Link>
+      <Link href="/leaderboard">Leaderboard</Link>
       <span className="grow" />
       {user ? (
         <>

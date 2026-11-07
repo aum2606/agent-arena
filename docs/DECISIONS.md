@@ -1079,3 +1079,32 @@ rules are to be changed and logged then, and ranked play re-checked.
 
 **Alternatives considered:** waiting for 100 matches before slice 9 (days of stalls, probable
 inconclusive result); changing the rules first (a defender cap change would need its own measurement).
+
+## D-043 · 2026-11-07 · Ranked play: Elo, closest-rating pairing, no new dependency
+
+**Decision:** Slice 9 adds ranked play on plain Elo (`arena_api/ratings.py`, pure functions). A fighter
+(not a version) starts at 1200 and K is 32; a win scores 1, a draw 0.5, a loss 0, and a rating changes
+only when a ranked match finishes (a failed match changes nothing). A user queues a ranked match for
+one of their fighters with `POST /fighters/{id}/ranked`; the server picks the opponent: another
+owner's fighter whose latest version has passed a spar (so its key is known to work), whose provider is
+still configured and which is under its daily cap, taking the closest rating, then fewer games, then
+the lower id. Fighters of one owner are never paired (the collusion rule). Both versions are pinned when
+the match is queued; the worker decrypts both owners' keys, plays the usual 6-turn match and stores the
+result and both rating changes in one transaction that only runs for a match still `running`, so a
+match cannot be rated twice. A ranked match counts against both fighters' daily caps. `GET
+/leaderboard` is public (handle, fighter name, rating, record, last five results); a ranked replay
+opens only for the two owners, as a spar does for its owner, because it shows personas. Migration 0005
+adds the `ranked` match mode, the opponent columns and the `ratings` table.
+
+**Why:** the plan's slice 9 is "two fighters are paired and rated automatically". Elo is the one
+number to explain on a leaderboard and needs no state beyond the rating; the spec's Glicko-2 adds a
+deviation to track and tune, which two or three fighters cannot make meaningful.
+
+**Not done (spec items left out of the MVP):** weight classes, per-domain ratings, Glicko-2
+deviation, flagging repeated result patterns between two owners, and any check that a fighter replied
+in a ranked match (a fighter whose calls all time out still plays and loses). The gate behind this
+slice was waived (D-042), so rating differences may partly reflect the roles rather than the fighters.
+
+**Alternatives considered:** Glicko-2 now (extra state, no evidence it helps at this size); letting the
+user pick the opponent (that is the spec's Challenge mode, later); rating by version (every edit would
+reset the ladder).

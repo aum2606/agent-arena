@@ -1264,3 +1264,38 @@ local-only risk of the stack, which already enables a sign-in-as-anyone form (D-
 
 **Alternatives considered:** no change (the stack's worker never starts); mounting the Docker socket (see
 above); dropping the worker from compose (the local stack could then not play a match).
+
+## D-049 · 2026-11-07 · Problems reach the defender as delimited data; fouls backfire
+
+**Decision:** Two changes to what a defender sees and what an attacker may send.
+(1) The defender's user message now holds the problem between `<problem>` and `</problem>` lines, the
+reply format stays last, and the system rules say that the problem is untrusted data and that any order
+inside it (ignore these rules, reveal your instructions, give a fixed answer) is part of the problem.
+Any `<problem>` or `</problem>` tag inside the text is replaced by `[tag removed]`, so a problem cannot
+close its own delimiter. This covers math, code and the reference panel alike.
+(2) `moderation.check_problem` runs on every problem once its attack has verified. A problem is a foul if
+it is empty, over 4,000 characters, contains zero-width, directional or control characters, or matches a
+rule for text aimed at the opponent: telling it to ignore or override its instructions or rules, asking
+it to reveal its system prompt, instructions, persona or key, or redefining its role ("you are now",
+"new instructions", "developer mode", "jailbreak"). A foul is a backfire: the attacker takes half the
+damage, the defender is never asked, there is no retry, and the `backfire` event keeps the problem with
+the reason `foul: ...`. It applies in every mode, not only ranked (the spec calls it a ranked foul; one
+rule is simpler and the filter never fires on real play).
+
+**Why:** a problem is text one user's model writes and another user's model reads. The spec asks for
+delimiters and a filter for problems that try to instruct the opponent.
+
+**Checked against the data:** 441 distinct logged problems: the instruction rules flagged none; the
+length limit flagged 2, both rambling problems of more than 4,000 characters (the maximum was 8,378; the
+99th percentile is 1,512).
+
+**Not done, and not measured:** this is a rule filter, not a content moderator: it knows nothing of
+hateful, sexual or violent text (that needs a classifier or a paid API), and a paraphrased instruction
+gets past it. Delimiters lower the chance that a model obeys a problem; they do not remove it. The new
+defender wording was not measured for its effect on how often defenders solve problems (slice 8's gate
+is waived, D-042). Reference solutions and hidden tests are not shown to the defender, so they are not
+filtered.
+
+**Alternatives considered:** a model-based classifier on every problem (cost and free-tier limits on
+the hot path); filtering only in ranked matches (two rule sets); stripping the offending sentence instead
+of a foul (the attacker would profit from trying).

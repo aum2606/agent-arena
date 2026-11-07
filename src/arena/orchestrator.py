@@ -17,6 +17,7 @@ from arena.damage import (
 )
 from arena.llm import Complete, Completion, LlmTimeout
 from arena.models import Attack, Domain, Fighter, MatchRecord, Outcome, Side, TurnResult
+from arena.moderation import check_problem
 from arena.prompts import (
     CODE_TOPICS,
     TOPICS,
@@ -212,6 +213,9 @@ def play_turn(
         attack = _pose_attack(
             fighter, attacker_side, prompts, complete, verify, settings, log, domain
         )
+        # A foul gets no retry and the defender is never asked: it is the attacker's doing (D-049).
+        if foul := check_problem(attack.problem):
+            raise _Backfire(f"foul: {foul}", attack)
     except _Backfire as exc:
         log.emit(
             "backfire",

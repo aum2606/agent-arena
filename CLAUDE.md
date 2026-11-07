@@ -22,7 +22,10 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
   or timeout → one retry that shows the attacker the real result (D-025). A reply with no usable
   problem/answer/code tags (often one cut off at the token cap) gets that same single retry (D-040).
   Failing again → **backfire**: attacker takes half the damage (D-013).
-- Defender answers within time/token budget. Checked with SymPy equality. score = 1 or 0.
+- Defender answers within time/token budget. The problem reaches it as delimited, untrusted data (D-049). The answer is
+  read by a restricted parser, never evaluated (D-047), and checked with SymPy equality. score = 1 or 0.
+- Foul (D-049): a verified problem that is empty, over 4,000 characters, hides characters, or tells the opponent to ignore
+  its rules or reveal its instructions is a backfire (reason `foul: ...`); the defender is never asked.
 - `damage = base × difficulty × (1 − score)`, base = 20. Difficulty is 0.5 to 2.0 from the reference panel
   (`[[panel]]` in `config/fighters.toml`; the share of members that fail the problem, D-036), or 1.0 when no
   panel is used (backfires, sparring, `--no-panel`).
@@ -66,7 +69,7 @@ Update this section if commands change.
 
 ## Layout (planned — adjust only with a DECISIONS entry)
 ```
-src/arena/      models.py  llm.py  prompts.py  verifier.py  sandbox.py  codestrike.py  damage.py
+src/arena/      models.py  llm.py  prompts.py  verifier.py  safe_expr.py  moderation.py  sandbox.py  codestrike.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)

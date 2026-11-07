@@ -1136,3 +1136,45 @@ against gVisor only where `runsc` exists: the tests that need it skip elsewhere.
 
 **Alternatives considered:** Docker's default `runc` (shared kernel, weaker); a restricted Python
 interpreter (known to be escapable); an external code-execution service (a new dependency and cost).
+
+## D-045 · 2026-11-07 · Code strike: a second problem domain, off by default
+
+**Decision:** A turn can be a code strike. `code_share` in `[settings]` (default 0.0, so nothing changes
+until the owner sets it) is the chance a turn is code; it is drawn only when above 0, so seeded runs
+keep their topics. The attacker writes a problem for a Python function `solve`, a reference
+solution (`<code>`), 1 to 10 test inputs (`<tests>`, a JSON list of argument lists) and the expected
+outputs (`<answer>`, a JSON list). Tests and outputs are JSON without floats, at most 20,000 characters
+each; a reply that breaks this is an unreadable reply (D-040). The check mirrors math: the reference
+solution is run on the inputs through `codestrike.harness`, and what it prints must equal the stated
+outputs, or the attack gets the one retry (D-025) and then backfires. The defender sees only the
+problem and replies with `<code>`; its function runs on the hidden inputs through the same harness and
+scores 1 only if the printed outputs equal the expected ones, else 0 (crash, timeout, wrong output,
+no code tag, or a reply cut off at the cap). The harness prints only results, so the expected outputs
+never enter the sandbox and a defender's code cannot read them; `answers_match` compares two JSON
+lists as canonical JSON (so `[1]` and `[true]` differ). Code and math use the same `verify` seam, so
+the worker's code runs in gVisor (D-044) and the CLI's runs locally (D-002). The reference panel scores
+math only: a code turn has difficulty 1.0, as backfires and sparring do. The log stays schema 2:
+verified, retried and backfired code attacks add `domain` and `tests`; a code defender's `defend_result`
+holds its code as `answer` and, on failure, `reason` (first 500 characters). Older logs are math.
+
+**Why:** the spec lists the code strike as an MVP domain, and "every result is checked by code".
+Reusing the verify seam and one binary score keeps the engine's rules (damage, backfire, retry) as
+they are.
+
+**Not done:** partial credit, float tolerance, panel difficulty for code (3 more sandbox runs a
+problem), a web switch for the domain, per-test time limits (one limit covers the whole run), and any
+balance measurement of the code domain: it is off in the shipped config until someone measures it.
+
+**Live spot check (not a measurement):** two 4-turn matches, gpt-oss against qwen on Groq (the D-039
+pool), `code_share` 1.0, seeds 7 and 11. None of the 8 first drafts verified; the one retry recovered 4
+and the other 4 attacks backfired (stated outputs that the reference did not print, test inputs that were
+not valid JSON, replies missing a tag). Of the 4 attacks that reached a defender: 1 block, 2 defenders cut
+off at the 2048-token cap, 1 reply with no `<code>` tag. It also found a bug, fixed before the second
+match: models copied the word `python` from the reply format into the code (3 of 4 first drafts in
+the first match), which crashed the reference; the format no longer starts with it and a lone leading
+`python` line is dropped (this also applies to math). So with these small models a code turn is mostly
+an attacker format or arithmetic failure, which is a reason to keep `code_share` at 0 for now.
+
+**Alternatives considered:** putting the expected outputs in the harness and printing PASS (the
+defender's code could read them); a separate `verify_code` seam (the existing one already fits);
+comparing outputs with SymPy (lists do not parse as expressions).

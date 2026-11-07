@@ -25,6 +25,8 @@ export interface Turn {
   problem: string | null;
   stated_answer: string | null;
   code: string | null;
+  domain: "math" | "code";
+  tests: string | null;
   defender_answer: string | null;
   score: number | null;
   timed_out: boolean;

@@ -19,6 +19,7 @@ class Settings:
     call_delay_s: float
     max_retries: int
     backoff_base_s: float
+    code_share: float = 0.0  # chance that a turn is a code strike instead of math (D-045)
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,8 @@ def load_config(path: Path) -> Config:
         raise ConfigError(f"invalid TOML in {path}: {exc}") from exc
 
     settings = _build(Settings, data.get("settings", {}), "[settings]")
+    if not 0.0 <= settings.code_share <= 1.0:
+        raise ConfigError(f"code_share must be between 0 and 1, not {settings.code_share}")
     providers = {
         name: _build(Provider, raw, f"provider {name!r}")
         for name, raw in data.get("providers", {}).items()

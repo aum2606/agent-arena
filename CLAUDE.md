@@ -26,11 +26,15 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - `damage = base × difficulty × (1 − score)`, base = 20. Difficulty is 0.5 to 2.0 from the reference panel
   (`[[panel]]` in `config/fighters.toml`; the share of members that fail the problem, D-036), or 1.0 when no
   panel is used (backfires, sparring, `--no-panel`).
+- Code strike (D-045): with `code_share` > 0 (default 0) a turn can be a code problem instead: the attacker gives a
+  `solve` problem, a reference solution, hidden test inputs and expected outputs (JSON); the reference must print the
+  stated outputs (same retry and backfire); the defender's function must pass every hidden test to score 1. The
+  panel scores math only (code difficulty is 1.0).
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
 - Battle log events: attack_start, attack_retry, attack_verified, difficulty, backfire, defend_start, defend_result,
   hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start); an `attack_retry` for an unreadable reply carries `reason` and `truncated` (D-040); a defender's `defend_result` and
   cut-off `timeout` carry `output_tokens` (D-037). The log has a
-  header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030).
+  header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030), and for code strikes `domain` and `tests` (D-045).
 - Sparring (D-035): a user's fighter vs the `house_bot` from `config/fighters.toml`, 3 turns, with the user's
   own key for their side; the engine's `run_match(max_turns=...)` takes the length.
 - Rule or number changes must be logged in `docs/DECISIONS.md`.
@@ -62,7 +66,7 @@ Update this section if commands change.
 
 ## Layout (planned — adjust only with a DECISIONS entry)
 ```
-src/arena/      models.py  llm.py  prompts.py  verifier.py  sandbox.py  damage.py
+src/arena/      models.py  llm.py  prompts.py  verifier.py  sandbox.py  codestrike.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)

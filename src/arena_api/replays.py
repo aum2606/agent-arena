@@ -42,7 +42,9 @@ class TurnView:
     damage_math: str
     problem: str | None  # None when the attack never verified
     stated_answer: str | None
-    code: str | None  # the attacker's snippet
+    code: str | None  # the attacker's snippet, or reference solution for a code strike
+    domain: str  # "math" or "code"; logs from before the code domain are math
+    tests: str | None  # code strike only: the hidden test inputs, a JSON list
     defender_answer: str | None
     score: float | None
     timed_out: bool  # the defender timed out or was cut off
@@ -110,6 +112,8 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
         problem=shown.get("problem"),
         stated_answer=shown.get("answer"),
         code=shown.get("code"),
+        domain=shown.get("domain", "math"),
+        tests=shown.get("tests"),
         defender_answer=defended["answer"] if defended else None,
         score=score,
         timed_out="timeout" in first and attacker != first["timeout"]["actor"],

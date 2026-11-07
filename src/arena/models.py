@@ -3,6 +3,7 @@ from typing import Literal
 
 Side = Literal["a", "b"]
 Outcome = Literal["hit", "block", "backfire"]
+Domain = Literal["math", "code"]
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,9 @@ class Fighter:
 class Attack:
     problem: str
     answer: str
-    snippet: str
+    snippet: str  # math: prints the answer; code: the reference solution
+    domain: Domain = "math"
+    inputs: str = ""  # code only: the hidden test inputs, a JSON list of argument lists
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ sequenceDiagram
     C->>O: run_match(a, b, llm.complete, log, rng, verify)
     loop each turn (max 6, roles swap)
         O->>G: start_turn, attack_start
-        O->>P: attack_prompts(attacker, random topic, problems so far, its recent outcomes)
+        O->>P: attack_prompts(attacker, random topic, problems so far, its recent outcomes, domain math or code)
         O->>L: complete(attacker)
         O->>P: parse_attack(reply)
         O->>V: verify_attack(answer, snippet)
@@ -64,6 +64,7 @@ saved records.
 - `damage`: pure rule functions and the constants (HP, base damage, max turns, difficulty range and its mapping from the panel).
 - `scorer`: `score_problem` asks the reference panel to solve a verified problem (parallel, defender budget) and returns the difficulty.
 - `verifier`: SymPy answer equality, the local snippet runner (subprocess, timeout, temp dir) and `judge`, which decides pass or fail from a `Run`.
+- `codestrike` (D-045): validates a code attack's tests and builds the harness snippet that runs a `solve` function on them and prints the results as JSON; the orchestrator runs it through `verify` for both the attacker's reference solution and the defender's code.
 - `sandbox` (D-044): `run_sandboxed` runs a snippet in a gVisor container and `sandboxed_verify` judges it like `verify_attack`; `ensure_ready` checks Docker has `runsc`. The worker passes `sandboxed_verify` to `run_match` as `verify`.
 - `battle_log`: per-turn event list with `t` in ms, a schema 2 header (fighters with personas), JSON writer.
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.

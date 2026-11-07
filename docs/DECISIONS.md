@@ -1058,3 +1058,24 @@ accepting a non-numeric answer such as `redesign`, and a defender reply with no 
 **Alternatives considered:** leaving cut-offs out of the turns (the gate would fail clearly at about
 6-10%, which says problems are too easy and points at a prompt or rules change); verified attacks only
 (drops backfires, which the attacker caused).
+
+## D-042 · 2026-11-07 · Slice 8 waived by the owner; the gate run continues in the background
+
+**Decision:** The owner waives the slice 8 gate so that slice 9 (ranked play and Elo) can be planned
+and built, as D-026 did for Phase 0. The 100-match run (`runs/gate4.jsonl`, D-041) is not stopped: it
+keeps going on the Groq pool and its result is recorded in PROGRESS.md when it ends. No rule changes.
+
+**Why:** the run is limited by the free-tier rate limits (13 of 50 matches after about two days of
+stalls, over 400 rate-limit retries), and every measurement so far has been about the measurement
+itself. Latest numbers, 14 matches of `runs/gate4.jsonl` (with the D-040 retry and the D-041 matching
+fix): attacker 31.0% of turns (95% interval 22.1-41.5%), defender 69.0% (58.5-77.9%), 32% backfires,
+hit rate 45.6% of attacks that reached a defender. That is inside the 70% line but far from the
+100 matches the gate needs, so it is a hint, not a pass.
+
+**What this does not claim:** the gate has not passed. The D-041 weakness stands: a share of the hits
+are defenders cut off at the token budget, which favours concise models, and small-model results do not
+establish balance for stronger models (D-019). If the finished run lands outside the 70% line, the
+rules are to be changed and logged then, and ranked play re-checked.
+
+**Alternatives considered:** waiting for 100 matches before slice 9 (days of stalls, probable
+inconclusive result); changing the rules first (a defender cap change would need its own measurement).

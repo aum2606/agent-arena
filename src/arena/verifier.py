@@ -8,15 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import sympy
-from sympy.parsing.sympy_parser import convert_xor, parse_expr, standard_transformations
+
+from arena.safe_expr import parse_answer
 
 logger = logging.getLogger(__name__)
-
-# convert_xor so "x^2" means a power, as models often write it.
-_TRANSFORMATIONS = (*standard_transformations, convert_xor)
-# Standard math spellings that SymPy lacks: a defender writing arcsin against a stated asin was
-# scored wrong for the same value.
-_ALIASES = {"arcsin": sympy.asin, "arccos": sympy.acos, "arctan": sympy.atan}
 
 
 @dataclass(frozen=True)
@@ -39,11 +34,8 @@ def answers_match(a: str, b: str) -> bool:
         except ValueError:
             return False
     try:
-        diff = sympy.simplify(
-            parse_expr(a, local_dict=_ALIASES, transformations=_TRANSFORMATIONS)
-            - parse_expr(b, local_dict=_ALIASES, transformations=_TRANSFORMATIONS)
-        )
-    except Exception as exc:  # parse_expr raises many types on arbitrary model text
+        diff = sympy.simplify(parse_answer(a) - parse_answer(b))
+    except Exception as exc:  # untrusted model text: refused, malformed or SymPy failing on it
         logger.info("answer comparison failed (%r vs %r): %s", a, b, exc)
         return False
     return bool(diff == 0)

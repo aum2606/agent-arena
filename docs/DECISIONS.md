@@ -1211,3 +1211,42 @@ checked by running its commands locally and parsing its YAML.
 **Alternatives considered:** Apache-2.0 (patent grant) and AGPL-3.0 (hosted forks must share changes)
 were offered and not chosen; rewriting the history to a GitHub no-reply email (offered, declined);
 squashing the history into one commit (loses the record the decision log refers to).
+
+## D-047 · 2026-11-07 · Answers are read, never evaluated (supersedes the parser part of D-002)
+
+**Decision:** `answers_match` no longer uses `sympy.parse_expr`. `arena.safe_expr.parse_answer` reads the
+text with Python's `ast` and builds the SymPy value bottom-up; nothing is ever passed to `eval`. It
+accepts only: integers and decimals; the operators `+ - * / % ** ^` (`^` is a power) and brackets;
+single-letter variables; the constants `pi E I oo GoldenRatio EulerGamma Catalan`; and calls to a fixed
+list of functions (roots, `exp`, `log`/`ln`, trigonometric and hyperbolic functions with `arcsin`,
+`arccos`, `arctan` as spellings of `asin`, `acos`, `atan`, `gcd`, `lcm`, `Abs`, `floor`, `ceiling`,
+`sign`, `Mod`, `Max`, `Min`, `Rational`, `Integer`, and `factorial`, `binomial`, `gamma`, `zeta`). Anything
+else is refused: attribute access, subscripts, strings, comprehensions, lambdas, keyword arguments, other
+names (`xy`, `theta`, `True`), underscores, `!`, and `1/0`. Limits: 200 characters, 150 syntax-tree
+nodes, a numeric exponent of at most 100,000 (200 when the base has a variable), no power with more than
+100,000 estimated digits, a number passed to a function of at most 1,000 digits, and `factorial`,
+`binomial`, `gamma` and `zeta` of nothing above 10,000. A refused answer is an answer that does not
+match, so a defender who sends one scores 0, and an attacker whose snippet prints one fails its check.
+`n!` is no longer read: the answer format now says to write `factorial(n)`. Applies to the CLI, the
+panel and the worker alike.
+
+**Why:** the old parser ran a model's reply as Python in the worker, which holds the database URL, the
+provider keys and the encryption secret, and users control their fighters' personas (found and probed
+safely on 2026-11-07: a reply changed an environment variable of the process). It also hung on `9**9**9`,
+`99999999!` and `factorial(10**8)` for more than 10 s each, which would stall the single worker.
+
+**Checked against the data:** all 186 stored battle logs, 273 distinct math answer strings, 706 scored
+defences. 272 strings parse. The one refused is `redesign`, an attacker's stated answer that the old
+parser accepted as a variable (the weakness noted in D-041); it now fails the attacker's own check. The
+new scores agree with the stored ones on 705 of 706; the one difference is the `arcsin` scoring bug
+already fixed in D-041. (`zeta(3)` was refused until `zeta` was added with its size guard.)
+
+**Not solved:** comparing two accepted answers still calls `sympy.simplify`, which can be slow on a
+200-character expression of nested functions; nothing times it out, and the arq job timeout (one hour)
+is the only backstop. Answers written with names outside the list (`theta`, `phi`, `fibonacci(n)`) are
+now wrong answers; add a name here with a test if a real problem needs it.
+
+**Alternatives considered:** keeping `parse_expr` behind a character whitelist (still evaluates, and the
+hang remains); running the comparison in a killable child process (the right answer if `simplify`
+proves slow; about a 2 s start-up per call without a long-lived helper); a regular-expression grammar
+(cannot bound the size of what it builds).

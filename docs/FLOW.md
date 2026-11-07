@@ -63,7 +63,8 @@ saved records.
 - `models`: dataclasses (`Fighter`, `Attack`, `TurnResult`, `MatchRecord`, `MatchResult`).
 - `damage`: pure rule functions and the constants (HP, base damage, max turns, difficulty range and its mapping from the panel).
 - `scorer`: `score_problem` asks the reference panel to solve a verified problem (parallel, defender budget) and returns the difficulty.
-- `verifier`: SymPy answer equality and the snippet runner (subprocess, timeout, temp dir).
+- `verifier`: SymPy answer equality, the local snippet runner (subprocess, timeout, temp dir) and `judge`, which decides pass or fail from a `Run`.
+- `sandbox` (D-044): `run_sandboxed` runs a snippet in a gVisor container and `sandboxed_verify` judges it like `verify_attack`; `ensure_ready` checks Docker has `runsc`. The worker passes `sandboxed_verify` to `run_match` as `verify`.
 - `battle_log`: per-turn event list with `t` in ms, a schema 2 header (fighters with personas), JSON writer.
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.
 - `llm`: OpenAI-compatible client per provider, 429 backoff, delay between calls.

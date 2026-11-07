@@ -1108,3 +1108,31 @@ slice was waived (D-042), so rating differences may partly reflect the roles rat
 **Alternatives considered:** Glicko-2 now (extra state, no evidence it helps at this size); letting the
 user pick the opponent (that is the spec's Challenge mode, later); rating by version (every edit would
 reset the ladder).
+
+## D-044 · 2026-11-07 · Sandbox for model-written code in the web worker (supersedes D-002 there)
+
+**Decision:** The match worker runs every attacker snippet in a gVisor container
+(`src/arena/sandbox.py`), through the `docker` command line (no new Python dependency): runtime `runsc`,
+image `python:3.12-slim`, `--network=none`, `--read-only` with a 16 MB `noexec` tmpfs, 256 MB memory with
+no swap, 1 CPU, 64 processes, all capabilities dropped, `no-new-privileges`, user 65534, nothing
+mounted. The snippet goes in on stdin. Output is capped at 64 KB and the run is killed (and its
+container removed) at the snippet limit plus a 10 s start-up allowance. The worker checks at start-up
+that Docker has `runsc` (pulling the image if absent) and refuses to start otherwise; it never falls back
+to the local subprocess silently. `ARENA_SANDBOX=off` is the explicit local-development escape: the
+worker then logs a warning and runs snippets as in D-002. A Docker failure (exit 125) fails the match
+with a clear reason instead of counting as a failed attack. The CLI (`arena match`, `sim`) keeps the local
+subprocess of D-002, so Phase 0 behaviour and the free-tier runs do not change. `verifier` is split into
+`run_local`, `judge` and `verify_attack`; the sandbox reuses `judge`, so both judge identically.
+
+**Why:** in spars and ranked matches a user's persona steers a model that writes code, and that code
+used to run on the server with the server's files and network. Containers share the host kernel; gVisor
+puts its own user-space kernel between the snippet and the host. The spec asks for no network, CPU and
+memory caps and a hard timeout.
+
+**Not done:** Firecracker; a Dockerised worker (it would need Docker access of its own); sandboxing the
+CLI; the SymPy parse of defender answers (`parse_expr` evaluates text, D-002), which still runs in the
+worker and is the next hole to close; a per-user rate limit on sandbox runs. The sandbox is verified
+against gVisor only where `runsc` exists: the tests that need it skip elsewhere.
+
+**Alternatives considered:** Docker's default `runc` (shared kernel, weaker); a restricted Python
+interpreter (known to be escapable); an external code-execution service (a new dependency and cost).

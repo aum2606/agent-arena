@@ -10,6 +10,7 @@ from arena.config import load_config
 from arena.llm import Completion, LlmError
 from arena.models import Fighter
 from arena.prompts import ATTACK_REQUEST
+from arena.verifier import verify_attack
 from arena_api import fighters, store
 from arena_api.app import app
 from arena_api.db import fighters_config_path
@@ -70,7 +71,8 @@ def play(match_id: str, complete: Complete, keys_seen: list[dict[str, str]] | No
         return complete
 
     config = load_config(fighters_config_path())
-    asyncio.run(play_match({"config": config, "complete_with": complete_with}, match_id))
+    ctx = {"config": config, "complete_with": complete_with, "verify": verify_attack}
+    asyncio.run(play_match(ctx, match_id))
 
 
 def finished_match(sign_in: SignIn, complete: Complete = a_wins) -> str:

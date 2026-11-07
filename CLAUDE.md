@@ -47,7 +47,8 @@ uv run arena synth --adaptive             # closed-loop attacker by step and sta
 docker compose up -d postgres redis      # needed by the database tests, which skip without it
 export DATABASE_URL=postgresql://arena:arena-dev@127.0.0.1:5442/arena   # local-only default (D-028)
 uv run uvicorn arena_api.app:app --reload # API on :8000 (D-028); POST /fighters/{id}/spar queues a spar
-uv run arq arena_api.jobs.WorkerSettings  # the match worker; needs the provider keys in the environment
+uv run arq arena_api.jobs.WorkerSettings  # the match worker; needs the provider keys in the environment, and
+                                          # Docker with gVisor (runsc) unless ARENA_SANDBOX=off (D-044)
 uv run python -m arena_api.import_logs runs/logs_gate48 --prefix gate48-   # load old logs (D-032)
 cd web && npm install && npm run dev      # web app on :3000; `npm run typecheck`, `npm test`, `npm run build`
 docker compose up --build                 # postgres :5442, redis, api :8100, web :3100 (localhost)
@@ -61,7 +62,7 @@ Update this section if commands change.
 
 ## Layout (planned — adjust only with a DECISIONS entry)
 ```
-src/arena/      models.py  llm.py  prompts.py  verifier.py  damage.py
+src/arena/      models.py  llm.py  prompts.py  verifier.py  sandbox.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
@@ -92,8 +93,8 @@ runs/           match logs + sim results (gitignored)
 - Errors handled at boundaries with clear messages. Never swallow exceptions.
 - Comments explain *why*, not *what*. Short docstrings on public functions only.
 - New dependency → justify in DECISIONS.md first. Runtime deps today: openai, sympy, python-dotenv.
-- Running model-written code: subprocess + hard timeout + temp dir + minimal env.
-  This is NOT a secure sandbox (that comes in Phase 1); don't present it as one.
+- Running model-written code: the CLI uses a subprocess + hard timeout + temp dir + minimal env. That is
+  NOT a secure sandbox; don't present it as one. The web worker runs it in gVisor (D-044, `ARENA_SANDBOX`).
 
 ## Tracking docs (update in the same commit as the code)
 - `docs/DECISIONS.md`: append-only. `## D-NNN · YYYY-MM-DD · Title` → Decision, Why,

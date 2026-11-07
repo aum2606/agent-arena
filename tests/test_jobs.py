@@ -4,10 +4,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from arena.config import Config, Provider, Settings
+from arena import sandbox
+from arena.config import Config, ConfigError, Provider, Settings
 from arena.llm import Completion, LlmError, LlmTimeout
 from arena.models import Fighter
 from arena.prompts import ATTACK_REQUEST
+from arena.verifier import verify_attack
 from arena_api import fighters, store
 from arena_api.jobs import SPARRING_TURNS, play_match, startup
 
@@ -48,7 +50,8 @@ def run(
             keys_seen.append(dict(keys))
         return complete
 
-    asyncio.run(play_match({"config": config, "complete_with": complete_with}, match_id))
+    ctx = {"config": config, "complete_with": complete_with, "verify": verify_attack}
+    asyncio.run(play_match(ctx, match_id))
 
 
 def test_a_queued_match_is_played_and_stored(database: str) -> None:
@@ -149,6 +152,7 @@ persona = "persona a"
         encoding="utf-8",
     )
     monkeypatch.setenv("FIGHTERS_CONFIG", str(path))
+    monkeypatch.setenv("ARENA_SANDBOX", "off")
     store.create_match("stuck", "alice", "bob")
     store.mark_running("stuck")
     ctx: dict[str, Any] = {}
@@ -285,3 +289,66 @@ def test_a_spar_whose_fighter_version_vanished_fails(
 
     row = store.get_match(spar.match_id)
     assert row is not None and row.status == "failed"
+
+
+def start_worker() -> dict[str, Any]:
+    ctx: dict[str, Any] = {}
+    asyncio.run(startup(ctx))
+    return ctx
+
+
+def test_the_worker_checks_matches_run_in_the_sandbox_by_default(
+    database: str, config_file: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checked: list[bool] = []
+    monkeypatch.delenv("ARENA_SANDBOX", raising=False)
+    monkeypatch.setattr("arena_api.jobs.ensure_ready", lambda: checked.append(True))
+
+    ctx = start_worker()
+
+    assert checked == [True] and ctx["verify"] is sandbox.sandboxed_verify
+
+
+def test_the_worker_refuses_to_start_without_a_sandbox(
+    database: str, config_file: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def missing() -> None:
+        raise ConfigError("docker has no 'runsc' runtime")
+
+    monkeypatch.delenv("ARENA_SANDBOX", raising=False)
+    monkeypatch.setattr("arena_api.jobs.ensure_ready", missing)
+
+    with pytest.raises(ConfigError, match="runsc"):
+        start_worker()
+
+
+def test_the_sandbox_can_be_turned_off_for_local_development(
+    database: str, config_file: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ARENA_SANDBOX", "off")
+
+    assert start_worker()["verify"] is verify_attack
+
+
+def test_an_unknown_sandbox_setting_is_an_error(
+    database: str, config_file: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ARENA_SANDBOX", "gvisr")
+
+    with pytest.raises(ConfigError, match="ARENA_SANDBOX"):
+        start_worker()
+
+
+def test_a_match_checks_attacks_with_the_workers_verify(database: str) -> None:
+    store.create_match("m1", "alice", "bob")
+    seen: list[str] = []
+
+    def spy(stated: str, snippet: str, timeout_s: float) -> Any:
+        seen.append(snippet)
+        return verify_attack(stated, snippet, timeout_s)
+
+    asyncio.run(
+        play_match({"config": CONFIG, "complete_with": lambda keys: blocking, "verify": spy}, "m1")
+    )
+
+    assert seen and set(seen) == {"print(42)"}

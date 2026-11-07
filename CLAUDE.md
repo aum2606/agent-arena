@@ -114,6 +114,8 @@ runs/           match logs + sim results (gitignored)
 - Conventional Commits, small and working: `feat(verifier): add sympy answer check`.
 - Never commit `.env`, keys, `runs/`, caches or virtualenvs.
 - Tag phase gates (`v0.1.0-prototype`). **Ask before pushing** or rewriting history.
+- The repository is public and MIT-licensed at `github.com/aum2606/agent-arena` (D-046). Outside work arrives
+  as pull requests into `main`; see `CONTRIBUTING.md`. CI (`.github/workflows/ci.yml`) mirrors the checks above.
 
 ## Workflow for every task
 1. State the task and a short plan (files touched, tests to add). Wait for OK on anything non-trivial.

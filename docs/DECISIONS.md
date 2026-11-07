@@ -1178,3 +1178,36 @@ an attacker format or arithmetic failure, which is a reason to keep `code_share`
 **Alternatives considered:** putting the expected outputs in the harness and printing PASS (the
 defender's code could read them); a separate `verify_code` seam (the existing one already fits);
 comparing outputs with SymPy (lists do not parse as expressions).
+
+## D-046 · 2026-11-07 · Open source: public MIT repository on GitHub
+
+**Decision:** The project is released as open source at `github.com/aum2606/agent-arena` under the MIT
+license (the owner's choice, 2026-11-07). The existing history of 109 commits is published unchanged,
+including the author email on every commit (the owner chose to keep it). The repository gets a README,
+CONTRIBUTING, SECURITY and CODE_OF_CONDUCT files, issue and pull-request templates, a `.gitattributes`
+(`* text=auto`, so the repository keeps LF) and a GitHub Actions workflow (`.github/workflows/ci.yml`)
+that runs the same checks as the pre-commit hooks plus pytest against a throwaway Postgres, and the web
+typecheck, tests and build. The gVisor tests skip in CI (the runner has no `runsc`). The workflow uses
+the GitHub actions `checkout`, `setup-uv` and `setup-node`; nothing is added to the runtime. Work
+arrives by pull request from forks or branches into `main`, which should require CI to pass. Releases
+are not tagged yet: Phase 0 closed without its gate (D-026) and the MVP is not finished.
+Before publishing, the whole history and the tracked files were searched for provider keys, tokens,
+private keys, `.env` files, `runs/` and personal paths: none were found.
+
+**Why:** the owner wants anyone to be able to try the project, contribute and help build it. A license is
+required for others to use or change the code, and CI plus templates keep outside contributions to the
+same standard as `CLAUDE.md`.
+
+**Disclosed, not hidden:** SECURITY.md and the README state the known problems: the answer parser still
+evaluates text from a model reply in the worker (D-002, D-044), the CLI does not sandbox code, the
+local Docker stack is not safe to expose, and the balance gate was waived (D-042). The first item of the
+launch-hardening slice closes the parser hole.
+
+**Left for the owner (GitHub settings the repository files cannot set):** turn on private vulnerability
+reporting, require the CI checks and a review before merging into `main`, delete head branches after
+merge, and set the repository description and topics. The CI workflow has not run on GitHub yet; it was
+checked by running its commands locally and parsing its YAML.
+
+**Alternatives considered:** Apache-2.0 (patent grant) and AGPL-3.0 (hosted forks must share changes)
+were offered and not chosen; rewriting the history to a GitHub no-reply email (offered, declined);
+squashing the history into one commit (loses the record the decision log refers to).

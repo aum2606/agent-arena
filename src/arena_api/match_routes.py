@@ -1,4 +1,5 @@
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated
@@ -25,6 +26,7 @@ class MatchStatus:
     fighter_b: str | None
     error: str | None
     fighter_version: int | None
+    rating_delta: float | None  # ranked, once finished: how the requester's rating moved
 
 
 def get_queue(request: Request) -> ArqRedis:
@@ -34,7 +36,13 @@ def get_queue(request: Request) -> ArqRedis:
 
 def status_of(row: store.MatchRow) -> MatchStatus:
     return MatchStatus(
-        row.id, row.status, row.fighter_a, row.fighter_b, row.error, row.fighter_version
+        row.id,
+        row.status,
+        row.fighter_a,
+        row.fighter_b,
+        row.error,
+        row.fighter_version,
+        row.rating_delta_a,
     )
 
 
@@ -42,10 +50,20 @@ async def start_sparring(
     queue: ArqRedis, fighter_a: str, fighter_b: str, user_id: int, fighter_id: int, version: int
 ) -> MatchStatus:
     """Save a queued sparring match and hand it to the worker."""
+    return await queue_match(
+        queue,
+        lambda match_id: store.create_match(
+            match_id, fighter_a, fighter_b, "sparring", user_id, fighter_id, version
+        ),
+    )
+
+
+async def queue_match(queue: ArqRedis, create: Callable[[str], None]) -> MatchStatus:
+    """Save a queued match with `create` and hand it to the worker."""
     if store.count_queued() >= MAX_QUEUED:
         raise HTTPException(status_code=429, detail="too many matches are waiting; try again later")
     match_id = f"m_{datetime.now(UTC):%Y%m%dT%H%M%S}_{secrets.token_hex(2)}"
-    store.create_match(match_id, fighter_a, fighter_b, "sparring", user_id, fighter_id, version)
+    create(match_id)
     try:
         await queue.enqueue_job("play_match", match_id)
     except (RedisError, OSError) as exc:

@@ -37,22 +37,36 @@ class Players:
     max_turns: int
 
 
+def _user_fighter(
+    config: Config, name: str | None, fighter_id: int | None, number: int | None
+) -> tuple[Fighter, str]:
+    """A user's fighter as pinned in the match (not its latest version) and its decrypted key."""
+    version = (
+        fighters.version(fighter_id, number)
+        if fighter_id is not None and number is not None
+        else None
+    )
+    if version is None:
+        raise ConfigError("the fighter version for this match no longer exists")
+    if version.provider not in config.providers:
+        raise ConfigError(f"provider {version.provider!r} is not in the config any more")
+    fighter = Fighter(name or "", version.provider, version.model, version.persona)
+    return fighter, decrypt(version.api_key_encrypted)
+
+
 def _players(config: Config, row: store.MatchRow) -> Players:
     if row.mode == "sparring":
-        version = (
-            fighters.version(row.fighter_id, row.fighter_version)
-            if row.fighter_id is not None and row.fighter_version is not None
-            else None
-        )
-        if version is None:
-            raise ConfigError("the fighter version for this match no longer exists")
-        if version.provider not in config.providers:
-            raise ConfigError(f"provider {version.provider!r} is not in the config any more")
+        mine, key = _user_fighter(config, row.fighter_a, row.fighter_id, row.fighter_version)
         house = config.fighters.get(config.house_bot or "")
         if house is None:
             raise ConfigError("no house bot is configured to spar against")
-        mine = Fighter(row.fighter_a or "", version.provider, version.model, version.persona)
-        return Players(mine, house, {mine.name: decrypt(version.api_key_encrypted)}, SPARRING_TURNS)
+        return Players(mine, house, {mine.name: key}, SPARRING_TURNS)
+    if row.mode == "ranked":
+        mine, mine_key = _user_fighter(config, row.fighter_a, row.fighter_id, row.fighter_version)
+        theirs, their_key = _user_fighter(
+            config, row.fighter_b, row.opponent_id, row.opponent_version
+        )
+        return Players(mine, theirs, {mine.name: mine_key, theirs.name: their_key}, MAX_TURNS)
     a, b = (config.fighters.get(name or "") for name in (row.fighter_a, row.fighter_b))
     if a is None or b is None:
         raise ConfigError(
@@ -109,7 +123,11 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
     except Exception as exc:
         store.mark_failed(match_id, _scrub(f"unexpected error: {exc!r}", keys))
         raise
-    store.mark_finished(match_id, log, parse_replay(match_id, log).summary)
+    summary = parse_replay(match_id, log).summary
+    if row.mode == "ranked":
+        store.finish_ranked(match_id, log, summary)
+    else:
+        store.mark_finished(match_id, log, summary)
     # A spar proves the key and model work when the fighter replied at least once.
     if row.mode == "sparring" and _replied(log, "a"):
         assert row.fighter_id is not None and row.fighter_version is not None

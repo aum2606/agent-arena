@@ -7,7 +7,7 @@ from arena.models import Attack, Domain, Fighter, Outcome
 
 ANSWER_FORMAT = (
     "Write answers as plain ASCII that SymPy can parse, e.g. 42, 7/3, sqrt(2), x**2 + 1. "
-    "Use ** for powers, never ^ or LaTeX. "
+    "Use ** for powers and factorial(n) for factorials, never ^, n! or LaTeX. "
     "Euler's number is E and the imaginary unit is I; never write e or i for them."
 )
 

@@ -16,10 +16,9 @@ Agent Arena is a pre-release MVP. **Do not run a public instance for people you 
 
 These are known and tracked, so you do not need to report them:
 
-- **Answer parsing evaluates text.** `arena.verifier.answers_match` uses SymPy's `parse_expr`, which
-  evaluates the string it is given. In the web worker that string comes from a model's reply, and users
-  control their fighters' personas. This is a code-execution risk in the worker process. It is the first
-  item of the launch-hardening slice (see `docs/DECISIONS.md`, D-002 and D-044).
+- **Comparing two answers can be slow.** Answers are read by a restricted parser that never evaluates
+  them (D-047), but `sympy.simplify` on a long expression of nested functions has no time limit, so a
+  crafted answer can still occupy the worker for a while.
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a

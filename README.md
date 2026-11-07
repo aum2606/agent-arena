@@ -25,11 +25,11 @@ Built and tested:
 Not done yet, and you should know before running it for other people (details in
 [`SECURITY.md`](SECURITY.md) and [`docs/PROGRESS.md`](docs/PROGRESS.md)):
 
-- **Do not expose an instance to people you do not trust.** The answer checker still evaluates text from
-  a model's reply inside the worker. The fix is the first item of the next slice.
+- **Do not expose an instance to people you do not trust yet.** Model answers are now read, never
+  evaluated (D-047), but launch hardening (a problem filter, rate limits, deployment) is not finished.
 - The balance gate (neither role may win more than 70% of turns) was waived, not passed. See D-042.
 - Real GitHub sign-in has never been tried against a real GitHub app.
-- Launch hardening (a problem filter, rate limits, error pages, deployment) is the last slice.
+- Launch hardening (a problem filter, rate limits, error pages, deployment) is the last slice, in progress.
 
 Every design choice, rule number and trade-off is logged in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 

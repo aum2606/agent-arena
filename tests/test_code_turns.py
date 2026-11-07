@@ -141,7 +141,7 @@ def test_an_endless_function_is_a_hit() -> None:
         },
     )
 
-    record, log = play(llm, replace(SETTINGS, snippet_timeout_s=0.5))
+    record, log = play(llm, replace(SETTINGS, snippet_timeout_s=3.0))
 
     assert record.turns[0].outcome == "hit"
     assert of_type(log, 1, "defend_result")["reason"].startswith("timeout")

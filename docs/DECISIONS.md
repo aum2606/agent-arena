@@ -1250,3 +1250,17 @@ now wrong answers; add a name here with a test if a real problem needs it.
 hang remains); running the comparison in a killable child process (the right answer if `simplify`
 proves slow; about a 2 s start-up per call without a long-lived helper); a regular-expression grammar
 (cannot bound the size of what it builds).
+
+## D-048 · 2026-11-07 · The compose worker runs with the sandbox off
+
+**Decision:** `docker-compose.yml` sets `ARENA_SANDBOX` for the worker to `${ARENA_SANDBOX:-off}`. A
+public deployment must not use the compose worker: it runs the worker on a host with gVisor (D-044).
+
+**Why:** since D-044 the worker checks for the gVisor runtime at start-up and refuses to start without
+it. The compose worker's container has no Docker, so it exited at once; this was found by reading the
+compose file on 2026-11-07, after D-044 wrongly implied the worker was not in compose. Giving the
+container the host's Docker socket would make it root-equivalent on the host, which is worse than the
+local-only risk of the stack, which already enables a sign-in-as-anyone form (D-033).
+
+**Alternatives considered:** no change (the stack's worker never starts); mounting the Docker socket (see
+above); dropping the worker from compose (the local stack could then not play a match).

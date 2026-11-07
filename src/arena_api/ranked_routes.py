@@ -8,6 +8,7 @@ from arena_api import fighters, store
 from arena_api.accounts import User
 from arena_api.auth import current_user
 from arena_api.db import fighters_config_path
+from arena_api.limits import rate_limit
 from arena_api.match_routes import MatchStatus, get_queue, queue_match
 from arena_api.ratings import pick_opponent
 from arena_api.store import Entrant, LeaderboardRow
@@ -15,7 +16,11 @@ from arena_api.store import Entrant, LeaderboardRow
 router = APIRouter()
 
 
-@router.post("/fighters/{fighter_id}/ranked", status_code=202)
+@router.post(
+    "/fighters/{fighter_id}/ranked",
+    status_code=202,
+    dependencies=[Depends(rate_limit("ranked"))],
+)
 async def enter_ranked(
     fighter_id: int,
     user: Annotated[User, Depends(current_user)],

@@ -87,6 +87,7 @@ saved records.
   owner (`ratings.pick_opponent` over `store.ranked_candidates`), saves a `ranked` match with both versions pinned and
   queues `play_match`. The worker decrypts both keys, plays the match, and `store.finish_ranked` stores the result and
   both Elo changes in one transaction (only while the match is `running`). `GET /leaderboard` is public.
+- `limits` (D-050): `rate_limit(name)` is a route dependency that counts a signed-in user's requests in Redis and answers 429 past `RULES[name]`; it fails open if Redis is down.
 - `auth` / `accounts` (Phase 1): GitHub sign-in (`/auth/github/login` and `/callback`), a session cookie whose
   token is stored hashed, `current_user` for protected routes, and a local-only dev sign-in. The web app
   forwards `/api/*` to the API so the cookie stays same-site.

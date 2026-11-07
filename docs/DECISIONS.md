@@ -1299,3 +1299,27 @@ filtered.
 **Alternatives considered:** a model-based classifier on every problem (cost and free-tier limits on
 the hot path); filtering only in ranked matches (two rule sets); stripping the offending sentence instead
 of a foul (the attacker would profit from trying).
+
+## D-050 · 2026-11-07 · Per-user rate limits, error pages and response headers
+
+**Decision:** The routes that write or spend are limited per signed-in user with a Redis counter
+(`arena_api.limits`; `SET` with a lifetime, then `INCR`, so a counter always expires): creating a fighter
+20 a minute, adding a version 100 a day, a spar 10 a minute, a ranked match 10 a minute. Past the limit
+the answer is 429 with `Retry-After`. Reading is never limited. If Redis fails the limiter lets the request
+through and logs a warning (no match can be queued then either, and the existing per-user and per-fighter
+daily caps still apply). The web app gets `error.tsx`, `global-error.tsx` and `not-found.tsx` (no error
+text is shown to the visitor), the leaderboard page shows "The API is unreachable" like the replay list,
+and every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin` and a `Permissions-Policy` that turns off the camera,
+microphone and location.
+
+**Why:** the plan's launch-hardening slice asks for rate limits and error pages, and a small group will
+share one worker and the free tiers.
+
+**Not done:** limits for visitors who are not signed in (the sign-in routes only redirect to GitHub or
+check its answer); a Content-Security-Policy (Next injects inline scripts, so a policy needs nonces);
+`Strict-Transport-Security` and HTTPS (the reverse proxy in front sets those); limits per IP (behind a
+proxy every visitor shares one address unless forwarded headers are trusted).
+
+**Alternatives considered:** an in-process counter (wrong with more than one API process and lost on a
+restart); a limiter library (a dependency for 30 lines); failing closed when Redis is down.

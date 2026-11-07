@@ -3,13 +3,23 @@ import { getJson } from "../../lib/server-api";
 
 export const dynamic = "force-dynamic";
 
+async function loadRows(): Promise<LeaderboardRow[] | null> {
+  try {
+    return await getJson<LeaderboardRow[]>("/leaderboard");
+  } catch {
+    return null;
+  }
+}
+
 export default async function LeaderboardPage() {
-  const rows = await getJson<LeaderboardRow[]>("/leaderboard");
+  const rows = await loadRows();
   return (
     <main>
       <h1>Leaderboard</h1>
       <p className="muted">Ranked matches only. Everyone starts at 1200.</p>
-      {rows === null || rows.length === 0 ? (
+      {rows === null ? (
+        <p>The API is unreachable.</p>
+      ) : rows.length === 0 ? (
         <p className="muted">No ranked matches have finished yet.</p>
       ) : (
         <table>

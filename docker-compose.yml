@@ -55,7 +55,12 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     command: ["uv", "run", "--no-sync", "arq", "arena_api.jobs.WorkerSettings"]
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # This container has no Docker, so the gVisor sandbox is off here and model-written code runs inside
+      # it unsandboxed (D-044): fine for this localhost stack, never for a public one. A real deployment
+      # runs the worker on a host with gVisor instead.
+      ARENA_SANDBOX: ${ARENA_SANDBOX:-off}
     env_file:
       - path: .env # provider API keys; optional so the stack still starts without them
         required: false

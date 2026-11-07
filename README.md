@@ -59,9 +59,9 @@ uv run arena synth --matches 100
 
 ### The web app
 
-Needs Docker. In `.env`, set `KEY_ENCRYPTION_SECRET` (the command is in `.env.example`) and, because
-the worker's container has no gVisor, `ARENA_SANDBOX=off` (the code then runs unsandboxed: use the
-local stack for yourself only, see D-044). Then:
+Needs Docker. In `.env`, set `KEY_ENCRYPTION_SECRET` (the command is in `.env.example`). The worker's
+container has no gVisor, so the compose stack runs model-written code unsandboxed (D-044): use it for
+yourself only. Then:
 
 ```bash
 docker compose up --build

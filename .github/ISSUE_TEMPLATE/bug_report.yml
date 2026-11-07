@@ -1,0 +1,37 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Never paste API keys, tokens or `.env` contents.** For security problems
+        use "Security → Report a vulnerability" instead of this form.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, or the clicks, in order.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: Output of `git rev-parse --short HEAD`.
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python and Node versions, how you ran it (CLI, `docker compose`), which provider.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or logs
+      render: shell

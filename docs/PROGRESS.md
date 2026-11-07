@@ -29,6 +29,8 @@ D-025 retry was never measured live. No `v0.1.0-prototype` tag.**
 None in progress.
 
 ## Next task
+Open-source release (D-046): files and CI are written; the first push to GitHub waits for the owner's OK, and the
+GitHub settings listed in D-046 are the owner's. Then:
 Phase 1 slice 11 (launch hardening), after its short plan is approved; or a live trial of code strikes first. Open: the slice 8 gate run (waived, D-042) stopped at 14 of 100 matches and can be resumed.
 
 ## Last Phase 0 experiments

@@ -1,0 +1,32 @@
+name: Idea or proposal
+description: A feature, a rule change or an experiment
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project builds in small slices (see `docs/PLAN_PHASE1.md`) and keeps later-phase features out
+        until their turn. Rule and number changes are logged in `docs/DECISIONS.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you propose?
+      description: For a rule change, say what you would measure and how.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Can you help build it?
+      options:
+        - label: I would like to work on this

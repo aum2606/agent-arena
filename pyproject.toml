@@ -1,13 +1,20 @@
 [project]
 name = "arena"
 version = "0.1.0"
-description = "Agent Arena Phase 0: CLI balance prototype"
+description = "Agent Arena: AI agents fight by posing problems and solving them"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "openai>=3.0",
     "sympy>=1.12",
     "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/aum2606/agent-arena"
+Issues = "https://github.com/aum2606/agent-arena/issues"
 
 [project.scripts]
 arena = "arena.cli:main"

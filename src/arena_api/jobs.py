@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import random
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,7 +13,9 @@ from arena.config import Config, ConfigError, load_config
 from arena.damage import MAX_TURNS
 from arena.llm import Complete, LlmClient, LlmError
 from arena.models import Fighter
-from arena.orchestrator import run_match
+from arena.orchestrator import Verify, run_match
+from arena.sandbox import ensure_ready, sandboxed_verify
+from arena.verifier import verify_attack
 from arena_api import fighters, store
 from arena_api.db import fighters_config_path, migrate, redis_url
 from arena_api.replays import parse_replay
@@ -75,7 +78,9 @@ def _players(config: Config, row: store.MatchRow) -> Players:
     return Players(a, b, {}, MAX_TURNS)
 
 
-def _play(config: Config, complete: Complete, match_id: str, players: Players) -> dict[str, Any]:
+def _play(
+    config: Config, complete: Complete, verify: Verify, match_id: str, players: Players
+) -> dict[str, Any]:
     log = BattleLog(match_id)
     run_match(
         players.a,
@@ -84,6 +89,7 @@ def _play(config: Config, complete: Complete, match_id: str, players: Players) -
         config.settings,
         log,
         random.Random(),
+        verify=verify,
         max_turns=players.max_turns,
     )
     return log.to_dict()
@@ -115,7 +121,7 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
         players = _players(ctx["config"], row)
         keys = players.keys
         log = await asyncio.to_thread(
-            _play, ctx["config"], ctx["complete_with"](keys), match_id, players
+            _play, ctx["config"], ctx["complete_with"](keys), ctx["verify"], match_id, players
         )
     except (LlmError, ConfigError) as exc:
         store.mark_failed(match_id, _scrub(str(exc), keys))
@@ -134,8 +140,21 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
         fighters.mark_verified(row.fighter_id, row.fighter_version)
 
 
+def _verify_from_env() -> Verify:
+    """Models write the snippets, and users steer the models: they run in the sandbox (D-044)."""
+    mode = os.environ.get("ARENA_SANDBOX", "gvisor")
+    if mode == "off":
+        logger.warning("ARENA_SANDBOX=off: model-written code runs on this machine, unsandboxed")
+        return verify_attack
+    if mode != "gvisor":
+        raise ConfigError(f"ARENA_SANDBOX must be 'gvisor' or 'off', not {mode!r}")
+    ensure_ready()
+    return sandboxed_verify
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     migrate()
+    ctx["verify"] = _verify_from_env()
     config = load_config(fighters_config_path())
     ctx["config"] = config
     # One client per match, so a user's key lives only as long as that match.

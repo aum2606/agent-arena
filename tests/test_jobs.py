@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 
 from arena import sandbox
 from arena.config import Config, ConfigError, Provider, Settings
@@ -166,6 +167,11 @@ persona = "persona a"
 
 
 KEY = "gsk_test_abcdefghij1234"
+
+
+@pytest.fixture(autouse=True)
+def stand_in_redis(queue: StubQueue) -> None:
+    """Creating a fighter through the API goes through the rate limiter, which needs Redis."""
 
 
 class Spar:

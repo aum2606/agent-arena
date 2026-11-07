@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 
 from arena_api import fighters, store
 from arena_api.app import app
@@ -23,8 +24,8 @@ BODY: dict[str, Any] = {
 
 
 @pytest.fixture(autouse=True)
-def setup(config_file: object, encryption: None) -> None:
-    """Every test here needs the provider config and a server secret for keys."""
+def setup(config_file: object, encryption: None, queue: StubQueue) -> None:
+    """Every test here needs the provider config, a key secret and the stand-in Redis."""
 
 
 def create(client: TestClient, **changes: Any) -> Any:

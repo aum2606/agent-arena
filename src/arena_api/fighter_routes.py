@@ -10,6 +10,7 @@ from arena_api.accounts import User
 from arena_api.auth import current_user
 from arena_api.db import fighters_config_path
 from arena_api.fighters import FighterView
+from arena_api.limits import rate_limit
 from arena_api.match_routes import MatchStatus, get_queue, start_sparring, status_of
 from arena_api.secret_box import encrypt
 
@@ -89,7 +90,7 @@ def options(user: Annotated[User, Depends(current_user)]) -> dict[str, object]:
     return {"providers": providers, "templates": PERSONA_TEMPLATES}
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(rate_limit("create_fighter"))])
 def create(body: NewFighter, user: Annotated[User, Depends(current_user)]) -> FighterView:
     _check_provider(body.provider)
     if fighters.count_for_owner(user.id) >= MAX_FIGHTERS_PER_USER:
@@ -117,7 +118,11 @@ def get_one(fighter_id: int, user: Annotated[User, Depends(current_user)]) -> Fi
     return _mine(user, fighter_id)
 
 
-@router.post("/{fighter_id}/versions", status_code=201)
+@router.post(
+    "/{fighter_id}/versions",
+    status_code=201,
+    dependencies=[Depends(rate_limit("new_version"))],
+)
 def new_version(
     fighter_id: int, body: NewVersion, user: Annotated[User, Depends(current_user)]
 ) -> FighterView:
@@ -133,7 +138,7 @@ def new_version(
     return _mine(user, fighter_id)
 
 
-@router.post("/{fighter_id}/spar", status_code=202)
+@router.post("/{fighter_id}/spar", status_code=202, dependencies=[Depends(rate_limit("spar"))])
 async def spar(
     fighter_id: int,
     user: Annotated[User, Depends(current_user)],

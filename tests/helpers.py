@@ -15,9 +15,28 @@ FIGHTER: dict[str, Any] = {
 
 
 class StubQueue:
+    """Stands in for the arq Redis client: records jobs and keeps rate-limit counters."""
+
     def __init__(self) -> None:
         self.jobs: list[tuple[str, tuple[Any, ...]]] = []
-        self.error: Exception | None = None
+        self.error: Exception | None = None  # raised when a job is enqueued
+        self.counter_error: Exception | None = None  # raised by the counter commands
+        self.counters: dict[str, int] = {}
+        self.expiries: dict[str, int] = {}
+
+    async def set(self, key: str, value: int, ex: int, nx: bool) -> None:
+        if self.counter_error:
+            raise self.counter_error
+        if not (nx and key in self.counters):
+            self.counters[key] = value
+            self.expiries[key] = ex
+
+    async def incr(self, key: str) -> int:
+        self.counters[key] += 1
+        return self.counters[key]
+
+    async def ttl(self, key: str) -> int:
+        return self.expiries[key]
 
     async def enqueue_job(self, function: str, *args: Any) -> None:
         if self.error:

@@ -1323,3 +1323,25 @@ proxy every visitor shares one address unless forwarded headers are trusted).
 
 **Alternatives considered:** an in-process counter (wrong with more than one API process and lost on a
 restart); a limiter library (a dependency for 30 lines); failing closed when Redis is down.
+
+## D-051 · 2026-11-08 · A ranked match with a silent fighter is void; shorter job timeout (supersedes a "not done" of D-043)
+
+**Decision:** A ranked match in which either fighter's model never answered is marked `failed` with a
+reason naming the silent fighter ("... got no reply from its model, so the match was not rated: check the
+key and the model") and rates nobody. A fighter "answered" if it has a verified or retried attack, a
+defence result, or a defence cut off at the token cap. To tell that cut-off from a model that never
+answered, the defender's `timeout` event now carries `truncated: true` when a reply came back and
+`false` for a real timeout (an additive log field; older logs have neither, and so count as silent).
+Sparring uses the same definition to decide whether a spar verifies a fighter's key, so a spar whose
+only replies were cut off now verifies it (the key and model do work). The worker's job timeout is
+1,800 s instead of 3,600 s: past half an hour a match is stuck, and one worker serves everyone.
+
+**Why:** D-043 left it open that a fighter whose calls all time out still plays and loses. A user with a
+dead key or an overloaded model lost rating, and the opponent gained it for a match nobody played. The
+match still counts toward both fighters' daily caps, since it used a queue slot and calls.
+
+**Not done:** a fighter that answers once in six turns is still rated; the failed match is not
+retried; its log is not kept (`failed` matches store only the reason).
+
+**Alternatives considered:** rating a forfeit as a loss for the silent side (punishes a transient
+outage); requiring a minimum number of answers (a number nobody has measured).

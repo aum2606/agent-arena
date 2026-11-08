@@ -680,3 +680,15 @@ def test_a_foul_problem_is_not_listed_as_used() -> None:
     play(llm)
 
     assert all(foul not in request for request in llm.attack_requests)
+
+
+def test_only_a_cut_off_defense_is_marked_truncated_not_a_real_timeout() -> None:
+    def timeout_event(reply: Reply) -> dict[str, Any]:
+        llm = FakeLlm(
+            attacks={"alice": [good_attack()] * 3, "bob": [good_attack()] * 3},
+            defenses={"bob": [reply, answer("42"), answer("42")], "alice": [answer("42")] * 3},
+        )
+        return next(e for e in defense_events(llm) if e["type"] == "timeout")
+
+    assert timeout_event(Completion("<answer>42</answer>", True, 300, 128))["truncated"] is True
+    assert timeout_event(LlmTimeout("slow"))["truncated"] is False

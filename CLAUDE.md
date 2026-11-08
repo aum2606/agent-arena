@@ -36,7 +36,7 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
 - Battle log events: attack_start, attack_retry, attack_verified, difficulty, backfire, defend_start, defend_result,
   hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start); an `attack_retry` for an unreadable reply carries `reason` and `truncated` (D-040); a defender's `defend_result` and
-  cut-off `timeout` carry `output_tokens` (D-037). The log has a
+  cut-off `timeout` carry `output_tokens` (D-037) and `truncated` (D-051: true when a reply came back, false for a real timeout). The log has a
   header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030), and for code strikes `domain` and `tests` (D-045).
 - Sparring (D-035): a user's fighter vs the `house_bot` from `config/fighters.toml`, 3 turns, with the user's
   own key for their side; the engine's `run_match(max_turns=...)` takes the length.

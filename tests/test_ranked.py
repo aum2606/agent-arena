@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from helpers import FIGHTER, SignIn, StubQueue, make_fighter
 
 from arena.config import load_config
-from arena.llm import Completion, LlmError
+from arena.llm import Completion, LlmError, LlmTimeout
 from arena.models import Fighter
 from arena.prompts import ATTACK_REQUEST
 from arena.verifier import verify_attack
@@ -253,3 +253,51 @@ def test_a_ranked_replay_opens_only_for_the_two_owners(sign_in: SignIn) -> None:
     assert sign_in("cy").get(f"/replays/{match_id}").status_code == 404
     assert TestClient(app).get(f"/replays/{match_id}").status_code == 404
     assert store.list_finished() == []
+
+
+def silent_bob(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+    """Bob's model never answers in time; alice's plays normally."""
+    if fighter.name == "bob/rex":
+        raise LlmTimeout("no answer")
+    return all_blocked(fighter, system, user, max_tokens)
+
+
+def test_a_ranked_match_where_a_fighter_never_got_a_reply_is_failed_and_rates_nobody(
+    sign_in: SignIn,
+) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id = verified(ada)
+    verified(bob)
+    match_id = ranked(ada, ada_id).json()["id"]
+
+    play(match_id, silent_bob)
+
+    row = store.get_match(match_id)
+    assert row is not None and row.status == "failed"
+    assert row.error is not None and "bob/rex" in row.error and "not rated" in row.error
+    assert "ada/rex" not in row.error
+    with store.connect() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM ratings").fetchone() == {"n": 0}
+    status = ada.get(f"/matches/{match_id}").json()
+    assert (status["status"], status["rating_delta"]) == ("failed", None)
+
+
+def test_a_fighter_whose_every_reply_is_cut_off_still_counts_as_having_replied(
+    sign_in: SignIn,
+) -> None:
+    def cut_off_bob(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        if fighter.name == "bob/rex" and not user.endswith(ATTACK_REQUEST):
+            return Completion("thinking...", True)  # a defense that ran into the token cap
+        return all_blocked(fighter, system, user, max_tokens)
+
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id = verified(ada)
+    verified(bob)
+    match_id = ranked(ada, ada_id).json()["id"]
+
+    play(match_id, cut_off_bob)
+
+    row = store.get_match(match_id)
+    assert row is not None and row.status == "finished"
+    with store.connect() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM ratings").fetchone() == {"n": 2}

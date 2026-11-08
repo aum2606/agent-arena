@@ -20,8 +20,6 @@ These are known and tracked, so you do not need to report them:
   evaluates them (D-047), but `sympy.simplify` has no time limit: a 32-character answer such as
   `(x+1)**200*(x+2)**200*(x+3)**200` ran for over 25 seconds, and the single worker is blocked meanwhile.
   A fix (a helper process with a time limit) is next.
-- **A ranked match is rated even if one fighter never got a reply** (a dead key or model loses rating
-  to its opponent). A fix is next.
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a

@@ -16,10 +16,10 @@ Agent Arena is a pre-release MVP. **Do not run a public instance for people you 
 
 These are known and tracked, so you do not need to report them:
 
-- **Comparing two answers can hang the worker.** Answers are read by a restricted parser that never
-  evaluates them (D-047), but `sympy.simplify` has no time limit: a 32-character answer such as
-  `(x+1)**200*(x+2)**200*(x+3)**200` ran for over 25 seconds, and the single worker is blocked meanwhile.
-  A fix (a helper process with a time limit) is next.
+- **A crafted answer can still cost the worker a few seconds.** Answers are read by a restricted parser
+  that never evaluates them (D-047) and compared in a helper process with a 5-second limit (D-052), but a
+  slow answer still occupies the single worker for about 8 seconds (the limit plus a restart), and
+  nothing yet limits how many a user can send.
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a

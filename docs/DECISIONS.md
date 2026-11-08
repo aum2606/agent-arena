@@ -1345,3 +1345,28 @@ retried; its log is not kept (`failed` matches store only the reason).
 
 **Alternatives considered:** rating a forfeit as a loss for the silent side (punishes a transient
 outage); requiring a minimum number of answers (a number nobody has measured).
+
+## D-052 · 2026-11-08 · Answer comparison runs in a helper process with a time limit (adds to D-047)
+
+**Decision:** `sympy.simplify` is no longer called in the worker's own process. `arena.equality` keeps
+one long-lived helper process (started on first use with the `spawn` method, so it behaves the same on
+Windows and Linux) that reads two answers, runs `parse_answer` and `simplify`, and sends back the result.
+If it does not answer within 5 seconds the parent kills it and the answer counts as not equal; the
+next comparison starts a fresh helper (about 2 to 3 s, SymPy's import). A helper that died is replaced the
+same way, comparisons are serialised with a lock, and a helper that cannot start raises `ConfigError`,
+which fails the match with a clear reason. `answers_match` keeps the JSON-list comparison in the parent
+and sends everything else to the helper. The CLI, the panel and the worker all use it.
+
+**Why:** D-047 made answers safe to read but left comparison unbounded. `(x+1)**200*(x+2)**200*(x+3)**200`
+is 32 characters, passes the parser (an exponent of 200 is allowed when the base has a variable) and
+kept `simplify` busy for more than 25 s; because the worker plays one match at a time, one crafted
+answer stalled everyone. SymPy cannot be interrupted, so only a process can be stopped.
+
+**Cost and limits:** a hostile answer still costs the worker about 8 s (5 s limit plus the restart),
+and an honest answer that simplifies slowly (the slowest seen took about 2 s) is safe under the limit but a
+slower one would count as wrong. The helper adds a process of roughly 100 MB. Not done: a per-user limit
+on how many slow answers a defender may send.
+
+**Alternatives considered:** a smaller exponent cap (does not stop other slow shapes); a thread with a
+timeout (the thread keeps burning CPU); a new process per comparison (2 to 3 s each); replacing
+`simplify` with a numeric check (wrong for symbolic answers).

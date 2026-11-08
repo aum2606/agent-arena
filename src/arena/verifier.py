@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import subprocess
 import sys
@@ -7,11 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import sympy
-
-from arena.safe_expr import parse_answer
-
-logger = logging.getLogger(__name__)
+from arena.equality import symbolic_equal
 
 
 @dataclass(frozen=True)
@@ -33,12 +28,7 @@ def answers_match(a: str, b: str) -> bool:
             return _canonical(a) == _canonical(b)
         except ValueError:
             return False
-    try:
-        diff = sympy.simplify(parse_answer(a) - parse_answer(b))
-    except Exception as exc:  # untrusted model text: refused, malformed or SymPy failing on it
-        logger.info("answer comparison failed (%r vs %r): %s", a, b, exc)
-        return False
-    return bool(diff == 0)
+    return symbolic_equal(a, b)
 
 
 @dataclass(frozen=True)

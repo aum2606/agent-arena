@@ -66,6 +66,7 @@ saved records.
 - `verifier`: SymPy answer equality, the local snippet runner (subprocess, timeout, temp dir) and `judge`, which decides pass or fail from a `Run`.
 - `codestrike` (D-045): validates a code attack's tests and builds the harness snippet that runs a `solve` function on them and prints the results as JSON; the orchestrator runs it through `verify` for both the attacker's reference solution and the defender's code.
 - `safe_expr` (D-047): reads an answer's text with `ast` and builds its SymPy value; anything but plain math, or anything huge, is refused. `answers_match` uses it, so it never evaluates a model's reply.
+- `equality` (D-052): `symbolic_equal` sends two answers to one long-lived helper process that runs `parse_answer` and `simplify`; past 5 s it is killed and the answer is not equal.
 - `moderation` (D-049): `check_problem` returns why a problem is a foul (empty, too long, hidden characters, instructions aimed at the opponent); the orchestrator turns a foul into a backfire before the defender is asked.
 - `sandbox` (D-044): `run_sandboxed` runs a snippet in a gVisor container and `sandboxed_verify` judges it like `verify_attack`; `ensure_ready` checks Docker has `runsc`. The worker passes `sandboxed_verify` to `run_match` as `verify`.
 - `battle_log`: per-turn event list with `t` in ms, a schema 2 header (fighters with personas), JSON writer.

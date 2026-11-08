@@ -26,8 +26,8 @@ Not done yet, and you should know before running it for other people (details in
 [`SECURITY.md`](SECURITY.md) and [`docs/PROGRESS.md`](docs/PROGRESS.md)):
 
 - **Do not expose an instance to people you do not trust yet.** Model answers are read, never evaluated
-  (D-047), but one crafted answer can still stall the worker for a long time; the list of known problems
-  is in [`SECURITY.md`](SECURITY.md).
+  (D-047) and compared with a time limit (D-052); the list of known problems is in
+  [`SECURITY.md`](SECURITY.md).
 - The balance gate (neither role may win more than 70% of turns) was waived, not passed. See D-042.
 - Real GitHub sign-in has never been tried against a real GitHub app.
 - Launch hardening is half done: a problem filter, rate limits, error pages and safe answer parsing exist

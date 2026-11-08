@@ -1,4 +1,8 @@
-# Progress — Phase 0 (Balance Prototype)
+# Progress
+
+The project is in Phase 1 (MVP). The Phase 0 record comes first, then the Phase 1 slice list.
+
+## Phase 0 (balance prototype)
 
 Gate: over 100+ simulated matches, neither role wins more than 70% of turns.
 

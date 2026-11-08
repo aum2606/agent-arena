@@ -1,5 +1,8 @@
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -59,7 +62,7 @@ def test_a_helper_that_died_is_replaced() -> None:
     process = equality._helper._process
     assert process is not None
     process.kill()
-    process.join()
+    process.wait()
 
     assert symbolic_equal("sqrt(8)", "2*sqrt(2)")
 
@@ -77,3 +80,31 @@ def test_threads_can_compare_at_the_same_time() -> None:
         thread.join()
 
     assert results == [True] * 8
+
+
+def test_a_script_file_without_a_main_guard_can_use_it(tmp_path: Path) -> None:
+    # multiprocessing's spawn re-runs the main script file in the child, which broke such scripts.
+    script = tmp_path / "no_guard.py"
+    script.write_text(
+        "from arena.equality import symbolic_equal\n"
+        "print('result:', symbolic_equal('sqrt(8)', '2*sqrt(2)'), flush=True)\n",
+        encoding="utf-8",
+    )
+
+    done = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, timeout=120
+    )
+
+    assert done.returncode == 0, done.stderr[-500:]
+    assert done.stdout.strip() == "result: True"
+
+
+def test_the_helper_does_not_inherit_the_workers_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "secret-that-must-not-leak")
+    equality._helper.stop()  # the next comparison starts a helper under this environment
+
+    assert symbolic_equal("1", "1")
+
+    assert equality._helper._process is not None
+    environment = equality._helper_environment()
+    assert "GROQ_API_KEY" not in environment and "DATABASE_URL" not in environment

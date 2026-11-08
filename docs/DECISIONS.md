@@ -1392,3 +1392,19 @@ running until the comparison ends, then exits when its input closes.
 
 **Alternatives considered:** a `multiprocessing` process with a guard documented for users (a trap for
 every script); the `fork` method (not on Windows).
+
+## D-054 · 2026-11-08 · CI runs the sandbox tests under gVisor
+
+**Decision:** `.github/workflows/ci.yml` has a third job, `sandbox`, that installs gVisor (`runsc`) on the
+runner from gVisor's own apt repository, registers it with Docker, and runs `tests/test_sandbox.py` with
+skips treated as a failure. The Python job still skips those tests (it has no `runsc`).
+
+**Why:** until now the claim that snippets cannot reach the network, the disk or other processes had been
+checked only by hand in one WSL distro. A sandbox that is not tested on every change is not one to
+rely on.
+
+**Not verified when written:** the job could only be proved by running it on GitHub's runners (the same
+install steps work in the Ubuntu 24.04 WSL distro). If a runner cannot run gVisor, the job fails and this
+entry is to be superseded, not hidden.
+
+**Alternatives considered:** a self-hosted runner (the owner's PC, kept on); leaving the tests skipped in CI.

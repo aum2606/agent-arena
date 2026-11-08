@@ -41,6 +41,31 @@ jobs:
       # The gVisor sandbox tests skip here: the runner's Docker has no runsc runtime.
       - run: uv run pytest
 
+  sandbox:
+    name: gVisor sandbox tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install gVisor and register it with Docker
+        run: |
+          curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y runsc
+          sudo runsc install
+          sudo systemctl restart docker
+          docker run --rm --runtime=runsc hello-world
+      - run: uv sync --frozen
+      # The same tests skip in the job above; here they must really run (D-054).
+      - name: Run the sandbox tests, and fail if any is skipped
+        shell: bash
+        run: |
+          uv run pytest tests/test_sandbox.py -v -rs 2>&1 | tee sandbox.log
+          ! grep -qi "skipped" sandbox.log
+
   web:
     name: Web checks and build
     runs-on: ubuntu-latest

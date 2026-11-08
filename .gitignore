@@ -9,3 +9,6 @@ runs/
 node_modules/
 .next/
 *.tsbuildinfo
+
+# Written by `next dev` (Next 16) on every run; not ours to review or commit
+web/AGENTS.md

@@ -1370,3 +1370,25 @@ on how many slow answers a defender may send.
 **Alternatives considered:** a smaller exponent cap (does not stop other slow shapes); a thread with a
 timeout (the thread keeps burning CPU); a new process per comparison (2 to 3 s each); replacing
 `simplify` with a numeric check (wrong for symbolic answers).
+
+## D-053 · 2026-11-08 · The comparison helper is a plain subprocess (supersedes the mechanism in D-052)
+
+**Decision:** `arena.equality` starts its helper with `subprocess.Popen([python, "-m", "arena.equality"])`
+and talks to it in JSON lines over the pipes (ASCII only, so no pipe encoding can fail), instead of a
+`multiprocessing` spawn process. A reader thread feeds the helper's lines into a queue so the parent can
+wait with a time limit on every platform. The helper gets a minimal environment (the Windows
+`SYSTEMROOT` and a `PYTHONPATH` to the package, no provider keys, no database URL), its stdout is
+reserved for the protocol, and it is killed at exit and replaced when it dies or runs past 5 s.
+Everything else in D-052 (the 5 s limit, one helper, the lock, `ConfigError` if it cannot start) stands.
+
+**Why:** found by running a live-match script on Windows: `multiprocessing`'s spawn method re-runs the
+caller's main script in the child, so any script without an `if __name__ == "__main__"` guard made the
+helper fail to start (and, in the worst case, re-ran the script's top level in the child). The `arena`
+CLI, uvicorn, arq and pytest have guards, so no shipped entry point was hit, but anyone using the
+library from a plain script would have been.
+
+**Not done:** if the parent is killed outright while a comparison is running, that one helper keeps
+running until the comparison ends, then exits when its input closes.
+
+**Alternatives considered:** a `multiprocessing` process with a guard documented for users (a trap for
+every script); the `fork` method (not on Windows).

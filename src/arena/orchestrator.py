@@ -150,7 +150,13 @@ def _defend(
     except LlmTimeout:
         reply = None
     if reply is None or reply.truncated:
-        log.emit("timeout", actor=side, output_tokens=reply.output_tokens if reply else None)
+        # `truncated` tells a model that answered and ran into the cap from one that never answered.
+        log.emit(
+            "timeout",
+            actor=side,
+            output_tokens=reply.output_tokens if reply else None,
+            truncated=reply is not None,
+        )
         return 0.0
     try:
         given = parse_code_defense(reply.text) if code else parse_defense(reply.text)

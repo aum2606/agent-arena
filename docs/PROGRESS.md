@@ -35,7 +35,7 @@ None in progress.
 ## Next task
 Open-source release (D-046): files and CI are written; the first push to GitHub waits for the owner's OK, and the
 GitHub settings listed in D-046 are the owner's. Then:
-Phase 1 slice 11 (launch hardening), plan approved 2026-11-07: parser fix done (D-047), compose worker fixed (D-048), prompt-injection delimiters and problem filter done (D-049); rate limits, error pages and response headers done (D-050). Left in slice 11: deploy files, a runbook and inviting a group, which need a hosting choice (home PC with a tunnel, or a small Linux VPS). Also open: real GitHub sign-in has never been tried; `KEY_ENCRYPTION_SECRET` must be set and backed up; the slice 8 gate run (waived) and a balance measurement of code strikes. Open: the slice 8 gate run (waived, D-042) stopped at 14 of 100 matches and can be resumed.
+Phase 1 slice 11 (launch hardening), plan approved 2026-11-07: parser fix done (D-047), compose worker fixed (D-048), prompt-injection delimiters and problem filter done (D-049); rate limits, error pages and response headers done (D-050); ranked matches with a silent fighter are void (D-051). Left in slice 11: deploy files, a runbook and inviting a group, which need a hosting choice (home PC with a tunnel, or a small Linux VPS). Also open: real GitHub sign-in has never been tried; `KEY_ENCRYPTION_SECRET` must be set and backed up; the slice 8 gate run (waived) and a balance measurement of code strikes. Open: the slice 8 gate run (waived, D-042) stopped at 14 of 100 matches and can be resumed.
 
 ## Last Phase 0 experiments
 Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):

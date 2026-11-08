@@ -23,8 +23,9 @@ from arena_api.secret_box import decrypt
 
 logger = logging.getLogger(__name__)
 
-# A live match takes minutes when the free tiers rate-limit, so the job limit is generous.
-JOB_TIMEOUT_S = 3600
+# A live match takes minutes when the free tiers rate-limit; past half an hour it is stuck, and the
+# single worker should move on (D-051).
+JOB_TIMEOUT_S = 1800
 # The spec's "3 unranked rounds" (a round is a turn here, D-006): half a ranked match, so a spar
 # costs the user's key and the house bot's free-tier quota less.
 SPARRING_TURNS = 3
@@ -103,8 +104,10 @@ def _scrub(text: str, keys: Mapping[str, str]) -> str:
 
 
 def _replied(log: dict[str, Any], side: str) -> bool:
+    """Did the side's model answer at least once? A reply cut off at the cap counts: it answered."""
     return any(
-        event["type"] in _REPLIED and event.get("actor") == side
+        event.get("actor") == side
+        and (event["type"] in _REPLIED or (event["type"] == "timeout" and event.get("truncated")))
         for turn in log["turns"]
         for event in turn["events"]
     )
@@ -131,6 +134,19 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
         raise
     summary = parse_replay(match_id, log).summary
     if row.mode == "ranked":
+        silent = [
+            name or side
+            for side, name in (("a", row.fighter_a), ("b", row.fighter_b))
+            if not _replied(log, side)
+        ]
+        if silent:
+            # A dead key or model must not cost its owner rating nor feed its opponent (D-051).
+            store.mark_failed(
+                match_id,
+                f"{' and '.join(silent)} got no reply from its model, so the match was not rated: "
+                "check the key and the model",
+            )
+            return
         store.finish_ranked(match_id, log, summary)
     else:
         store.mark_finished(match_id, log, summary)

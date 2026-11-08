@@ -16,14 +16,20 @@ Agent Arena is a pre-release MVP. **Do not run a public instance for people you 
 
 These are known and tracked, so you do not need to report them:
 
-- **Comparing two answers can be slow.** Answers are read by a restricted parser that never evaluates
-  them (D-047), but `sympy.simplify` on a long expression of nested functions has no time limit, so a
-  crafted answer can still occupy the worker for a while.
+- **Comparing two answers can hang the worker.** Answers are read by a restricted parser that never
+  evaluates them (D-047), but `sympy.simplify` has no time limit: a 32-character answer such as
+  `(x+1)**200*(x+2)**200*(x+3)**200` ran for over 25 seconds, and the single worker is blocked meanwhile.
+  A fix (a helper process with a time limit) is next.
+- **A ranked match is rated even if one fighter never got a reply** (a dead key or model loses rating
+  to its opponent). A fix is next.
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a
   "sign in as anyone" form, and the Postgres password is a published default. Bind it to localhost only.
-- No rate limits, problem moderation or prompt-injection filtering exist yet.
+- **Limits and filters are basic.** Rate limits cover only signed-in users' write routes (D-050); visitors
+  who are not signed in are not limited. The problem filter (D-049) is a set of rules for instructions
+  aimed at the opponent: it does not catch hateful or adult text, or a cleverly reworded instruction.
+  There is no Content-Security-Policy yet.
 
 ## Handling secrets
 

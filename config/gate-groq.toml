@@ -18,6 +18,7 @@ name = "gpt-oss"
 provider = "groq"
 model = "openai/gpt-oss-120b"
 persona = "You are GPT-OSS, a careful competitor who double-checks every result."
+reasoning_effort = "low"
 
 [[fighters]]
 name = "qwen"

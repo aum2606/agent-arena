@@ -90,6 +90,21 @@ def test_routes_request_to_the_fighters_provider_and_model(harness: type[Harness
     ]
 
 
+def test_the_reasoning_effort_is_sent_only_when_the_fighter_sets_one(
+    harness: type[Harness],
+) -> None:
+    h = harness(lambda _: chat_response())
+
+    h.client.complete(FIGHTER, "s", "u", 64)
+    h.client.complete(
+        Fighter("beta", "groq", "some-model", "p", reasoning_effort="low"), "s", "u", 64
+    )
+
+    plain, tuned = (json.loads(r.content) for r in h.requests)
+    assert "reasoning_effort" not in plain
+    assert tuned["reasoning_effort"] == "low"
+
+
 def test_waits_the_configured_delay_after_a_call(harness: type[Harness]) -> None:
     h = harness(lambda _: chat_response())
     h.client.complete(FIGHTER, "s", "u", 64)

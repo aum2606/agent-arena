@@ -12,6 +12,9 @@ class Fighter:
     provider: str
     model: str
     persona: str
+    # How hard a reasoning model thinks, passed to the provider as is: the allowed values differ by
+    # model (D-055). None leaves the provider's default.
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True)

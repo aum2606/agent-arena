@@ -87,7 +87,7 @@ saved records.
 - `ratings` / `ranked_routes` (Phase 1, D-043): `POST /fighters/{id}/ranked` picks the closest-rated fighter of another
   owner (`ratings.pick_opponent` over `store.ranked_candidates`), saves a `ranked` match with both versions pinned and
   queues `play_match`. The worker decrypts both keys, plays the match, and `store.finish_ranked` stores the result and
-  both Elo changes in one transaction (only while the match is `running`). `GET /leaderboard` is public.
+  both Elo changes in one transaction (only while the match is `running`). `GET /leaderboard` is public. `GET /fighters/{id}/ranked` lists the fighter's latest ranked matches from its own side (result W, D or L and its own rating change), for its owner only; the fighter page shows it and refreshes while a match is waiting.
 - `limits` (D-050): `rate_limit(name)` is a route dependency that counts a signed-in user's requests in Redis and answers 429 past `RULES[name]`; it fails open if Redis is down.
 - `auth` / `accounts` (Phase 1): GitHub sign-in (`/auth/github/login` and `/callback`), a session cookie whose
   token is stored hashed, `current_user` for protected routes, and a local-only dev sign-in. The web app

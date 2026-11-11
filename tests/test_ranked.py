@@ -301,3 +301,97 @@ def test_a_fighter_whose_every_reply_is_cut_off_still_counts_as_having_replied(
     assert row is not None and row.status == "finished"
     with store.connect() as conn:
         assert conn.execute("SELECT count(*) AS n FROM ratings").fetchone() == {"n": 2}
+
+
+def history(client: TestClient, fighter_id: int) -> Any:
+    response = client.get(f"/fighters/{fighter_id}/ranked")
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_a_fighters_ranked_history_shows_each_match_from_its_own_side(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id, bob_id = verified(ada), verified(bob, api_key=BOB_KEY)
+    match_id = ranked(ada, ada_id).json()["id"]
+    play(match_id, a_wins)
+
+    assert history(ada, ada_id) == [
+        {
+            "id": match_id,
+            "status": "finished",
+            "opponent": "bob/rex",
+            "result": "W",
+            "rating_delta": K_FACTOR / 2,
+            "error": None,
+        }
+    ]
+    assert history(bob, bob_id) == [
+        {
+            "id": match_id,
+            "status": "finished",
+            "opponent": "ada/rex",
+            "result": "L",
+            "rating_delta": -K_FACTOR / 2,
+            "error": None,
+        }
+    ]
+
+
+def test_a_drawn_match_is_a_d_with_no_rating_change(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id = verified(ada)
+    verified(bob)
+    play(ranked(ada, ada_id).json()["id"], all_blocked)
+
+    (entry,) = history(ada, ada_id)
+
+    assert (entry["result"], entry["rating_delta"]) == ("D", 0.0)
+
+
+def test_a_match_that_has_not_finished_shows_no_result_to_either_owner(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id, bob_id = verified(ada), verified(bob)
+    match_id = ranked(ada, ada_id).json()["id"]
+
+    (mine,) = history(ada, ada_id)
+    (theirs,) = history(bob, bob_id)
+
+    assert (mine["id"], mine["status"], mine["opponent"]) == (match_id, "queued", "bob/rex")
+    assert (theirs["status"], theirs["opponent"]) == ("queued", "ada/rex")
+    for entry in (mine, theirs):
+        assert (entry["result"], entry["rating_delta"], entry["error"]) == (None, None, None)
+
+
+def test_a_failed_match_shows_why_and_no_result(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id = verified(ada)
+    verified(bob)
+    play(ranked(ada, ada_id).json()["id"], silent_bob)
+
+    (entry,) = history(ada, ada_id)
+
+    assert entry["status"] == "failed" and "bob/rex" in entry["error"]
+    assert (entry["result"], entry["rating_delta"]) == (None, None)
+
+
+def test_the_history_is_the_latest_ten_newest_first(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id, bob_id = verified(ada), verified(bob)
+    for i in range(12):
+        store.create_ranked_match(
+            f"m_h{i:02d}",
+            store.Entrant(ada_id, 1, 1, "ada/rex"),
+            store.Entrant(bob_id, 1, 2, "bob/rex"),
+        )
+
+    ids = [entry["id"] for entry in history(ada, ada_id)]
+
+    assert ids == [f"m_h{i:02d}" for i in range(11, 1, -1)]
+
+
+def test_only_the_owner_can_read_a_fighters_ranked_history(sign_in: SignIn) -> None:
+    ada_id = verified(sign_in("ada"))
+    verified(sign_in("bob"))
+
+    assert sign_in("bob").get(f"/fighters/{ada_id}/ranked").status_code == 404
+    assert TestClient(app).get(f"/fighters/{ada_id}/ranked").status_code == 401

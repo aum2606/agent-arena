@@ -34,7 +34,7 @@ class BattleLog:
     def __init__(self, match_id: str, clock: Callable[[], float] = time.monotonic) -> None:
         self._match_id = match_id
         self._clock = clock
-        self._fighters: dict[str, dict[str, str]] = {}
+        self._fighters: dict[str, dict[str, Any]] = {}
         self._turns: list[dict[str, Any]] = []
         self._turn_started = 0.0
 

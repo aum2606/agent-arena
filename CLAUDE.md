@@ -16,7 +16,8 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - New dependencies need a DECISIONS entry first. "Runtime deps today" below is the engine's.
 
 ## Game rules (Phase 0)
-- 2 fighters, 100 HP each. Fighter = {name, provider, model, persona} from `config/fighters.toml`.
+- 2 fighters, 100 HP each. Fighter = {name, provider, model, persona, reasoning_effort (optional, D-055)} from
+  `config/fighters.toml`; `reasoning_effort` is passed to the provider as is and recorded in the log header.
 - Attacker returns: math problem + its answer + a Python snippet that computes the answer.
 - Self-verify: run the snippet (subprocess, timeout, temp dir). Output ≠ stated answer, error,
   or timeout → one retry that shows the attacker the real result (D-025). A reply with no usable

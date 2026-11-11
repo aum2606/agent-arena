@@ -474,6 +474,7 @@ def test_log_header_names_both_fighters_with_their_personas() -> None:
     assert data["schema"] == 2
     assert data["fighters"]["a"] == {
         "name": "alice", "provider": "p", "model": "m", "persona": "persona a",
+        "reasoning_effort": None,
     }  # fmt: skip
     assert data["fighters"]["b"]["name"] == "bob"
 

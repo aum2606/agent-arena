@@ -71,6 +71,12 @@ class LlmClient:
                     ],
                     max_tokens=max_tokens,
                     timeout=s.turn_time_limit_s,
+                    # extra_body: the SDK's typed field rejects values like qwen's "none".
+                    extra_body=(
+                        {"reasoning_effort": fighter.reasoning_effort}
+                        if fighter.reasoning_effort
+                        else None
+                    ),
                 )
             except (openai.RateLimitError, openai.InternalServerError) as exc:
                 # 429 and 5xx (e.g. Gemini 503 "overloaded") are transient: back off and retry.

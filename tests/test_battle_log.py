@@ -90,7 +90,7 @@ def test_write_creates_parent_dirs_and_round_trips(tmp_path: Path) -> None:
 
 
 def test_log_header_names_the_schema_and_both_fighters() -> None:
-    alice = Fighter("alice", "groq", "model-a", "You are bold.")
+    alice = Fighter("alice", "groq", "model-a", "You are bold.", reasoning_effort="low")
     bob = Fighter("bob", "gemini", "model-b", "You are careful.")
     log = BattleLog("m1")
 
@@ -99,11 +99,18 @@ def test_log_header_names_the_schema_and_both_fighters() -> None:
     data = log.to_dict()
     assert data["schema"] == SCHEMA_VERSION == 2
     assert data["fighters"] == {
-        "a": {"name": "alice", "provider": "groq", "model": "model-a", "persona": "You are bold."},
+        "a": {
+            "name": "alice",
+            "provider": "groq",
+            "model": "model-a",
+            "persona": "You are bold.",
+            "reasoning_effort": "low",  # a log says how hard its fighters were allowed to think
+        },
         "b": {
             "name": "bob",
             "provider": "gemini",
             "model": "model-b",
             "persona": "You are careful.",
+            "reasoning_effort": None,
         },
     }

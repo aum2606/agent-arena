@@ -1408,3 +1408,37 @@ install steps work in the Ubuntu 24.04 WSL distro). If a runner cannot run gViso
 entry is to be superseded, not hidden.
 
 **Alternatives considered:** a self-hosted runner (the owner's PC, kept on); leaving the tests skipped in CI.
+
+## D-055 · 2026-11-12 · A fighter may set how hard its model thinks (`reasoning_effort`)
+
+**Decision:** `Fighter` (and so every `[[fighters]]` and `[[panel]]` entry) takes an optional
+`reasoning_effort`. When set, it is sent to the provider unchanged in the request body (`extra_body`,
+because the SDK's typed field rejects values such as qwen's `none`); when unset the request is exactly
+what it was. The allowed values differ by model (Groq gpt-oss: low, medium, high; Groq qwen3.8-27b: none,
+default, low, medium, high; Gemini 3.1 Flash-Lite: minimal, low, medium, high), so the config holds a free
+string and a wrong value comes back from the provider as a plain HTTP 400. The battle log header records
+each fighter's setting. `config/gate-groq.toml` sets `low` for gpt-oss and leaves qwen at the provider
+default. `config/fighters.toml` and fighters made in the web app are unchanged.
+
+**Why:** in the 14 matches of `runs/gate4.jsonl` (84 turns), 27 turns were decided by a token cap: 16 of
+the 26 hits were defenders cut off at 2,048 tokens and 11 of the 27 backfires were attacker replies cut
+off at 4,096 before any code (D-040). Both Groq fighters are reasoning models and their hidden thinking
+counts against `max_tokens` (`output_tokens`, D-037). Groq's 8,000 tokens per minute also counts each
+request's `max_tokens`, so this is also what makes the sim wait on 429s.
+
+**Measured (small, a spot check, not a balance run):** real attack calls with the real prompts, 3 topics
+per setting. gpt-oss: default 1 of 3 cut off (2,490 / 4,096 / 1,656 tokens), `low` 0 of 3 (859 / 262 / 216).
+qwen: default 0 of 3 cut off (857 / 1,424 / 291), `low` 2 of 3 cut off at 4,096, `none` 1 of 3. So `low`
+helps gpt-oss and did not help qwen (it looked worse; three calls cannot say how much). The planned
+10-match run did not finish: Groq's rate limit allowed one match in about two hours (it had `low` on both
+fighters: 3 of 3 qwen attacks cut off, defender replies 918 / 923 / 1,316 / 2,048 tokens), so it was
+stopped. That match is the only whole-match evidence and it is one match.
+
+**Not done:** the cut-off share per 84 turns with the shipped settings has not been measured; the token
+caps are unchanged; the panel does not set an effort (it scores difficulty, D-036). Whether qwen
+needs `none`, `medium` or a larger cap is open, as is a different effort for attacking and defending (a
+balance lever, the owner's call).
+
+**Alternatives considered:** one effort for every fighter (the qwen probe says no); lowering the caps first
+(would turn more replies into cut-offs before the effort is known to help); counting a cut-off as a
+no-contest turn (a rule change, left to the owner).

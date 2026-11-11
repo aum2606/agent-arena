@@ -146,3 +146,14 @@ def test_code_share_is_a_share(tmp_path: Path, value: str) -> None:
 
     with pytest.raises(ConfigError, match="code_share"):
         load_config(write(tmp_path, text))
+
+
+def test_a_fighter_or_panel_member_may_set_its_reasoning_effort(tmp_path: Path) -> None:
+    tuned = VALID + 'reasoning_effort = "low"\n'
+    panel = PANEL.replace('model = "model-1"\n', 'model = "model-1"\nreasoning_effort = "none"\n')
+
+    config = load_config(write(tmp_path, tuned + panel))
+
+    assert config.fighters["alpha"].reasoning_effort == "low"
+    assert [m.reasoning_effort for m in config.panel] == ["none", None]
+    assert load_config(write(tmp_path, VALID)).fighters["alpha"].reasoning_effort is None

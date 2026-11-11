@@ -26,6 +26,17 @@ export interface MatchStatus {
   rating_delta: number | null;
 }
 
+/** One ranked match from a fighter's own side, as `GET /fighters/{id}/ranked` returns it. */
+export interface RankedEntry {
+  id: string;
+  status: MatchStatus["status"];
+  opponent: string | null;
+  result: "W" | "D" | "L" | null;
+  /** This fighter's rating change, once finished. */
+  rating_delta: number | null;
+  error: string | null;
+}
+
 export interface LeaderboardRow {
   handle: string;
   name: string;

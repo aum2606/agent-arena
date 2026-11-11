@@ -1,37 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { errorText, type MatchStatus } from "../../../lib/fighters";
+import { errorText, type RankedEntry } from "../../../lib/fighters";
 
 const POLL_MS = 5000;
 
-function describe(match: MatchStatus) {
-  const versus = `${match.fighter_a} vs ${match.fighter_b}`;
-  if (match.status === "queued") return `${versus}: waiting for the worker`;
-  if (match.status === "running") return `${versus}: playing… (can take many minutes)`;
-  if (match.status === "failed") return `Failed, no rating change: ${match.error ?? "unknown error"}`;
-  const delta = match.rating_delta ?? 0;
-  const change = `${delta > 0 ? "+" : ""}${delta.toFixed(1)}`;
-  return `${versus}: finished, rating ${change}`;
+function outcome(match: RankedEntry) {
+  if (match.status === "queued") return "waiting for the worker";
+  if (match.status === "running") return "playing… (can take many minutes)";
+  if (match.status === "failed") return `failed, not rated: ${match.error ?? "unknown error"}`;
+  return { W: "won", D: "drawn", L: "lost" }[match.result ?? "D"];
 }
 
-/** Starts a ranked match and follows it; the standings are on the leaderboard. */
-export function RankedPanel({ fighterId, verified }: { fighterId: number; verified: boolean }) {
-  const [match, setMatch] = useState<MatchStatus | null>(null);
+function change(delta: number | null) {
+  if (delta === null) return "";
+  return `${delta > 0 ? "+" : ""}${delta.toFixed(1)}`;
+}
+
+/** Starts a ranked match and lists this fighter's latest ones; the standings are on the leaderboard. */
+export function RankedPanel({
+  fighterId,
+  verified,
+  matches,
+}: {
+  fighterId: number;
+  verified: boolean;
+  matches: RankedEntry[];
+}) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const busy = match !== null && (match.status === "queued" || match.status === "running");
+  const busy = matches.some((m) => m.status === "queued" || m.status === "running");
 
+  // While a match is waiting or playing, re-read the list so its result shows up by itself.
   useEffect(() => {
     if (!busy) return;
-    const timer = setInterval(async () => {
-      const response = await fetch(`/api/matches/${match.id}`);
-      if (response.ok) setMatch(await response.json());
-    }, POLL_MS);
+    const timer = setInterval(() => router.refresh(), POLL_MS);
     return () => clearInterval(timer);
-  }, [busy, match]);
+  }, [busy, router]);
 
   async function start() {
     setStarting(true);
@@ -42,7 +51,7 @@ export function RankedPanel({ fighterId, verified }: { fighterId: number; verifi
       setError(errorText(await response.json().catch(() => null), "Could not start the match"));
       return;
     }
-    setMatch(await response.json());
+    router.refresh();
   }
 
   return (
@@ -57,16 +66,29 @@ export function RankedPanel({ fighterId, verified }: { fighterId: number; verifi
       </button>
       {!verified && <p className="muted">Spar once first, so we know your key works.</p>}
       {error && <p role="alert">{error}</p>}
-      {match && (
-        <p>
-          {describe(match)}
-          {match.status === "finished" && (
-            <>
-              {" "}
-              · <Link href={`/replays/${match.id}`}>watch the replay</Link>
-            </>
-          )}
-        </p>
+      {matches.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Match</th>
+              <th>Opponent</th>
+              <th>Result</th>
+              <th>Rating</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {matches.map((m) => (
+              <tr key={m.id}>
+                <td>{m.id}</td>
+                <td>{m.opponent}</td>
+                <td>{outcome(m)}</td>
+                <td>{change(m.rating_delta)}</td>
+                <td>{m.status === "finished" && <Link href={`/replays/${m.id}`}>replay</Link>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );

@@ -38,6 +38,20 @@ class Entrant:
 
 
 @dataclass(frozen=True)
+class RankedRow:
+    """A ranked match as stored, from nobody's point of view yet."""
+
+    id: str
+    status: str
+    fighter_id: int | None  # fighter A's id; the opponent is `opponent_id` in the table
+    fighter_a: str | None
+    fighter_b: str | None
+    winner: str | None
+    rating_delta_a: float | None
+    error: str | None
+
+
+@dataclass(frozen=True)
 class LeaderboardRow:
     handle: str
     name: str
@@ -116,6 +130,18 @@ def spars_for_fighter(fighter_id: int, limit: int = 10) -> list[MatchRow]:
             (fighter_id, limit),
         ).fetchall()
     return [MatchRow(**row) for row in rows]
+
+
+def ranked_for_fighter(fighter_id: int, limit: int = 10) -> list[RankedRow]:
+    """The fighter's latest ranked matches, as A or as B, newest first."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, status, fighter_id, fighter_a, fighter_b, winner, rating_delta_a, error "
+            "FROM matches WHERE mode = 'ranked' AND (fighter_id = %s OR opponent_id = %s) "
+            "ORDER BY created_at DESC, id DESC LIMIT %s",
+            (fighter_id, fighter_id, limit),
+        ).fetchall()
+    return [RankedRow(**row) for row in rows]
 
 
 def count_queued() -> int:

@@ -43,7 +43,7 @@ backfires were cut-off attackers). Fighters can now set `reasoning_effort`; the 
 gpt-oss only. Spot check, 3 real attack calls per setting: gpt-oss default 1 of 3 cut off, `low` 0 of 3;
 qwen default 0 of 3, `low` 2 of 3 (so qwen stays at the default). Not measured: the cut-off share over
 whole matches with these settings (a 10-match run managed one match in two hours under Groq's 8,000
-tokens-per-minute limit and was stopped). qwen: 90 real calls (15 attack + 15 defence at default, `none`, `low`, D-057) found no setting near a 10% cut-off rate (default 3 and 4 of 15, `none` 2 and 4, `low` 13 and 4), so qwen stays at the default; the cause is unknown, probably its visible working-out, and the next step is to save and read cut-off replies. Open: the panel's
+tokens-per-minute limit and was stopped). qwen: 90 real calls (15 attack + 15 defence at default, `none`, `low`, D-057) found no setting near a 10% cut-off rate (default 3 and 4 of 15, `none` 2 and 4, `low` 13 and 4), so qwen stays at the default; D-058 read its replies: no hidden thinking at all; the cut-offs are visible working-out (attacks 8,700 to 10,600 characters before any tag, defences re-verifying a solved problem), despite prompts that say keep it short. Options (a different second fighter, answer-first format, a larger cap for qwen, a follow-up call) are each a separate plan. Open: the panel's
 cost (about 4,300 tokens per scored problem); pacing requests by tokens instead of waiting out 429s.
 
 ## Last Phase 0 experiments

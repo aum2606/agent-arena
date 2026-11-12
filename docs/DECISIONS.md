@@ -1491,3 +1491,37 @@ against 1 of 3 at the default, which is itself a spot check.
 **Alternatives considered:** `none` for qwen (no better than default on these counts and untested against
 the real match flow); `low` (worse); a larger cap for qwen (a new per-fighter setting, and Groq's 8,000
 tokens-per-minute limit counts the cap on every request).
+
+## D-058 · 2026-11-12 · qwen's cut-offs are visible working-out, not hidden thinking
+
+**Decision:** No code or config change. This records what qwen's failing replies contain, so the next fix
+is chosen on evidence (D-057 left the cause open).
+
+**Evidence:** qwen (`qwen/qwen3.8-27b` on Groq, default effort, the shipped prompts, real math problems)
+made calls whose full replies were kept; 20 of a planned 24 had been collected when this was written
+(attacks 11 incl. 1 connection error, defences 10; the rest were still waiting on Groq's rate limit).
+- The `reasoning` field was empty on every call and Groq reported no reasoning tokens: qwen at the default
+  setting does not think in hidden tokens.
+- Attacks: 3 of 10 answered calls were cut off at 4,096 tokens, with 8,700 to 10,600 characters of design
+  notes and trial arithmetic before any tag; none reached `<problem>`, `<answer>` or `<code>`. A fourth
+  failure was not a cut-off: all tags present but `<answer></answer>` empty.
+- Defences: 5 of 10 were cut off at 2,048 tokens (3,800 to 4,800 characters). Each had already solved the
+  problem and was re-checking it ("Matches.", "Let's re-verify") when the cap hit, so `<answer>` never came.
+- Both prompts already tell the fighter to keep its working short (`ATTACKER_RULES`, `DEFENDER_RULES`);
+  qwen does not follow that.
+- Together with D-057 (4 of 15 defences cut off at every effort setting), the effort setting cannot fix
+  this; the length is in the visible answer.
+
+**Not known:** how the 4 unfinished calls would count; the share is from about 10 calls per role, enough to
+name the kind of failure but not to rank fixes. A defender that outruns its token budget loses by the
+game's rules, so for a defence this is partly the rule working as designed; for an attack, a cut-off costs
+a backfire (D-040).
+
+**Options, each its own plan:** (1) a different second fighter for balance runs, since qwen's cut-offs
+measure verbosity, not skill; (2) an answer-first reply format (the final answer in tags before any
+working), which loses the cut-off but may cost accuracy for a model that thinks aloud; (3) a larger cap
+for this one model (a per-fighter setting; Groq's 8,000 tokens per minute counts the cap on every
+request); (4) one follow-up call asking for just the final answer after a cut-off (more tokens per turn).
+
+**Alternatives considered:** treating the cut-offs as qwen's loss and doing nothing (leaves the balance
+numbers measuring verbosity).

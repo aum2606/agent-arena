@@ -56,6 +56,15 @@ def test_gate_pool_config_parses() -> None:
     assert set(config.fighters) == {"gpt-oss", "qwen"}
 
 
+def test_mixed_gate_pool_pairs_gpt_oss_with_gemini() -> None:
+    config = load_config(Path(__file__).parents[1] / "config" / "gate-mixed.toml")
+
+    assert set(config.fighters) == {"gpt-oss", "gemini-lite"}
+    assert {f.provider for f in config.fighters.values()} == {"groq", "gemini"}
+    assert config.fighters["gpt-oss"].reasoning_effort == "low"  # D-055
+    assert config.fighters["gemini-lite"].reasoning_effort is None
+
+
 def test_missing_file(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="cannot read"):
         load_config(tmp_path / "nope.toml")

@@ -1457,3 +1457,37 @@ regression test covers this case.
 
 **Alternatives considered:** keeping `reasoning_effort` out of the log header (loses the record of what
 each match ran with); adding the field to `FighterInfo` (shows a setting nobody asked to see).
+
+## D-057 · 2026-11-12 · qwen keeps the provider's default reasoning effort; effort does not fix its cut-offs
+
+**Decision:** `config/gate-groq.toml` is unchanged: qwen (`qwen/qwen3.8-27b`) sets no `reasoning_effort`.
+None of the three settings tried brings its token cut-offs near the 10% target set when this was planned.
+
+**Why:** in `runs/logs_gate4` (14 matches, no effort set) qwen's first attack drafts were cut off in 13 of 42
+(31%) and its defences ran into the 2,048-token cap in 13 of 37 (35%); gpt-oss was 5 of 42 (12%) and 3 of
+20 (15%). To see whether effort changes that, qwen made 15 real attack calls and 15 real defence calls
+at each of three settings (real prompts, real verified math problems from earlier logs, settings
+interleaved; `qwen/qwen3.8-27b` on Groq, 2026-11-12):
+
+| setting | attack: cut off at 4,096 / did not parse | defence: cut off at 2,048 / did not parse |
+|---|---|---|
+| default | 3 / 4 of 15 | 4 / 6 of 15 |
+| `none` | 2 / 5 of 15 | 4 / 4 of 15 |
+| `low` | 13 / 13 of 15 | 4 / 4 of 15 |
+
+Median output tokens: attack 1,339 (default), 868 (`none`), 4,096 (`low`); defence 1,189, 1,229, 1,007.
+`low` is clearly worse for attacks (13 of 15 cut off). Default and `none` are not told apart by 15 calls
+each, and neither can be told from the 31% baseline with this many (3 of 15 against 13 of 42 could be
+chance). Defence cut-offs are 4 of 15 at every setting, so effort does not move them. Some replies end
+under the cap and still lack a required tag (for `none` attacks, 5 did not parse and only 2 were cut off),
+so a bigger cap would not fix all of it.
+
+**Not known:** why. The likeliest cause is qwen's visible working-out (D-040 saw replies of 9,600 and
+13,900 characters), but the replies were not kept, so this is a guess. The next step is to read some
+(save the text of cut-off and unparsed replies) and then change the prompt, the cap for this one model, or
+the model; each is its own plan. gpt-oss keeps `low` (D-055), the only measured gain: 0 of 3 cut off
+against 1 of 3 at the default, which is itself a spot check.
+
+**Alternatives considered:** `none` for qwen (no better than default on these counts and untested against
+the real match flow); `low` (worse); a larger cap for qwen (a new per-fighter setting, and Groq's 8,000
+tokens-per-minute limit counts the cap on every request).

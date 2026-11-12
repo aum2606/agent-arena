@@ -1525,3 +1525,49 @@ request); (4) one follow-up call asking for just the final answer after a cut-of
 
 **Alternatives considered:** treating the cut-offs as qwen's loss and doing nothing (leaves the balance
 numbers measuring verbosity).
+
+## D-059 · 2026-11-12 · Balance runs use gpt-oss against gemini-lite (`config/gate-mixed.toml`), not qwen (supersedes the pool in D-039)
+
+**Decision:** `config/gate-mixed.toml` is the fighter pool for balance runs:
+`arena sim --config config/gate-mixed.toml --no-panel`. It pairs `gpt-oss` (openai/gpt-oss-120b on Groq,
+`reasoning_effort = "low"`, D-055) with `gemini-lite` (gemini-3.1-flash-lite on Gemini, default effort), with
+the personas from `config/fighters.toml`. `config/gate-groq.toml` stays as the record of the runs in
+`runs/gate3.jsonl` and `runs/gate4.jsonl`; no further runs should use it. `config/fighters.toml`, the house
+bot and the panel are unchanged.
+
+**Why:** qwen's replies were cut off in 31% of attacks and 35% of defences in the gate4 matches, and in a
+fresh test (D-058) 3 of 11 attacks and 5 of 12 defences, because it writes its working out at length and
+ignores the instruction to keep it short; no reasoning setting fixes that (D-057). A balance run with qwen
+measures its verbosity, not role balance. Groq offers no other usable family: its chat models are
+gpt-oss-120b, gpt-oss-20b, gpt-oss-safeguard-20b, qwen3.8-27b and a 4,096-context allam model, so a second
+family has to come from Gemini.
+
+**Measured (12 attack and 12 defence calls per candidate, the same 12 verified math problems for every
+defence, 2026-11-12):**
+
+| fighter | attacks: errors / cut off / unparsed | defences: cut off / correct |
+|---|---|---|
+| qwen, default | 1 / 3 / 4 of 12 | 5 / 7 of 12 (cut-offs count as wrong) |
+| gpt-oss-20b, `low` | 8 / 0 / 0 | 0 / 9 of 12 |
+| gemini-3.1-flash-lite, default | 1 / 0 / 0 | 0 / 11 of 11 (1 call timed out) |
+
+gemini-3.1-flash-lite was never cut off and answered every defence it returned correctly; its two errors
+were one "Request timed out" per role. gpt-oss-20b was rejected as an attacker: on 8 of 12 attacks Groq
+returned HTTP 400 "Tool choice is none, but model called a tool" (the model called a tool nobody offered),
+which our client treats as a hard error. A user's fighter on that model would probably hit it too; not
+tested, not part of this decision.
+
+**Smoke match on the new pool** (one match, `gpt-oss` first, no panel): finished, gpt-oss won 90 to 70 by
+decision. No reply was cut off. Both backfires were an attacker whose stated answer differed from its
+snippet's output (the D-025 problem, not the token cap). Gemini returned HTTP 503 nine times (retried), and
+one Gemini defence timed out and was scored a hit: a provider that is slow or overloaded loses turns on the
+Gemini side, which D-039 had already moved the pool away from.
+
+**Not known:** the replies were checked for format only, not how often Gemini's attacks verify or how hard
+its problems are (D-017 found it repeating easy ones); 12 calls per role names the kinds of failure, not
+exact rates; a Gemini overload can bias a run against it, and the sim only replays a match when the provider
+is unreachable (D-038), not for a timeout.
+
+**Alternatives considered:** gpt-oss-120b against itself under two personas (removes the strength
+difference, shares one Groq token budget, so slower; untested); keeping qwen (cut-offs measure verbosity);
+gpt-oss-20b as the second fighter (cannot attack).

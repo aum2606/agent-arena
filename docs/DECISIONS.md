@@ -1442,3 +1442,18 @@ balance lever, the owner's call).
 **Alternatives considered:** one effort for every fighter (the qwen probe says no); lowering the caps first
 (would turn more replies into cut-offs before the effort is known to help); counting a cut-off as a
 no-contest turn (a rule change, left to the owner).
+
+## D-056 · 2026-11-12 · Replays read only the fighter fields they show (corrects a claim in D-055)
+
+**Decision:** `arena_api.replays` builds each replay's fighter info from the four fields it shows (name,
+provider, model, persona) instead of unpacking the whole log header entry. A header may carry more.
+
+**Why:** D-055 added `reasoning_effort` to the log header. I wrote then that readers ignore the extra
+field, but I had only checked the web app. `parse_replay` unpacked the header into `FighterInfo`, so
+every replay of a match made after D-055 failed with "unreadable" (commit 0ac2334 on `main`; the CI
+Python job failed on it). The tests that showed it need Postgres and skip on the Windows PC, so the local
+full run passed. The full suite now also runs on Linux with Postgres before a push, and a database-free
+regression test covers this case.
+
+**Alternatives considered:** keeping `reasoning_effort` out of the log header (loses the record of what
+each match ran with); adding the field to `FighterInfo` (shows a setting nobody asked to see).

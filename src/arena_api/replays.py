@@ -80,6 +80,11 @@ class Replay:
     max_hp: float  # what a full health bar means
 
 
+def _fighter_info(header: dict[str, Any]) -> FighterInfo:
+    # Only the fields shown: the header carries more (reasoning_effort, D-055) and may carry others.
+    return FighterInfo(header["name"], header["provider"], header["model"], header["persona"])
+
+
 def _damage_math(outcome: str, damage: float, score: float | None, difficulty: float) -> str:
     if outcome == "block":
         return "no damage"
@@ -139,8 +144,8 @@ def parse_replay(replay_id: str, raw: dict[str, Any]) -> Replay:
             (e for e in raw["turns"][-1]["events"] if e["type"] == "match_end"), {}
         )
         header = raw.get("fighters")  # schema 2 only
-        fighter_a = FighterInfo(**header["a"]) if header else None
-        fighter_b = FighterInfo(**header["b"]) if header else None
+        fighter_a = _fighter_info(header["a"]) if header else None
+        fighter_b = _fighter_info(header["b"]) if header else None
     except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
         raise ReplayError(f"replay {replay_id!r} is unreadable: {exc!r}") from exc
     summary = ReplaySummary(

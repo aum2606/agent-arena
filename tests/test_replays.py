@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from arena_api import store
 from arena_api.app import app
-from arena_api.replays import ReplayError, parse_replay
+from arena_api.replays import FighterInfo, ReplayError, parse_replay
 
 type Event = dict[str, Any]
 
@@ -310,3 +310,20 @@ def test_older_and_math_turns_are_math_without_tests() -> None:
     (view,) = parse_replay("m1", {"turns": [block_turn(1, "a", "b")]}).turns
 
     assert (view.domain, view.tests) == ("math", None)
+
+
+def test_a_log_header_with_extra_fighter_fields_still_replays() -> None:
+    # D-055: the header also records reasoning effort; the replay shows only four fields.
+    turns = [hit_turn(1, "a", "b")]
+    turns[-1]["events"].append({"t": 1, "type": "match_end", "winner": "a", "reason": "decision"})
+    fighters = {
+        "a": FIGHTERS["a"] | {"reasoning_effort": "low"},
+        "b": FIGHTERS["b"] | {"reasoning_effort": None},
+    }
+
+    replay = parse_replay(
+        "m1", {"match_id": "m1", "schema": 2, "fighters": fighters, "turns": turns}
+    )
+
+    assert replay.fighter_a == FighterInfo("alice", "groq", "model-a", "You are bold.")
+    assert replay.fighter_b == FighterInfo("bob", "gemini", "model-b", "You are careful.")

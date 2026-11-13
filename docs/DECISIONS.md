@@ -1607,3 +1607,42 @@ limit is not shown by the log. These are the results, not a balance verdict for 
 **Alternatives considered:** running to 100 matches for the formal gate (it cannot flip the verdict at the
 observed rates and spends the free-tier budget); treating the result as a token problem (the data says it
 no longer is).
+
+## D-061 · 2026-11-13 · A reply Groq rejects as a failed tool call is an unreadable reply, not a failed match
+
+**Decision:** `LlmClient` treats an HTTP 400 whose error `code` is `tool_use_failed` as a reply with no
+text (`Completion("", truncated=False)`) instead of raising `LlmError`. The orchestrator then handles it as
+any unreadable attack reply: one retry (D-040), then a backfire; a defender's empty reply scores 0. Every
+other 400 (a bad key, a bad request) stays a hard `LlmError`. The code, not the message, is matched. There
+is no retry inside the client: the unreadable-reply retry is the retry.
+
+**Why:** gpt-oss models on Groq sometimes write their reply as a call to a tool named `python`, which
+nobody offered (the attack prompt asks for a Python snippet), and Groq answers 400 `tool_use_failed` with the
+attempted call in `failed_generation`. Before this, the first such 400 aborted the whole match: a spar failed
+and its fighter was not verified, a ranked match failed and rated nobody (D-051), and the opponent's slot
+was wasted. Web fighters never set `reasoning_effort` (the setting from D-055 is only in the config
+files), so users get the provider's default. Probe, 8 real attack calls per cell, 2026-11-13:
+
+| model and effort | 400 errors | repeat of the same call worked | OK calls that parsed |
+|---|---|---|---|
+| gpt-oss-20b, default | 5 of 8 | 2 of 5 | 0 of 3 (all 3 cut off at 4,096) |
+| gpt-oss-20b, medium | 6 of 8 | 3 of 6 | 0 of 2 |
+| gpt-oss-20b, high | 0 of 8 | n/a | 0 of 8 (all cut off) |
+| gpt-oss-20b, low | 5 of 8 | 3 of 5 | 3 of 3 |
+| gpt-oss-120b, default | 0 of 8 | n/a | 6 of 8 |
+
+Every error body had the same code. The 120b model never failed this way.
+
+**Checked live:** one match, gpt-oss-20b on both sides at the default effort, finished (before this it would
+have failed on the first 400); 5 of its 6 attacks backfired with "missing or empty `<code>`".
+
+**Not fixed, and not claimed:** gpt-oss-20b stays a poor attacker whatever the client does: at the default
+effort its answers that do arrive are mostly cut off. A user's fighter on it will lose most attacks. A
+fighter whose every reply is unreadable still counts as having replied under D-051 (a retried attack is a
+reply), so a ranked match with it is rated, not voided: it loses rating, as a model that writes garbage would.
+Defences on this model were not probed at the default effort.
+
+**Alternatives considered:** retrying the same request once inside the client (the repeat worked in 8 of 16
+tries, and the caller already retries); matching the message text (brittle); keeping the hard error (a clear
+message for the owner, but a wasted match for the opponent); offering the model a tool so the call is
+accepted (changes the request for every model).

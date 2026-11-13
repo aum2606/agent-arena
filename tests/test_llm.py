@@ -161,6 +161,29 @@ def test_client_errors_fail_without_retrying(harness: type[Harness]) -> None:
     assert len(h.requests) == 1
 
 
+def test_a_reply_put_into_an_unoffered_tool_call_is_an_unreadable_reply_not_an_error(
+    harness: type[Harness],
+) -> None:
+    # Groq answers 400 tool_use_failed when a gpt-oss model writes its reply as a tool call (D-061).
+    body = {
+        "error": {
+            "message": "Tool choice is none, but model called a tool",
+            "type": "invalid_request_error",
+            "code": "tool_use_failed",
+            "failed_generation": '{"name": "python", "arguments": print(1)}',
+        }
+    }
+    h = harness(lambda _: httpx2.Response(400, json=body))
+
+    completion = h.client.complete(FIGHTER, "s", "u", 64)
+
+    assert (completion.text, completion.truncated) == ("", False)
+    assert (
+        len(h.requests) == 1
+    )  # no retry here: the caller's unreadable-reply retry (D-040) is the retry
+    assert h.sleeps == [2.0]
+
+
 def unavailable() -> httpx2.Response:
     return httpx2.Response(503, json={"error": {"message": "overloaded"}})
 

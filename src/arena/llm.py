@@ -40,6 +40,13 @@ class Completion:
 Complete = Callable[[Fighter, str, str, int], Completion]
 
 
+def _is_failed_tool_call(exc: openai.APIStatusError) -> bool:
+    """Groq answers 400 `tool_use_failed` when a gpt-oss model writes its reply as a call to a tool
+    nobody offered (its snippet becomes the call's arguments). That is a bad reply, not a bad
+    request: the caller treats it as unreadable (D-061)."""
+    return isinstance(exc.body, dict) and exc.body.get("code") == "tool_use_failed"
+
+
 class LlmClient:
     """One OpenAI-compatible client per provider, with 429 backoff and a delay between calls."""
 
@@ -93,6 +100,9 @@ class LlmClient:
             except openai.APIConnectionError as exc:
                 raise LlmUnavailable(f"cannot reach {fighter.provider}: {exc}") from exc
             except openai.APIStatusError as exc:
+                if _is_failed_tool_call(exc):
+                    self._sleep(s.call_delay_s)
+                    return Completion("", False)
                 raise LlmError(
                     f"{fighter.provider} returned HTTP {exc.status_code}: {exc.message}"
                 ) from exc

@@ -1571,3 +1571,39 @@ is unreachable (D-038), not for a timeout.
 **Alternatives considered:** gpt-oss-120b against itself under two personas (removes the strength
 difference, shares one Groq token budget, so slower; untested); keeping qwen (cut-offs measure verbosity);
 gpt-oss-20b as the second fighter (cannot attack).
+
+## D-060 · 2026-11-13 · First balance measurement on the mixed pool: the defender still wins about 78% of turns, and tokens are no longer the cause
+
+**Decision:** No code or rule change. This records the result of `arena sim --n 30 --no-panel
+--config config/gate-mixed.toml --out runs/mixed.jsonl` (D-059), so the next balance decision rests on it.
+The slice 8 gate stays waived (D-042); this is not a gate run.
+
+**Result (29 of 30 matches, 174 turns, 2026-11-12):** the 30th match was rate limited by Groq on all three
+attempts (8 retries and a 300 s wait each, D-038) and the sim stopped; the 29 saved matches are intact and
+the run can be resumed.
+- Attacker won 22.4% of turns (39 hits, 95% interval 16.9% to 29.2%); defender 77.6% (85 blocks and 50
+  backfires, 70.8% to 83.1%). The gate verdict is "cannot pass": the defender's lower bound is above 70%.
+- Backfires were 28.7% of turns: gemini-lite 36% of its 87 attacks, gpt-oss 22% of its 87. A backfire is
+  an attacker whose stated answer differs from its snippet's output (D-025), not a token cut-off.
+- Of attacks that reached a defender, 31.5% hit. Matches: gpt-oss 18, gemini-lite 10, 1 draw; 28 ended by
+  decision, none by KO; average length 6.0 turns.
+- Token cut-offs: 1 of 174 turns (a gpt-oss reply), against 27 of 84 turns in the qwen runs (`runs/gate4.jsonl`).
+  All 39 hits are wrong or missing answers; in `gate4`, 16 of 26 hits were defenders cut off at their cap.
+- Timeouts: 1 real defender timeout (gemini-lite, no reply) and 2 attacker timeouts logged without the
+  flag. Leaving the real-timeout turn out moves the shares by 0.4 points (attacker 22.0%, defender 78.0%).
+  The timeout rule (a defender that does not answer in time scores 0, an attacker backfires) stays.
+
+**Why it matters:** the attacker's 22.4% matches what the scripted-fighter study predicted (D-020): with
+no attacker advantage its best case is about 22 to 25% of turns, so the 70% gate cannot pass however the
+fighters behave. The earlier skew toward the defender was partly tokens (cut-offs fed hits in the qwen
+runs) and is now mostly the rules. The levers D-020 found were an attacker bonus of 0.1 and problems pitched
+near the defender's skill (31 to 33% attacker wins, at the cost of 30 to 48% backfires). Choosing among
+them is a design decision for the owner; it is not made here.
+
+**Not known:** a 29-match, two-fighter sample, one model pair; no panel, so every difficulty is 1.0; Gemini's
+problem quality and variety were not measured (D-017); whether Groq stopped on its per-minute or a daily
+limit is not shown by the log. These are the results, not a balance verdict for other model pairs.
+
+**Alternatives considered:** running to 100 matches for the formal gate (it cannot flip the verdict at the
+observed rates and spends the free-tier budget); treating the result as a token problem (the data says it
+no longer is).

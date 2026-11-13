@@ -1,5 +1,7 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+
+import { forwardedAddress } from "./client-address";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
@@ -8,10 +10,11 @@ export interface User {
   handle: string;
 }
 
-/** Server-side fetch of the API that carries the visitor's session cookie along. */
+/** Server-side fetch of the API that carries the visitor's session cookie and address along. */
 async function request(path: string): Promise<Response> {
   const cookie = (await cookies()).toString();
-  return fetch(`${API_URL}${path}`, { cache: "no-store", headers: { cookie } });
+  const address = forwardedAddress(process.env.CLIENT_IP_HEADER, await headers());
+  return fetch(`${API_URL}${path}`, { cache: "no-store", headers: { cookie, ...address } });
 }
 
 /** The parsed JSON, or null on a 404; a 401 sends the visitor to sign in. Anything else is an error. */

@@ -13,7 +13,7 @@ from psycopg.conninfo import make_conninfo
 
 from arena_api.app import app
 from arena_api.db import migrate
-from arena_api.match_routes import get_queue
+from arena_api.deps import get_queue
 
 # The compose Postgres with its local-only default password (D-028). Override to test elsewhere.
 ADMIN_URL = os.environ.get(

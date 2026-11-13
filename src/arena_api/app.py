@@ -15,6 +15,7 @@ from arena_api.fighter_routes import router as fighter_router
 from arena_api.match_routes import router as match_router
 from arena_api.ranked_routes import router as ranked_router
 from arena_api.replays import VALID_ID, Replay, ReplayError, ReplaySummary, parse_replay
+from arena_api.visitor_limits import visitor_limit
 
 
 @asynccontextmanager
@@ -37,12 +38,12 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/replays")
+@app.get("/replays", dependencies=[Depends(visitor_limit("read"))])
 def replays() -> list[ReplaySummary]:
     return store.list_finished()
 
 
-@app.get("/replays/{replay_id}")
+@app.get("/replays/{replay_id}", dependencies=[Depends(visitor_limit("read"))])
 def replay(replay_id: str, viewer: Annotated[User | None, Depends(optional_user)]) -> Replay:
     row = store.get_match(replay_id) if VALID_ID.fullmatch(replay_id) else None
     # Sparring and ranked replays show a user's persona, so only the match's owners may open them.

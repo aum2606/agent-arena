@@ -9,9 +9,10 @@ from arena_api import fighters, store
 from arena_api.accounts import User
 from arena_api.auth import current_user
 from arena_api.db import fighters_config_path
+from arena_api.deps import get_queue
 from arena_api.fighters import FighterView
 from arena_api.limits import rate_limit
-from arena_api.match_routes import MatchStatus, get_queue, start_sparring, status_of
+from arena_api.match_routes import MatchStatus, start_sparring, status_of
 from arena_api.secret_box import encrypt
 
 router = APIRouter(prefix="/fighters")

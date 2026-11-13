@@ -9,6 +9,7 @@ snippet_timeout_s = 20.0
 call_delay_s = 2.0
 max_retries = 8
 backoff_base_s = 2.0
+attack_retries = 2  # D-062: one more correction than the shipped default
 
 [providers.groq]
 base_url = "https://api.groq.com/openai/v1"

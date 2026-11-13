@@ -106,17 +106,20 @@ def _pose_attack(
 ) -> Attack:
     """Get a verified attack or raise _Backfire. Other provider errors abort the match.
 
-    A failed check gets one retry that shows the attacker the real result (D-025): models guess the
-    answer without running their snippet, so most first attempts miss. A reply with no usable tags
-    (mostly one cut off at the token cap) gets that same single retry (D-040).
+    A failed check gets `attack_retries` retries (one by default), each showing the attacker the
+    real result of its latest attempt (D-025): models guess the answer without running their
+    snippet, so most first attempts miss. A reply with no usable tags (mostly one cut off at the
+    token cap) gets the same retries (D-040). The last attempt's failure is the backfire.
     """
     system, user = prompts
-    try:
-        attack = _draft(attacker, side, prompts, complete, settings, log, domain)
-    except _Unparsed as exc:
-        log.emit("attack_retry", actor=side, reason=str(exc), truncated=exc.truncated)
-        retry_user = unparsed_prompt(user, exc.truncated)
-    else:
+    retry_user = user
+    for _ in range(settings.attack_retries):
+        try:
+            attack = _draft(attacker, side, (system, retry_user), complete, settings, log, domain)
+        except _Unparsed as exc:
+            log.emit("attack_retry", actor=side, reason=str(exc), truncated=exc.truncated)
+            retry_user = unparsed_prompt(user, exc.truncated)
+            continue
         check = _check(attack, verify, settings)
         if check.passed:
             return attack

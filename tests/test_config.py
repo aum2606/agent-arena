@@ -166,3 +166,18 @@ def test_a_fighter_or_panel_member_may_set_its_reasoning_effort(tmp_path: Path) 
     assert config.fighters["alpha"].reasoning_effort == "low"
     assert [m.reasoning_effort for m in config.panel] == ["none", None]
     assert load_config(write(tmp_path, VALID)).fighters["alpha"].reasoning_effort is None
+
+
+def with_setting(line: str) -> str:
+    return VALID.replace("backoff_base_s = 2.0", f"backoff_base_s = 2.0\n{line}")
+
+
+def test_attack_retries_default_to_one_and_cannot_be_negative(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, VALID)).settings.attack_retries == 1
+    assert (
+        load_config(write(tmp_path, with_setting("attack_retries = 2"))).settings.attack_retries
+        == 2
+    )
+
+    with pytest.raises(ConfigError, match="attack_retries"):
+        load_config(write(tmp_path, with_setting("attack_retries = -1")))

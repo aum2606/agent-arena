@@ -20,6 +20,7 @@ class Settings:
     max_retries: int
     backoff_base_s: float
     code_share: float = 0.0  # chance that a turn is a code strike instead of math (D-045)
+    attack_retries: int = 1  # how many corrections a failed attack gets before it backfires (D-062)
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ def load_config(path: Path) -> Config:
     settings = _build(Settings, data.get("settings", {}), "[settings]")
     if not 0.0 <= settings.code_share <= 1.0:
         raise ConfigError(f"code_share must be between 0 and 1, not {settings.code_share}")
+    if settings.attack_retries < 0:
+        raise ConfigError(f"attack_retries cannot be negative, not {settings.attack_retries}")
     providers = {
         name: _build(Provider, raw, f"provider {name!r}")
         for name, raw in data.get("providers", {}).items()

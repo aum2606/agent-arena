@@ -1,4 +1,5 @@
 import random
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -64,9 +65,9 @@ class FakeLlm:
         return reply if isinstance(reply, Completion) else Completion(reply, False)
 
 
-def play(llm: FakeLlm) -> tuple[MatchRecord, BattleLog]:
+def play(llm: FakeLlm, settings: Settings = SETTINGS) -> tuple[MatchRecord, BattleLog]:
     log = BattleLog("m1")
-    return run_match(A, B, llm, SETTINGS, log, random.Random(0)), log
+    return run_match(A, B, llm, settings, log, random.Random(0)), log
 
 
 def event_types(log: BattleLog, turn: int) -> list[str]:
@@ -389,6 +390,57 @@ def test_a_second_failed_check_backfires_with_the_retry_reason() -> None:
     assert event_types(log, 1) == ["attack_start", "attack_retry", "backfire", "hit", "hp"]
     assert record.turns[0].outcome == "backfire"
     assert "stated '40'" in log.to_dict()["turns"][0]["events"][2]["reason"]
+
+
+def with_retries(n: int) -> Settings:
+    return replace(SETTINGS, attack_retries=n)
+
+
+def test_with_two_retries_a_second_failed_check_gets_a_third_attempt() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": [good_attack(answer="41"), good_attack(answer="40")] + [good_attack()] * 3,
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer("42")] * 3},
+    )
+
+    record, log = play(llm, with_retries(2))
+
+    assert event_types(log, 1)[:5] == [
+        "attack_start", "attack_retry", "attack_retry", "attack_verified", "defend_start",
+    ]  # fmt: skip
+    assert record.turns[0].outcome == "block"
+    assert "stated '40'" in llm.attack_requests[2]  # each retry shows the latest failed attempt
+
+
+def test_with_two_retries_a_third_failed_check_backfires() -> None:
+    llm = FakeLlm(
+        attacks={
+            "alice": [good_attack(answer=n) for n in ("41", "40", "39")] * 3,
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3},
+    )
+
+    record, log = play(llm, with_retries(2))
+
+    assert event_types(log, 1) == [
+        "attack_start", "attack_retry", "attack_retry", "backfire", "hit", "hp",
+    ]  # fmt: skip
+    assert record.turns[0].outcome == "backfire"
+    assert "stated '39'" in log.to_dict()["turns"][0]["events"][3]["reason"]
+
+
+def test_with_no_retries_a_failed_check_backfires_at_once() -> None:
+    llm = FakeLlm(
+        attacks={"alice": [good_attack(answer="41")] * 3, "bob": [good_attack()] * 3},
+        defenses={"alice": [answer("42")] * 3},
+    )
+
+    _, log = play(llm, with_retries(0))
+
+    assert event_types(log, 1) == ["attack_start", "backfire", "hit", "hp"]
 
 
 def test_a_timeout_gets_no_retry() -> None:

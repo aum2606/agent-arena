@@ -61,6 +61,14 @@ the 120b: 0 of 8). That used to fail the whole match; now it is an unreadable re
 backfire). A live match with the 20b on both sides finished, 5 of 6 attacks backfired. The 20b stays a poor
 attacker (its OK replies are mostly cut off at the default). Not probed: its defences at the default effort.
 
+## Launch hardening, 2026-11-14 (D-063, D-064)
+Visitors are rate limited per address on replays, the leaderboard and GitHub sign-in (60 and 20 a minute;
+needs `CLIENT_IP_HEADER` behind a proxy that overwrites it; checked through the web server, not through a
+real proxy). A nonce-based Content-Security-Policy is on every page (no eval in production; Pixi uses its
+eval-free build), checked page by page in a browser on a local production build, not on Firefox/Safari,
+HTTPS or the Docker standalone server. Left in slice 11: deploy files, a runbook, inviting a group (need a
+hosting choice), content moderation, real GitHub sign-in, `KEY_ENCRYPTION_SECRET` setup.
+
 ## Last Phase 0 experiments
 Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):
 attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite

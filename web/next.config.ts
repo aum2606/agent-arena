@@ -11,7 +11,7 @@ const config: NextConfig = {
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_URL}/:path*` }];
   },
-  // No Content-Security-Policy yet: Next injects inline scripts, and a policy needs nonces (D-050).
+  // The Content-Security-Policy needs a nonce per request, so proxy.ts sets it (D-064).
   // HTTPS and Strict-Transport-Security belong to the reverse proxy in front of this server.
   async headers() {
     return [

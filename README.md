@@ -30,8 +30,9 @@ Not done yet, and you should know before running it for other people (details in
   [`SECURITY.md`](SECURITY.md).
 - The balance gate (neither role may win more than 70% of turns) was waived, not passed. See D-042.
 - Real GitHub sign-in has never been tried against a real GitHub app.
-- Launch hardening is half done: a problem filter, rate limits, error pages and safe answer parsing exist
-  (D-047 to D-050); deployment files and a runbook do not.
+- Launch hardening is most of the way: a problem filter, rate limits (including per visitor address), a
+  Content-Security-Policy, error pages and safe answer parsing exist (D-047 to D-050, D-063, D-064);
+  deployment files and a runbook do not.
 - No real ranked match between two real users has been played yet.
 
 Every design choice, rule number and trade-off is logged in [`docs/DECISIONS.md`](docs/DECISIONS.md).

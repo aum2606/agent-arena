@@ -1646,3 +1646,73 @@ Defences on this model were not probed at the default effort.
 tries, and the caller already retries); matching the message text (brittle); keeping the hard error (a clear
 message for the owner, but a wasted match for the opponent); offering the model a tool so the call is
 accepted (changes the request for every model).
+
+## D-063 · 2026-11-14 · Visitors are rate limited per address on the routes anyone can reach
+
+**Decision:** `/replays`, `/replays/{id}`, `/leaderboard` share a "read" allowance of 60 requests a minute per
+visitor address, and the GitHub sign-in routes (`/auth/github/login`, `/auth/github/callback`) a "login"
+allowance of 20 a minute (`VISITOR_RULES` in `src/arena_api/visitor_limits.py`). Counting is the same Redis
+counter as the signed-in write limits (D-050) and fails open the same way; past the limit the answer is 429
+with `Retry-After`. The per-page session check (`/auth/me`), `/auth/config` and `/health` are not counted.
+The numbers are guesses, not measured.
+
+The address: the API only ever sees the web server (the browser talks to the Next origin, which relays `/api`
+and fetches server-side), so the deployer names a header in `CLIENT_IP_HEADER` that their reverse proxy
+**overwrites** with the visitor's address (X-Real-IP, CF-Connecting-IP, ...). The API uses it only if it is
+exactly one valid address; unset, malformed or a list falls back to the connection, so a made-up header
+cannot buy a fresh allowance. The web server passes that header on in its server-side fetches
+(`web/lib/client-address.ts`) and the `/api` relay already carries it. `CLIENT_IP_HEADER` is in `.env.example`
+and `docker-compose.yml` for both services.
+
+Code: the limiter and the shared counter (`count_request`) live in `visitor_limits.py`; `get_queue` moved from
+`match_routes.py` to `deps.py`, because the auth routes need the limiter and `limits.py` imports auth (a cycle
+otherwise); `limits.py` now calls `count_request`.
+
+**Checked** (production web build, the API and Redis in WSL, the web server with `CLIENT_IP_HEADER=x-real-ip`):
+through the `/api` relay a request with `X-Real-IP: 198.51.100.7` counted under that address; a page fetched
+with `X-Real-IP: 198.51.100.8` counted under that address (the server-side path); a request with no header or
+`not-an-address` counted under the connection address. Unit tests cover the limit, per-address and per-rule
+counting, the fallback cases, the Redis outage and the real sign-in routes; the read-route test needs
+Postgres and ran on Linux.
+
+**Not safe to ignore:** with `CLIENT_IP_HEADER` unset every visitor shares the web server's address, so one
+allowance serves the whole site (fine for one person on localhost, wrong for a public site); a header the
+proxy passes through instead of overwriting lets a visitor pick their address; behind a tunnel or proxy that
+cannot set a header there is no per-visitor limit at all. A page whose server-side fetch is refused shows the
+error page. No hosting is chosen yet, so none of this has met a real proxy.
+
+**Alternatives considered:** leaving per-address limits to the reverse proxy (needs no code, but hosting is
+undecided and Redis is already here); parsing `X-Forwarded-For` (which hop to trust depends on the proxy
+chain, and a wrong guess is spoofable); limiting by the web server's own address (one flood would lock out
+everyone).
+
+## D-064 · 2026-11-14 · A Content-Security-Policy with a nonce per request
+
+**Decision:** `web/proxy.ts` (Next 16's name for middleware) gives every page request a fresh nonce and sends
+`Content-Security-Policy` built by `web/lib/csp.ts`: `default-src 'self'`; `script-src 'self'
+'nonce-<n>' 'strict-dynamic'` (plus `'unsafe-eval'` in development only, where React needs it); `style-src
+'self' 'nonce-<n>'`; `img-src 'self' blob: data:`; `font-src 'self'`; `object-src 'none'`; `base-uri 'self'`;
+`form-action 'self'`; `frame-ancestors 'none'`. It does not run for `/api`, built assets, the icon or link
+prefetches. There is no `upgrade-insecure-requests`: HTTPS belongs to the reverse proxy (D-050) and the
+directive would break plain-HTTP localhost. `web/lib/stage.ts` imports `pixi.js/unsafe-eval`, Pixi's build
+that makes no eval calls, so the replay viewer still draws without `'unsafe-eval'`. Every page was already
+dynamically rendered, which nonces need. D-050's "no policy yet" is superseded.
+
+**Checked** in the browser pane on a local production build (the stack, the old gate replays and a stub
+model behind it): home, a replay (the Pixi canvas was created at 900 by 400 and drew both fighters and the
+turn buttons; "Play match" ran), leaderboard, login, signed-in fighters list, new-fighter form, a fighter's
+page and a real spar through the worker (the fighter was verified). The browser console held no violation
+from any of them. Controls showed the console does report violations and the policy bites: an external
+image, an inline event handler and a `javascript:` link were each blocked and reported. A script element
+created through the DOM ran, as `strict-dynamic` allows by design (the browser cannot tell who created it);
+markup an attacker injects stays inert.
+
+**Not checked:** Firefox and Safari (only the Chromium-based pane); HTTPS or any real proxy; the standalone
+server that the Docker image runs (`node server.js`) as opposed to `next start`, though the proxy file is
+part of the build; the GitHub sign-in round trip; development mode under the policy. One thing found
+on the way: the `/api` relay's target (`API_URL`) is fixed when the app is built, so a build made without it
+relays to `localhost:8000`; the Dockerfile already sets it.
+
+**Alternatives considered:** a policy with `'unsafe-inline'` (defeats the point); hashes instead of nonces
+(Next's inline scripts change per build and render); `Content-Security-Policy-Report-Only` first (this
+project has no endpoint to collect reports, and the console check showed the same).

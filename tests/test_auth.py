@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 
 from arena_api import accounts, store
 from arena_api.app import app
@@ -47,7 +48,8 @@ def use_github() -> Iterator[Callable[[Handler], None]]:
 
 
 @pytest.fixture
-def client(database: str, env: None) -> TestClient:
+def client(database: str, env: None, queue: StubQueue) -> TestClient:
+    # The sign-in routes are limited per visitor in Redis (D-063): the stand-in queue is that Redis.
     return TestClient(app, follow_redirects=False)
 
 
@@ -147,7 +149,7 @@ def test_github_refusing_the_code_signs_nobody_in(
 
 
 def test_without_github_settings_sign_in_says_so(
-    database: str, monkeypatch: pytest.MonkeyPatch
+    database: str, queue: StubQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("GITHUB_CLIENT_ID", raising=False)
 

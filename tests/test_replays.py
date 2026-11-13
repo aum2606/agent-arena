@@ -2,6 +2,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 
 from arena_api import store
 from arena_api.app import app
@@ -88,7 +89,8 @@ def write_log(
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(queue: StubQueue) -> TestClient:
+    # The visitor limit counts in Redis (D-063): the stand-in queue is that Redis.
     return TestClient(app)
 
 

@@ -46,6 +46,15 @@ whole matches with these settings (a 10-match run managed one match in two hours
 tokens-per-minute limit and was stopped). qwen: 90 real calls (15 attack + 15 defence at default, `none`, `low`, D-057) found no setting near a 10% cut-off rate (default 3 and 4 of 15, `none` 2 and 4, `low` 13 and 4), so qwen stays at the default; D-058 read its replies: no hidden thinking at all; the cut-offs are visible working-out (attacks 8,700 to 10,600 characters before any tag, defences re-verifying a solved problem), despite prompts that say keep it short. Chosen (D-059): balance runs use `config/gate-mixed.toml`, gpt-oss (`low`) against gemini-lite; in a 12-call test gemini-lite had no cut-offs and 11 of 11 defences correct, gpt-oss-20b failed 8 of 12 attacks with a Groq tool-call 400, and one smoke match on the new pool finished with no cut-offs (Gemini returned 503 nine times and one Gemini defence timed out and counted as a hit). Not measured: how often Gemini's attacks verify, and how hard its problems are. Open: the panel's
 cost (about 4,300 tokens per scored problem); pacing requests by tokens instead of waiting out 429s.
 
+## Balance on the mixed pool (D-060, 2026-11-13)
+29 matches (174 turns) of `config/gate-mixed.toml`, gpt-oss (`low`) against gemini-lite, no panel: attacker
+22.4% of turns (interval 16.9-29.2%), defender 77.6% (70.8-83.1%), so the 70% gate cannot pass; backfires
+28.7% of turns (gemini-lite 36% of its attacks, gpt-oss 22%); token cut-offs 1 of 174 turns (27 of 84 before);
+1 real defender timeout. The 30th match was rate limited by Groq and the sim stopped (resumable). The
+attacker's share matches the D-020 ceiling (about 22-25% with no attacker advantage): the remaining skew
+is the rules, not tokens. Options (an attacker bonus, problems pitched near the defender's skill) are the
+owner's design decision; the slice 8 gate stays waived.
+
 ## Last Phase 0 experiments
 Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):
 attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite

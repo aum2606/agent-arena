@@ -55,6 +55,12 @@ attacker's share matches the D-020 ceiling (about 22-25% with no attacker advant
 is the rules, not tokens. Options (an attacker bonus, problems pitched near the defender's skill) are the
 owner's design decision; the slice 8 gate stays waived.
 
+## gpt-oss-20b tool-call errors (D-061, 2026-11-13)
+On Groq, gpt-oss-20b answers 400 `tool_use_failed` on 5 of 8 attacks at the default effort (what web users get;
+the 120b: 0 of 8). That used to fail the whole match; now it is an unreadable reply (one retry, then a
+backfire). A live match with the 20b on both sides finished, 5 of 6 attacks backfired. The 20b stays a poor
+attacker (its OK replies are mostly cut off at the default). Not probed: its defences at the default effort.
+
 ## Last Phase 0 experiments
 Rolling outcome feedback is implemented (D-023). Live trial, 10 matches (`runs/feedback.jsonl`):
 attacker 6.7% of turns (4 hits), backfires 48.3% (baseline 3.8% and 26.4%). Per attacker, gemini-lite

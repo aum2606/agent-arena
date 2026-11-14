@@ -2,8 +2,13 @@ from collections.abc import Callable
 from typing import Any
 
 import psycopg
+import pytest
+from fastapi.testclient import TestClient
+from psycopg_pool import PoolTimeout
 
 from arena_api import store
+from arena_api.app import app
+from arena_api.auth import SESSION_COOKIE
 from arena_api.db import MIGRATIONS, database_url, migrate
 from arena_api.replays import parse_replay
 
@@ -113,3 +118,50 @@ def test_migrating_twice_changes_nothing(database: str) -> None:
     with psycopg.connect(database_url()) as conn:
         names = [r[0] for r in conn.execute("SELECT name FROM schema_migrations")]
     assert names == sorted(p.name for p in MIGRATIONS.glob("*.sql"))
+
+
+def test_connections_come_from_one_bounded_pool(
+    database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Every request used to open its own connection, so a flood could use them all up (D-070).
+    monkeypatch.setenv("ARENA_DB_POOL", "2")
+    monkeypatch.setattr(store, "POOL_WAIT_S", 0.3)
+
+    with store.connect() as one, store.connect() as two:
+        assert one is not two
+        with pytest.raises(PoolTimeout), store.connect():
+            pass  # a third has to wait, and gives up
+
+    with store.connect() as again:  # connections come back to the pool
+        assert again.execute("SELECT 1 AS n").fetchone() == {"n": 1}
+
+
+def test_a_busy_pool_answers_503_not_500(database: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARENA_DB_POOL", "1")
+    monkeypatch.setattr(store, "POOL_WAIT_S", 0.3)
+    client = TestClient(app, raise_server_exceptions=False)
+    client.cookies.set(SESSION_COOKIE, "not-a-real-session")  # a session check needs the database
+
+    with store.connect():  # the only connection is taken
+        busy = client.get("/auth/me")
+
+    assert busy.status_code == 503 and "busy" in busy.json()["detail"]
+    assert busy.headers["retry-after"] == "5"
+    assert client.get("/auth/me").status_code == 401  # free again: a plain "not signed in"
+
+
+def test_a_pooled_connection_still_commits_at_the_end_and_rolls_back_on_an_error(
+    database: str,
+) -> None:
+    store.create_match("m1", "alice", "bob")
+
+    with pytest.raises(RuntimeError), store.connect() as conn:
+        conn.execute("UPDATE matches SET status = 'failed' WHERE id = 'm1'")
+        raise RuntimeError("boom")
+
+    row = store.get_match("m1")
+    assert row is not None and row.status == "queued"  # rolled back
+    with store.connect() as conn:
+        conn.execute("UPDATE matches SET status = 'running' WHERE id = 'm1'")
+    row = store.get_match("m1")
+    assert row is not None and row.status == "running"  # committed

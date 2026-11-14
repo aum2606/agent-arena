@@ -1,11 +1,14 @@
+import os
+import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from psycopg_pool import ConnectionPool
 
 from arena_api.db import database_url
 from arena_api.ratings import START_RATING, Candidate, rate
@@ -71,9 +74,41 @@ _MATCH_COLUMNS = (
 )
 
 
-def connect() -> psycopg.Connection[dict[str, Any]]:
-    """A connection that commits when its `with` block ends."""
-    return psycopg.connect(database_url(), row_factory=dict_row)
+# One bounded pool per database instead of a connection per call: a flood of cheap requests (each
+# session check opens one) could use up Postgres's connections (D-070).
+POOL_SIZE_ENV = "ARENA_DB_POOL"
+DEFAULT_POOL_SIZE = 10
+POOL_WAIT_S = 5.0  # how long a request waits for a free connection before the API says "busy"
+_pools: dict[str, ConnectionPool[psycopg.Connection[dict[str, Any]]]] = {}
+_pools_lock = threading.Lock()
+
+
+def _pool() -> ConnectionPool[psycopg.Connection[dict[str, Any]]]:
+    url = database_url()
+    with _pools_lock:
+        pool = _pools.get(url)
+        if pool is None:
+            pool = ConnectionPool(
+                url,
+                min_size=1,
+                max_size=int(os.environ.get(POOL_SIZE_ENV, DEFAULT_POOL_SIZE)),
+                kwargs={"row_factory": dict_row},
+                open=True,
+            )
+            _pools[url] = pool
+    return pool
+
+
+def connect() -> AbstractContextManager[psycopg.Connection[dict[str, Any]]]:
+    """A pooled connection that commits when its `with` block ends, or rolls back on an error."""
+    return _pool().connection(timeout=POOL_WAIT_S)
+
+
+def close_pools() -> None:
+    with _pools_lock:
+        for pool in _pools.values():
+            pool.close()
+        _pools.clear()
 
 
 def create_match(

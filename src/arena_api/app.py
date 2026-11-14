@@ -5,7 +5,9 @@ from typing import Annotated
 
 from arq import create_pool
 from arq.connections import RedisSettings
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from psycopg_pool import PoolTimeout
 
 from arena_api import store
 from arena_api.accounts import User
@@ -30,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.queue = await create_pool(RedisSettings.from_dsn(redis_url()))
     yield
     await app.state.queue.aclose()
+    store.close_pools()
 
 
 # No docs pages: they load scripts from a CDN on the app's own origin (D-068).
@@ -37,6 +40,18 @@ app = FastAPI(
     title="Agent Arena", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 )
 add_guards(app)
+
+
+@app.exception_handler(PoolTimeout)
+def busy(request: Request, exc: PoolTimeout) -> JSONResponse:
+    """Every database connection is in use: say so, and let the client try again."""
+    return JSONResponse(
+        {"detail": "the server is busy; try again in a moment"},
+        status_code=503,
+        headers={"Retry-After": "5"},
+    )
+
+
 app.include_router(auth_router)
 app.include_router(fighter_router)
 app.include_router(match_router)

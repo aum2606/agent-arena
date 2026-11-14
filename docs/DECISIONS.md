@@ -1917,3 +1917,53 @@ match through the worker with a configured panel (the stored replay shows overtu
 **Alternatives considered:** a panel check on every attack (about 4,300 tokens a problem on every match); a lower bar for overturning
 (two agreeing weak models would overturn too easily); counting an overturned hit as a backfire for the attacker (it punishes an honest
 mistake as if it were cheating, and the owner chose "overturn to a block").
+
+## D-070 · 2026-11-15 · Accounts, keys and data: owner control, safer failures, a connection pool
+
+**Decision:** Third phase of the pre-deploy security work (the audit's API and data findings).
+- **A new provider needs a new key.** Saving a version with another provider and no key is a 422: the saved key belongs to the old
+  provider and would have been sent to the new one as its credential.
+- **Delete a fighter** (`DELETE /fighters/{id}`, owner only, a button on the fighter page): erases the fighter, every version (so
+  every key it stored) and its rating. Finished matches stay on record with the link to it cleared (the foreign keys already said
+  so). Refused while a match of it is waiting or being played.
+- **Ranked pool opt-in** (`fighters.ranked_opt_in`, migration 0006, `PUT /fighters/{id}/ranked-pool`, a checkbox on the fighter
+  page): other players' ranked matches spend a fighter's key only if its owner turned it on; asking for your own ranked match needs
+  it too. Every fighter that existed before starts out of the pool, so the pool is empty until owners opt in.
+- **Handles:** `handle` is unique across providers, and a clash (a GitHub rename onto a taken name, or a dev-login user holding it)
+  ended in a 500 at sign-in. `upsert_user` now gives the clashing account `name-2`, `name-3`, ... and keeps it.
+- **The worker stops at its time limit:** a match stops asking models (raising "ran out of time") 60 s before arq's 1,800 s job timeout,
+  instead of its thread spending keys after arq gave up; a cancelled or crashing match is marked failed (it used to stay `running`
+  until a restart), and `mark_failed` never overwrites a finished match.
+- **No internals in errors users see:** a server bug is "the match failed because of a server error" (the detail, scrubbed of keys, goes
+  to the worker's log and is re-raised scrubbed); a queue failure no longer shows the Redis host; an unreadable replay says so without the
+  parser's text; and a ranked match's error, which both owners can read, says only that "a fighter's model returned an error".
+- **Per-user limits:** at most 2 matches waiting or playing per user (the single worker was one user's to fill), and one
+  spar or ranked request per user at a time, held with a Postgres advisory lock that never waits (waiting would freeze the API's event
+  loop); a second concurrent request gets "try again in a moment". This closes the check-then-insert race on a user's own caps.
+- **Cross-site writes and big bodies** (`arena_api/guards.py`, middleware): a POST/PUT/DELETE whose `Origin` is not the app's own
+  (on a local address: any local origin, for `npm run dev`) or whose `Sec-Fetch-Site` is not `same-origin`/`none` gets 403; a body over
+  64 KB gets 413 and a body with no length 411. Requests with neither header (curl, scripts) pass. The three body-less POSTs
+  (`/spar`, `/ranked`, `/logout`) were protected by SameSite=Lax alone.
+- **Persona and model** reject invisible, bidirectional and control characters (the other player sees both in a ranked replay);
+  newlines and tabs stay.
+- **A bounded database pool:** `store.connect()` takes a connection from a `psycopg_pool.ConnectionPool` (size `ARENA_DB_POOL`, default 10;
+  a request waits up to 5 s) instead of opening one per call, and an exhausted pool is a 503 with `Retry-After`, not a 500. Pools are
+  closed at shutdown and by the test fixture.
+
+**New dependency (`psycopg-pool`, in the `api` group: the pool package from the project that makes `psycopg`; its licence was not checked here):** the audit showed that every
+authenticated request opens a new connection, so any flood of cheap requests can exhaust Postgres's connection limit; a pool is the
+standard bound and nothing smaller (a semaphore around `psycopg.connect`) would also reuse connections.
+
+**Checked:** each item has tests written first; the whole suite passes on Linux with Postgres and gVisor.
+
+**Not done, and not claimed:**
+- A victim's daily cap can still be overshot a little: a ranked match picks the opponent and counts its cap without a lock on the opponent
+  (bounded by the requester's rate limit of 10 a minute and the 2-match limit).
+- The body-size check reads `Content-Length`; a client that lies about it is stopped later by the field limits, not here.
+- Old fighter versions keep their keys (only deleting the fighter erases them); there is no key rotation for the server secret.
+- Sessions are not ended on a new sign-in, and expired session rows are never deleted.
+- The web changes (the checkbox, the delete button) pass the typecheck but were not exercised in a browser.
+
+**Alternatives considered:** ending a match's thread by killing it (Python cannot, short of a subprocess per match); an opponent-side lock
+(try-lock order problems and a failure mode for the requester); a CSRF token (the Origin and fetch-metadata checks need no state and no web
+change); deleting only the key and keeping the fighter (a fighter without a key cannot play, so delete is the honest operation).

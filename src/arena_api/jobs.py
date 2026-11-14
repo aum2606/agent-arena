@@ -225,12 +225,17 @@ async def startup(ctx: dict[str, Any]) -> None:
         logger.warning("marked %d match(es) left running by a dead worker as failed", stale)
 
 
+async def shutdown(ctx: dict[str, Any]) -> None:
+    store.close_pools()
+
+
 class WorkerSettings:
     """Run with `arq arena_api.jobs.WorkerSettings`. One match at a time, never retried: a retry
     would play (and pay for) the match twice."""
 
     functions = [play_match]
     on_startup = startup
+    on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(redis_url())
     max_jobs = 1
     max_tries = 1

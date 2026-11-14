@@ -67,6 +67,17 @@ rules as they are (the D-020 ceiling); tokens, the unparsed-reply failure and ba
 are fixed. Balance is to be judged by whether stronger fighters beat weaker ones once ranked matches exist. Not
 built: a panel-based "too easy" retry. Not measured: how often real matches (with the panel's difficulty) end by KO.
 
+## Pre-deploy security work (D-068 to D-071, 2026-11-15)
+A read-only audit of the API, the engine and the web side, then a plan the owner approved. Done and on local `main`:
+exposure guardrails (dev login and an unsandboxed worker refused on a public `PUBLIC_URL`, a smaller worker environment, non-root
+images, no API docs pages; the API image build, broken since the open-source release, fixed); engine integrity (a snippet's exit
+code 125 can no longer void a match, output floods capped, a SymPy sandbox image, deep JSON no longer aborts a match, a reference-
+panel review on ranked hits that overturns deliberately wrong answers, more moderation); accounts and data (delete a fighter and its
+keys, ranked-pool opt-in, a new provider needs a new key, handle clashes, a match stops at its time limit, no internals in errors,
+a cross-site write and body-size guard, a bounded connection pool); pins and CI (images by digest, actions by commit, images built
+in CI, Dependabot, ignore files). 750 tests pass on Linux with Postgres and gVisor; checked live on the local stack in a browser.
+Not yet seen on GitHub: the new CI `images` job and Dependabot. What it left, and the deploy checklist, are in `SECURITY.md`.
+
 ## A second attack retry (D-062, 2026-11-14)
 `attack_retries` (default 1; 2 in `config/gate-mixed.toml`). 28 matches (168 turns): backfires 28.7% -> 12.5%,
 verified attacks 71% -> 87.5%, but the attacker's share of turns only 22.4% -> 24.4% (intervals overlap) and the

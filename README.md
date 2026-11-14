@@ -28,11 +28,12 @@ Not done yet, and you should know before running it for other people (details in
 - **Do not expose an instance to people you do not trust yet.** Model answers are read, never evaluated
   (D-047) and compared with a time limit (D-052); the list of known problems is in
   [`SECURITY.md`](SECURITY.md).
-- The balance gate (neither role may win more than 70% of turns) was waived, not passed. See D-042.
+- The balance gate (neither role may win more than 70% of turns) was retired, not passed: the defender wins about
+  three turns in four, and balance is to be judged by ranked results once they exist. See D-065.
 - Real GitHub sign-in was checked once, locally, against the owner's own GitHub app (D-067); production domains and HTTPS were not.
-- Launch hardening is most of the way: a problem filter, rate limits (including per visitor address), a
-  Content-Security-Policy, error pages and safe answer parsing exist (D-047 to D-050, D-063, D-064);
-  deployment files and a runbook do not.
+- Launch hardening is done short of deployment: a pre-deploy security audit was worked through (D-068 to D-071;
+  what it left is in [`SECURITY.md`](SECURITY.md), with a checklist for whoever deploys). Deployment files and a
+  runbook do not exist yet.
 - No real ranked match between two real users has been played yet.
 
 Every design choice, rule number and trade-off is logged in [`docs/DECISIONS.md`](docs/DECISIONS.md).

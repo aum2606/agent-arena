@@ -18,6 +18,12 @@ def _fernet() -> Fernet:
         ) from exc
 
 
+def check_secret() -> None:
+    """Raise ConfigError if the secret is missing or not a valid key. The API and the worker call it
+    on startup, so a deploy without it fails at once, not on the first user's key."""
+    _fernet()
+
+
 def encrypt(plain: str) -> str:
     """Encrypt an API key for storage with the server's secret."""
     return _fernet().encrypt(plain.encode()).decode()

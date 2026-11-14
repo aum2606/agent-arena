@@ -38,4 +38,5 @@ These are known and tracked, so you do not need to report them:
 ## Handling secrets
 
 Users' provider API keys are encrypted at rest with `KEY_ENCRYPTION_SECRET` (D-034). Keep that secret out
-of the repository and back it up: without it the saved keys cannot be read again.
+of the repository and back it up: without it the saved keys cannot be read again. The API and the worker refuse to
+start without a valid one (D-066).

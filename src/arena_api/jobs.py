@@ -19,7 +19,7 @@ from arena.verifier import verify_attack
 from arena_api import fighters, store
 from arena_api.db import fighters_config_path, migrate, redis_url
 from arena_api.replays import parse_replay
-from arena_api.secret_box import decrypt
+from arena_api.secret_box import check_secret, decrypt
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +169,7 @@ def _verify_from_env() -> Verify:
 
 
 async def startup(ctx: dict[str, Any]) -> None:
+    check_secret()
     migrate()
     ctx["verify"] = _verify_from_env()
     config = load_config(fighters_config_path())

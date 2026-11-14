@@ -12,7 +12,7 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
 - Slice order approved 2026-11-02 (D-027): 11 slices, one at a time. Do not start a later slice.
 - In scope: only the current slice, after its short plan is approved (see Workflow).
 - Out of MVP scope: live spectating, tournaments, remote agents, 3D avatars, paid plans.
-- Slice 8 (100-match balance re-check) was waived by the owner on 2026-11-07 (D-042); slice 9 is built.
+- Slice 8 (100-match balance re-check) was waived by the owner on 2026-11-07 (D-042) and the gate retired on 2026-11-14 (D-065); slice 9 is built.
 - New dependencies need a DECISIONS entry first. "Runtime deps today" below is the engine's.
 
 ## Game rules (Phase 0)

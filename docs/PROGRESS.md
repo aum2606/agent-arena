@@ -61,6 +61,13 @@ the 120b: 0 of 8). That used to fail the whole match; now it is an unreadable re
 backfire). A live match with the 20b on both sides finished, 5 of 6 attacks backfired. The 20b stays a poor
 attacker (its OK replies are mostly cut off at the default). Not probed: its defences at the default effort.
 
+## A second attack retry (D-062, 2026-11-14)
+`attack_retries` (default 1; 2 in `config/gate-mixed.toml`). 28 matches (168 turns): backfires 28.7% -> 12.5%,
+verified attacks 71% -> 87.5%, but the attacker's share of turns only 22.4% -> 24.4% (intervals overlap) and the
+hit rate of verified attacks fell 31.5% -> 27.9%; draws 1 -> 8 of the matches. The defender's interval is now
+68.6-81.5%, so the gate is not ruled out, but 75.6% is above it and the formal gate (100 matches) is waived.
+What is left is how hard verified problems are: the owner's design decision.
+
 ## Launch hardening, 2026-11-14 (D-063, D-064)
 Visitors are rate limited per address on replays, the leaderboard and GitHub sign-in (60 and 20 a minute;
 needs `CLIENT_IP_HEADER` behind a proxy that overwrites it; checked through the web server, not through a

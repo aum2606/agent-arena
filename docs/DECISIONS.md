@@ -1716,3 +1716,48 @@ relays to `localhost:8000`; the Dockerfile already sets it.
 **Alternatives considered:** a policy with `'unsafe-inline'` (defeats the point); hashes instead of nonces
 (Next's inline scripts change per build and render); `Content-Security-Policy-Report-Only` first (this
 project has no endpoint to collect reports, and the console check showed the same).
+
+## D-062 · 2026-11-14 · An attack may get more than one correction (`attack_retries`); it halves backfires but does not move the attacker's share
+
+**Decision:** `Settings.attack_retries` (default 1, the behaviour since D-025 and D-040) sets how many
+corrections a failed attack gets before it backfires; each retry shows the attacker the real output of its latest
+attempt, or says the reply was unreadable. It is validated as not negative. `config/gate-mixed.toml` sets 2;
+`config/fighters.toml`, the house bot, sparring and ranked play keep 1, so nothing a user sees changes. The log
+carries one `attack_retry` event per retry (the replay viewer shows the first, as before).
+
+**Why:** in the first 29-match run on the mixed pool (D-060) only 34 of 174 attacks verified on the first try, the
+one retry rescued 90 of the 139 that needed it, and 49 still backfired, nearly all because the stated answer
+differed from the snippet's output. A second retry looked like the cheapest lever for the attacker.
+
+**Result** (`runs/mixed2.jsonl`, 28 of a planned 30 matches, 168 turns, `--no-panel`, gpt-oss against gemini-lite;
+the pairings and topics are the same by match number because each match seeds its own `Random`, the model replies
+are not; compared with D-060's 29 matches / 174 turns):
+
+| | `attack_retries` 1 (D-060) | `attack_retries` 2 |
+|---|---|---|
+| Backfires | 50 of 174 (28.7%) | 21 of 168 (12.5%) |
+| Attacks that verified | 124 (71%) | 147 (87.5%) |
+| Attacker share of turns | 22.4% (16.9 to 29.2%) | 24.4% (18.5 to 31.4%) |
+| Hit rate of verified attacks | 31.5% | 27.9% |
+| Draws (of the matches) | 1 of 29 | 8 of 28 |
+
+Backfires: gemini-lite 36% to 17% of its attacks, gpt-oss 22% to 8%. Of the 35 attacks that needed a second retry,
+14 verified (40%) and 21 backfired. Hit rate by path now: first try 7 of 43 (16%), after one retry 30 of 90
+(33%), after two 4 of 14 (29%); the rescued attacks do not hit harder than the others, so there is no sign
+they are broken problems. Attack calls per turn: 1.80 before, 1.95 now (+8%). Token cut-offs 1 of 168 turns, real
+timeouts 0.
+
+**What it shows and what it does not:** the second retry cuts the attacker's wasted turns by more than half, but
+the attacker's share of turns rose by 2.0 points, inside the noise and short of the 4 to 6 expected: the
+extra attacks that now verify are mostly blocked (the defender wins 72% of verified attacks, up from 68.5%).
+Draws rose because fewer backfires means fewer lopsided matches. The defender's share is 75.6% (68.6 to
+81.5%): the interval now reaches below 70%, so the gate is no longer ruled out, but the point estimate is
+still above it and the formal gate needs 100 matches (waived, D-042). The remaining lever is how hard the
+verified problems are, a design choice for the owner.
+
+**Not known:** a 28-match, two-fighter sample; the first sim hung when the computer slept and was restarted once
+after match 20 (matches are independent and the restart resumed from the saved ones); the 29th and 30th matches
+were rate limited by Groq and the run was stopped at 28; the rescued attacks' hit rate rests on 14 attacks.
+
+**Alternatives considered:** keeping 1 (leaves 28.7% of turns wasted); a third retry (the second rescued 40%,
+the third would rescue fewer and cost more calls); taking the answer from the snippet (rejected in D-021).

@@ -20,9 +20,9 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
   `config/fighters.toml`; `reasoning_effort` is passed to the provider as is and recorded in the log header.
 - Attacker returns: math problem + its answer + a Python snippet that computes the answer.
 - Self-verify: run the snippet (subprocess, timeout, temp dir). Output ≠ stated answer, error,
-  or timeout → one retry that shows the attacker the real result (D-025). A reply with no usable
-  problem/answer/code tags (often one cut off at the token cap) gets that same single retry (D-040).
-  Failing again → **backfire**: attacker takes half the damage (D-013).
+  or timeout → a retry that shows the attacker the real result (D-025; `attack_retries` sets how many, default 1, D-062). A reply with no usable
+  problem/answer/code tags (often one cut off at the token cap) gets the same retry (D-040).
+  Failing the last retry → **backfire**: attacker takes half the damage (D-013).
 - Defender answers within time/token budget. The problem reaches it as delimited, untrusted data (D-049). The answer is
   read by a restricted parser, never evaluated (D-047), and compared with SymPy in a helper process under a time limit
   (D-052). score = 1 or 0.

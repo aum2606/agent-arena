@@ -80,8 +80,8 @@ needs `CLIENT_IP_HEADER` behind a proxy that overwrites it; checked through the 
 real proxy). A nonce-based Content-Security-Policy is on every page (no eval in production; Pixi uses its
 eval-free build), checked page by page in a browser on a local production build, not on Firefox/Safari,
 HTTPS or the Docker standalone server. Left in slice 11: deploy files, a runbook, inviting a group (need a
-hosting choice), content moderation, real GitHub sign-in (next: the owner makes a GitHub OAuth app and the key secret, then
-the round trip is checked in the browser), `KEY_ENCRYPTION_SECRET` setup (the API and the worker now refuse to start
+hosting choice), content moderation, real GitHub sign-in (checked locally on 2026-11-14, D-067: it works; Cancel on GitHub now returns to
+the login page; production needs its own OAuth app and an https PUBLIC_URL), `KEY_ENCRYPTION_SECRET` setup (the API and the worker now refuse to start
 without a valid one, D-066).
 
 ## Last Phase 0 experiments

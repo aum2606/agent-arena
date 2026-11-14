@@ -107,11 +107,17 @@ def github_login() -> RedirectResponse:
 
 @router.get("/github/callback", dependencies=[Depends(visitor_limit("login"))])
 def github_callback(
-    code: str,
-    state: str,
     http: Annotated[httpx2.Client, Depends(get_github_http)],
+    code: str = "",
+    state: str = "",
+    error: str | None = None,
     remembered: Annotated[str | None, Cookie(alias=STATE_COOKIE)] = None,
 ) -> RedirectResponse:
+    if error:
+        # Cancel on GitHub (error=access_denied) or a refusal: back to a page the user can read.
+        response = RedirectResponse("/login?error=denied")
+        response.delete_cookie(STATE_COOKIE, path="/")
+        return response
     # The state we set before leaving must come back unchanged, or someone else started this login.
     if not remembered or not state or not secrets.compare_digest(state, remembered):
         raise HTTPException(status_code=400, detail="sign-in state did not match; try again")

@@ -9,10 +9,12 @@ from arena_api import fighters, store
 from arena_api.accounts import User
 from arena_api.auth import current_user
 from arena_api.db import fighters_config_path
+from arena_api.deps import get_queue
 from arena_api.limits import rate_limit
-from arena_api.match_routes import MatchStatus, get_queue, queue_match
+from arena_api.match_routes import MatchStatus, queue_match
 from arena_api.ratings import pick_opponent
 from arena_api.store import Entrant, LeaderboardRow, RankedRow
+from arena_api.visitor_limits import visitor_limit
 
 router = APIRouter()
 
@@ -101,6 +103,6 @@ def ranked_history(
     return [_entry(row, fighter_id) for row in store.ranked_for_fighter(fighter_id)]
 
 
-@router.get("/leaderboard")
+@router.get("/leaderboard", dependencies=[Depends(visitor_limit("read"))])
 def leaderboard() -> list[LeaderboardRow]:
     return store.leaderboard()

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from arena_api import accounts
 from arena_api.accounts import User
+from arena_api.visitor_limits import visitor_limit
 
 router = APIRouter(prefix="/auth")
 
@@ -88,7 +89,7 @@ def me(user: Annotated[User, Depends(current_user)]) -> User:
     return user
 
 
-@router.get("/github/login")
+@router.get("/github/login", dependencies=[Depends(visitor_limit("login"))])
 def github_login() -> RedirectResponse:
     client_id, _ = _github_settings()
     state = secrets.token_urlsafe(24)
@@ -104,7 +105,7 @@ def github_login() -> RedirectResponse:
     return response
 
 
-@router.get("/github/callback")
+@router.get("/github/callback", dependencies=[Depends(visitor_limit("login"))])
 def github_callback(
     code: str,
     state: str,

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from arq.connections import ArqRedis
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from redis.exceptions import RedisError
 
 from arena_api import store
@@ -27,11 +27,6 @@ class MatchStatus:
     error: str | None
     fighter_version: int | None
     rating_delta: float | None  # ranked, once finished: how the requester's rating moved
-
-
-def get_queue(request: Request) -> ArqRedis:
-    queue: ArqRedis = request.app.state.queue
-    return queue
 
 
 def status_of(row: store.MatchRow) -> MatchStatus:

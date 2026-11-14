@@ -17,6 +17,7 @@ from arena.orchestrator import Verify, run_match
 from arena.sandbox import ensure_ready, sandboxed_verify
 from arena.verifier import verify_attack
 from arena_api import fighters, store
+from arena_api.auth import public_url_is_local
 from arena_api.db import fighters_config_path, migrate, redis_url
 from arena_api.replays import parse_replay
 from arena_api.secret_box import check_secret, decrypt
@@ -160,6 +161,11 @@ def _verify_from_env() -> Verify:
     """Models write the snippets, and users steer the models: they run in the sandbox (D-044)."""
     mode = os.environ.get("ARENA_SANDBOX", "gvisor")
     if mode == "off":
+        if not public_url_is_local():
+            raise ConfigError(
+                "ARENA_SANDBOX=off is only allowed when PUBLIC_URL is localhost: on a public "
+                "address model-written code must run in the sandbox"
+            )
         logger.warning("ARENA_SANDBOX=off: model-written code runs on this machine, unsandboxed")
         return verify_attack
     if mode != "gvisor":

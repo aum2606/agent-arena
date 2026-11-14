@@ -12,7 +12,7 @@ from arena.models import Fighter
 from arena.prompts import ATTACK_REQUEST
 from arena.verifier import verify_attack
 from arena_api import fighters, store
-from arena_api.jobs import SPARRING_TURNS, play_match, startup
+from arena_api.jobs import SPARRING_TURNS, _verify_from_env, play_match, startup
 
 SETTINGS = Settings(
     turn_time_limit_s=30.0,
@@ -335,6 +335,24 @@ def test_the_sandbox_can_be_turned_off_for_local_development(
     monkeypatch.setenv("ARENA_SANDBOX", "off")
 
     assert start_worker()["verify"] is verify_attack
+
+
+def test_running_snippets_unsandboxed_is_refused_on_a_public_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARENA_SANDBOX", "off")
+    monkeypatch.setenv("PUBLIC_URL", "https://arena.example.com")
+
+    with pytest.raises(ConfigError, match="PUBLIC_URL"):
+        _verify_from_env()
+
+
+def test_the_sandbox_stays_on_for_a_public_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARENA_SANDBOX", "gvisor")
+    monkeypatch.setenv("PUBLIC_URL", "https://arena.example.com")
+    monkeypatch.setattr("arena_api.jobs.ensure_ready", lambda: None)
+
+    assert _verify_from_env() is sandbox.sandboxed_verify
 
 
 def test_an_unknown_sandbox_setting_is_an_error(

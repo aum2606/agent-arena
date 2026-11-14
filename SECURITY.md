@@ -23,7 +23,12 @@ These are known and tracked, so you do not need to report them:
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a
-  "sign in as anyone" form, and the Postgres password is a published default. Bind it to localhost only.
+  "sign in as anyone" form, and the Postgres password is a published default. Binding it to localhost is not
+  enough: a tunnel or proxy running on the same machine reaches it as localhost. Since D-068 the API refuses the
+  "sign in as anyone" form, and the worker refuses `ARENA_SANDBOX=off`, whenever `PUBLIC_URL` is not a localhost
+  address, so set `PUBLIC_URL` to the real address before exposing anything. That is a guard, not a hardening of
+  the stack: a deployment forgetting `PUBLIC_URL` is still treated as local. The containers run as an unprivileged
+  user, and the worker no longer receives the whole `.env`, only the provider keys, the secret and the database.
 - **Limits and filters are basic.** Signed-in users' write routes are rate limited (D-050), and the
   routes anyone can reach (replays, the leaderboard, GitHub sign-in) are limited per visitor address
   (D-063). That only works behind a reverse proxy that overwrites one header with the visitor's address

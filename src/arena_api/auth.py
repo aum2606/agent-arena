@@ -3,7 +3,7 @@ import re
 import secrets
 from collections.abc import Iterator
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx2
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
@@ -30,6 +30,11 @@ def public_url() -> str:
     return os.environ.get("PUBLIC_URL", "http://127.0.0.1:3100").rstrip("/")
 
 
+def public_url_is_local() -> bool:
+    """True only when the app is reached on this machine; the local-only switches use it (D-068)."""
+    return urlparse(public_url()).hostname in ("127.0.0.1", "localhost", "::1")
+
+
 def _github_settings() -> tuple[str, str]:
     id_, secret = os.environ.get("GITHUB_CLIENT_ID"), os.environ.get("GITHUB_CLIENT_SECRET")
     if not id_ or not secret:
@@ -41,7 +46,8 @@ def _github_settings() -> tuple[str, str]:
 
 
 def dev_login_enabled() -> bool:
-    return os.environ.get("ARENA_DEV_LOGIN") == "1"
+    # Never on a public address, whatever the setting: anyone could sign in as anyone (D-068).
+    return os.environ.get("ARENA_DEV_LOGIN") == "1" and public_url_is_local()
 
 
 def get_github_http() -> Iterator[httpx2.Client]:
@@ -145,7 +151,7 @@ class DevLogin(BaseModel):
     handle: str
 
 
-@router.post("/dev", status_code=204)
+@router.post("/dev", status_code=204, dependencies=[Depends(visitor_limit("login"))])
 def dev_login(body: DevLogin) -> Response:
     """Local development only: sign in as any handle, no GitHub. Off unless ARENA_DEV_LOGIN=1."""
     if not dev_login_enabled():

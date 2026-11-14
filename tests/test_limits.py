@@ -27,7 +27,8 @@ def test_a_user_past_the_limit_is_turned_away_with_a_wait_time(
     refused = ada.post("/fighters", json=body("again"))
     assert refused.json()["detail"].startswith("too many requests")
     assert refused.headers["retry-after"] == "60"
-    assert list(queue.expiries.values()) == [60]  # a counter always expires on its own
+    assert queue.counters.keys() == queue.expiries.keys()  # every counter expires on its own
+    assert {k: v for k, v in queue.expiries.items() if "create_fighter" in k}.popitem()[1] == 60
 
 
 def test_limits_are_per_user_and_per_route(

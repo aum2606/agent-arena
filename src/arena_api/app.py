@@ -28,7 +28,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await app.state.queue.aclose()
 
 
-app = FastAPI(title="Agent Arena", lifespan=lifespan)
+# No docs pages: they load scripts from a CDN on the app's own origin (D-068).
+app = FastAPI(
+    title="Agent Arena", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
+)
 app.include_router(auth_router)
 app.include_router(fighter_router)
 app.include_router(match_router)

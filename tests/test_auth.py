@@ -148,6 +148,34 @@ def test_github_refusing_the_code_signs_nobody_in(
     assert client.get("/auth/me").status_code == 401
 
 
+def test_denying_access_on_github_returns_to_the_login_page_and_signs_nobody_in(
+    client: TestClient, use_github: Callable[[Handler], None]
+) -> None:
+    use_github(github())
+    client.get("/auth/github/login")
+
+    response = client.get(
+        "/auth/github/callback", params={"error": "access_denied", "state": "whatever"}
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/login?error=denied"
+    assert 'arena_oauth_state=""' in response.headers["set-cookie"]  # the state is used up
+    assert client.get("/auth/me").status_code == 401
+
+
+def test_a_callback_with_neither_a_code_nor_an_error_is_refused_not_a_validation_error(
+    client: TestClient, use_github: Callable[[Handler], None]
+) -> None:
+    use_github(github())
+    client.get("/auth/github/login")
+
+    response = client.get("/auth/github/callback")
+
+    assert response.status_code == 400
+    assert client.get("/auth/me").status_code == 401
+
+
 def test_without_github_settings_sign_in_says_so(
     database: str, queue: StubQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:

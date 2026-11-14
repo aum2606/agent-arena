@@ -1807,3 +1807,31 @@ touches the database or Redis before it; the worker tests set the secret.
 
 **Alternatives considered:** leaving it lazy; a required variable in compose (breaks the database-only commands); a stored
 check value to catch a changed secret (new state and a migration, and there is no rotation story yet).
+
+## D-067 · 2026-11-14 · Real GitHub sign-in checked end to end; denying access no longer shows a raw error
+
+**Decision:** A user who presses Cancel on GitHub (or whom GitHub refuses) comes back to `/login?error=denied`, which says "GitHub
+did not let you in. You can try again.", instead of a raw 422 JSON error. `/auth/github/callback` takes GitHub's `error` parameter,
+and `code` and `state` now default to empty, so a callback with neither is a 400 ("sign-in state did not match"), not a 422. The login
+page shows text only for the fixed value `denied`; any other `error` value shows nothing.
+
+**Checked live** (2026-11-14, local only: the owner's own GitHub OAuth app with the callback
+`http://127.0.0.1:3100/api/auth/github/callback`, a generated local `KEY_ENCRYPTION_SECRET`, the production web build, the API,
+Postgres and Redis in WSL, the "sign in as anyone" form off):
+- The API started with the real secret, so the startup check (D-066) accepts a real key.
+- The redirect to GitHub carried the right callback address, a random 32-character state in a cookie that is HttpOnly,
+  SameSite=Lax and lasts 10 minutes, and no scope, so GitHub shares only the public profile.
+- A real sign-in, done by the owner in their own browser (the browser pane's cookies were not shared): GitHub returned a code, the
+  callback answered 307 and `/auth/me` answered 200; one user row (provider `github`) and one session row were stored.
+- A mismatching state, and a callback with no state cookie, each got a clean 400; both the denial and the missing-parameter cases
+  were reproduced as a 422 before this fix and checked as a redirect and a 400 after it, and the new login message showed with no
+  console error in the browser pane. The per-address sign-in counter (D-063) counted each of those requests.
+
+**Not checked:** signing out and in again in the real flow (a test covers that the same user is kept); what the owner's browser
+console showed after returning to the app, so the Content-Security-Policy (D-064) is untested across the real redirect; any
+domain other than `127.0.0.1`, HTTPS, or a real proxy. **Deploy requirement found:** the session and state cookies are Secure only
+when `PUBLIC_URL` starts with `https://`, so production must set it to an `https` address; each OAuth app has one callback, so
+production needs its own app with the public domain as the callback.
+
+**Alternatives considered:** showing GitHub's own error text (it would put outside text on the page); a generic error page (the
+user would not know they pressed Cancel).

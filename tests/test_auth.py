@@ -9,7 +9,7 @@ from helpers import StubQueue
 
 from arena_api import accounts, store
 from arena_api.app import app
-from arena_api.auth import get_github_http
+from arena_api.auth import dev_login_enabled, get_github_http
 
 type Handler = Callable[[httpx2.Request], httpx2.Response]
 
@@ -213,6 +213,31 @@ def test_logging_out_ends_the_session(
     assert client.get("/auth/me").status_code == 401
     with store.connect() as conn:
         assert conn.execute("SELECT count(*) AS n FROM sessions").fetchone() == {"n": 0}
+
+
+@pytest.mark.parametrize(
+    "url", ["http://127.0.0.1:3100", "http://localhost:3100", "http://[::1]:3100"]
+)
+def test_dev_login_works_on_a_local_address_when_asked_for(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("ARENA_DEV_LOGIN", "1")
+    monkeypatch.setenv("PUBLIC_URL", url)
+
+    assert dev_login_enabled() is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://arena.example.com", "http://arena.example.com", "http://127.0.0.1.example.com"],
+)
+def test_dev_login_is_refused_on_a_public_address_even_when_asked_for(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("ARENA_DEV_LOGIN", "1")
+    monkeypatch.setenv("PUBLIC_URL", url)
+
+    assert dev_login_enabled() is False
 
 
 def test_dev_login_is_off_unless_asked_for(client: TestClient) -> None:

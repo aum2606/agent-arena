@@ -1835,3 +1835,38 @@ production needs its own app with the public domain as the callback.
 
 **Alternatives considered:** showing GitHub's own error text (it would put outside text on the page); a generic error page (the
 user would not know they pressed Cancel).
+
+## D-068 · 2026-11-15 · Exposure guardrails: local-only switches, a smaller worker environment, non-root images, no API docs
+
+**Decision:** First phase of the pre-deploy security work (a read-only audit of the API, the engine and the web side,
+then a plan approved by the owner).
+- `ARENA_DEV_LOGIN=1` only takes effect when `PUBLIC_URL` is a localhost address (`127.0.0.1`, `localhost`, `::1`;
+  `auth.public_url_is_local`); `/auth/dev` also has the sign-in rate limit (D-063).
+- The worker refuses `ARENA_SANDBOX=off` unless `PUBLIC_URL` is a localhost address, so a public deployment cannot run
+  model-written code unsandboxed by a typo or a copied default.
+- Compose: `PUBLIC_URL` can be set (`${PUBLIC_URL:-http://127.0.0.1:3100}`) for the API and the worker; the worker gets
+  an explicit list (the three provider keys, `PUBLIC_URL`, the shared database, Redis, config and secret settings) in
+  place of the whole `.env`, so `GITHUB_CLIENT_SECRET` never sits in the process that runs model-written code.
+- The API and web images run as unprivileged users (`app`, uid 10001; `node`).
+- FastAPI's `/docs`, `/redoc` and `/openapi.json` are off: they load scripts from a CDN, unpinned and without
+  integrity hashes, on the app's own origin.
+
+**Why:** the audit's worst finding: the shipped compose stack, put behind a tunnel on the same machine, ran
+model-written code as root with the secret and the database URL in reach (`/proc/1/environ`), and let anyone sign in as
+anyone, which exposes every user's stored key. Binding ports to localhost does not stop a tunnel.
+
+**Found on the way, not part of the audit:** `docker compose up --build`, which the README tells newcomers to run, had
+been failing since the open-source release (D-046): `pyproject.toml` names `README.md` and `LICENSE`, and the API
+Dockerfile did not copy them, so `uv sync` failed. CI never builds the images. Fixed, and a test checks the Dockerfile
+copies every file the package metadata names. Both images were built and run in WSL after the change: the API and worker
+modules import as uid 10001, and the web image served the login page as `node` with the Content-Security-Policy header
+(which also settles D-064's open question about the standalone server).
+
+**What this does not do:** the guards trust `PUBLIC_URL`: a deployment that forgets it is treated as local, and so is a
+tunnel to an unchanged stack. They are a safety net under a deploy checklist (SECURITY.md), not a replacement for it.
+The images are still pinned by tag, not digest, and Redis and Postgres still have default or no passwords (later
+phases and the deploy step).
+
+**Alternatives considered:** removing the dev-login default from compose (breaks the one-command local try-out); refusing to
+start the API at all on a public `PUBLIC_URL` without a sandboxed worker (it cannot see the worker); dropping `ARENA_SANDBOX=off`
+from compose (the compose worker has no Docker, so it could not start).

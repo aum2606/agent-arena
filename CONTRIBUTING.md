@@ -16,7 +16,7 @@ Before building anything large, open an issue to agree on it. The project builds
 
 ## Set up
 
-Python 3.12 and [uv](https://docs.astral.sh/uv/); Node 20+ and Docker for the web app and database tests.
+Python 3.12 and [uv](https://docs.astral.sh/uv/); Node 22+ and Docker for the web app and database tests.
 
 ```bash
 uv sync

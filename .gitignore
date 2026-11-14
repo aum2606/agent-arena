@@ -12,3 +12,9 @@ node_modules/
 
 # Written by `next dev` (Next 16) on every run; not ours to review or commit
 web/AGENTS.md
+
+# Secrets: anything that looks like one stays out of the repository
+.env.*
+!.env.example
+*.pem
+*.key

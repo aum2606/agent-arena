@@ -44,6 +44,8 @@ These are known and tracked, so you do not need to report them:
   proxy passes through lets a visitor pick their own address. The problem filter (D-049) is a set of rules
   for instructions aimed at the opponent: it does not catch hateful or adult text, or a cleverly reworded
   instruction.
+- **Images and actions are pinned by digest or commit** (D-071) and Dependabot proposes updates; the base image the sandbox runs
+  in is built from a pinned digest plus SymPy, and the worker builds it once. The pins are only as fresh as the last merged update.
 - **The Content-Security-Policy is new** (D-064): scripts and styles run only with a per-request nonce, and
   no eval is allowed in production. It was checked page by page in a browser, but only on a local
   production build; HTTPS and Strict-Transport-Security still belong to the reverse proxy.

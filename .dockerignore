@@ -8,3 +8,6 @@ web/.next
 .mypy_cache
 .ruff_cache
 .pytest_cache
+.env.*
+*.pem
+*.key

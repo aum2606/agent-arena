@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
         env:
           POSTGRES_USER: arena
           POSTGRES_PASSWORD: arena-dev # a throwaway database inside this job (D-028)
@@ -29,11 +29,11 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://arena:arena-dev@127.0.0.1:5432/postgres
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
-      - run: uv sync --frozen
+      - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
@@ -45,8 +45,8 @@ jobs:
     name: gVisor sandbox tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
       - name: Install gVisor and register it with Docker
@@ -58,7 +58,7 @@ jobs:
           sudo runsc install
           sudo systemctl restart docker
           docker run --rm --runtime=runsc hello-world
-      - run: uv sync --frozen
+      - run: uv sync --locked
       # The same tests skip in the job above; here they must really run (D-054).
       - name: Run the sandbox tests, and fail if any is skipped
         shell: bash
@@ -73,8 +73,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -82,4 +82,15 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm audit --audit-level=high
       - run: npm run build
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # `docker compose up --build` broke once and nothing noticed (D-068): build what it builds.
+      - run: docker build -f docker/api.Dockerfile -t arena-api .
+      - run: docker build -f docker/web.Dockerfile -t arena-web .
+      - run: docker build -f docker/sandbox.Dockerfile -t arena-sandbox:1 docker

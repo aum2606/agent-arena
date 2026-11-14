@@ -1967,3 +1967,36 @@ standard bound and nothing smaller (a semaphore around `psycopg.connect`) would 
 **Alternatives considered:** ending a match's thread by killing it (Python cannot, short of a subprocess per match); an opponent-side lock
 (try-lock order problems and a failure mode for the requester); a CSRF token (the Origin and fetch-metadata checks need no state and no web
 change); deleting only the key and keeping the fighter (a fighter without a key cannot play, so delete is the honest operation).
+
+## D-071 · 2026-11-15 · Web headers, pinned images and actions, CI that builds the images, ignore files
+
+**Decision:** Fourth phase of the pre-deploy security work (the audit's web, container and repository findings).
+- **Headers:** pages also send `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, and no longer announce
+  `X-Powered-By: Next.js`; the API adds `X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin` and
+  `Referrer-Policy: no-referrer` to its own responses (including the guard's refusals).
+- **Forms:** the API-key field is `autocomplete="new-password"` (browsers ignore `off` on password fields and offered to save the key); the
+  local dev sign-in shows an error only when it is text (a list or a non-JSON body used to throw).
+- **The answer checker** starts with `python -P` (no working directory on its import path) and limits its own address space to 1 GiB on POSIX, so a
+  SymPy expression that eats memory inside its 5 s cannot take the worker with it. `-I` was not used: the helper's `PYTHONPATH` is how it finds
+  the package from a source tree.
+- **Ignore files:** `.env.*` (but not `.env.example`), `*.pem` and `*.key` in `.gitignore` and `.dockerignore`: `web/.env.local`, which Next reads,
+  would have been copied into the web image build.
+- **Pins:** every base image (the API, web and sandbox Dockerfiles, the `uv` image copied into the API image, `postgres` and `redis` in compose and
+  the CI database) is pinned by digest, and every GitHub Action in CI by commit (with the tag as a comment). `python:3.12-slim` moved to a new
+  digest within a day of the first pin, which is what a tag does; the sandbox image was rebuilt from the new one and its gVisor tests passed.
+- **CI:** `uv sync --locked` (a stale lock now fails), `npm audit --audit-level=high` (0 vulnerabilities today), and a job that builds the
+  API, web and sandbox images (D-068); `.github/dependabot.yml` proposes weekly updates for uv, npm, Actions and the Dockerfiles, because pins only stay safe if
+  something moves them. `httpx2`, which `arena.llm` imports, is now declared.
+- CONTRIBUTING says Node 22+, which is what CI builds with.
+
+**Checked:** a test for each item (repo files, headers, the helper's limit run in a subprocess); the three images built from the pinned
+digests in WSL; the full suite passes on Linux with Postgres and gVisor.
+
+**Not checked, because they only run on GitHub:** the new `images` job, the SHA-pinned actions, `npm audit` as a gate, and Dependabot reading its
+file. A first push will show; if an action's commit were wrong the job would fail loudly.
+
+**Not done:** HSTS and TLS (the reverse proxy, at deploy), passwords for Redis and Postgres beyond the localhost-only defaults, a CSP report endpoint,
+secret scanning and push protection on GitHub (repository settings, the owner's), and a pre-commit secret scanner.
+
+**Alternatives considered:** `-I` for the checker (breaks its source-tree start); pinning actions by tag only (a retagged release would run in CI with
+no review); leaving Dependabot out and pinning once (the pins would age into known-vulnerable images).

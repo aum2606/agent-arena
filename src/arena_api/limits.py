@@ -15,6 +15,7 @@ from arena_api.visitor_limits import count_request
 RULES: dict[str, tuple[int, int]] = {
     "create_fighter": (20, 60),  # above the 10-fighter cap, so the cap message comes first
     "new_version": (100, 86_400),
+    "fighter_edit": (60, 60),  # deleting a fighter, joining or leaving the ranked pool
     "spar": (10, 60),
     "ranked": (10, 60),
 }

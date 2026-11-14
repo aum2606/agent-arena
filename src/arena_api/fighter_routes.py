@@ -50,6 +50,10 @@ class NewFighter(BaseModel):
     daily_match_cap: int = Field(DEFAULT_DAILY_CAP, ge=1, le=50)
 
 
+class RankedPool(BaseModel):
+    enabled: bool
+
+
 class NewVersion(BaseModel):
     provider: str
     model: str = Field(min_length=1, max_length=100)
@@ -131,12 +135,40 @@ def new_version(
     _check_provider(body.provider)
     current = fighters.current_version(fighter_id)
     assert current is not None  # a fighter is created together with its first version
+    if body.provider != current.provider and not body.api_key:
+        # The saved key belongs to the old provider: it must not be sent to another one.
+        raise HTTPException(
+            status_code=422, detail="changing the provider needs a new API key for it"
+        )
     stored = _encrypted(body.api_key) if body.api_key else current.api_key_encrypted
     hint = body.api_key[-4:] if body.api_key else current.key_hint
     fighters.add_version(
         fighter_id, body.provider, body.model, body.persona, stored, hint, body.daily_match_cap
     )
     return _mine(user, fighter_id)
+
+
+@router.put("/{fighter_id}/ranked-pool", dependencies=[Depends(rate_limit("fighter_edit"))])
+def ranked_pool(
+    fighter_id: int, body: RankedPool, user: Annotated[User, Depends(current_user)]
+) -> FighterView:
+    """Let other players' ranked matches use this fighter (they spend its key), or stop them."""
+    _mine(user, fighter_id)
+    fighters.set_ranked_opt_in(fighter_id, body.enabled)
+    return _mine(user, fighter_id)
+
+
+@router.delete("/{fighter_id}", status_code=204, dependencies=[Depends(rate_limit("fighter_edit"))])
+def delete(fighter_id: int, user: Annotated[User, Depends(current_user)]) -> None:
+    """Erase the fighter and every key it stored; refused while one of its matches is waiting or
+    being played."""
+    _mine(user, fighter_id)
+    if store.has_unfinished_matches(fighter_id):
+        raise HTTPException(
+            status_code=409,
+            detail="a match of this fighter is waiting or running: try again after it",
+        )
+    fighters.delete(user.id, fighter_id)
 
 
 @router.post("/{fighter_id}/spar", status_code=202, dependencies=[Depends(rate_limit("spar"))])

@@ -8,6 +8,8 @@ export interface FighterView {
   key_hint: string;
   verified: boolean;
   daily_match_cap: number;
+  /** Other players' ranked matches may spend this fighter's key. */
+  ranked_opt_in: boolean;
 }
 
 export interface Options {

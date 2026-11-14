@@ -162,6 +162,17 @@ def count_recent_for_fighter(fighter_id: int) -> int:
     return int(row["n"]) if row else 0
 
 
+def has_unfinished_matches(fighter_id: int) -> bool:
+    """A match of this fighter is waiting or being played, as either side."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM matches WHERE (fighter_id = %s OR opponent_id = %s) "
+            "AND status IN ('queued', 'running') LIMIT 1",
+            (fighter_id, fighter_id),
+        ).fetchone()
+    return row is not None
+
+
 def count_recent_spars(user_id: int) -> int:
     with connect() as conn:
         row = conn.execute(
@@ -317,7 +328,8 @@ def rating_of(fighter_id: int) -> float:
 
 def ranked_candidates(owner_id: int, providers: list[str]) -> list[Candidate]:
     """Other owners' fighters that can be paired now: their latest version has passed a spar, its
-    provider is still configured, and the fighter is under its daily cap."""
+    provider is still configured, and the fighter is under its daily cap. Only fighters whose
+    owner opted in are paired, because the match spends their key (D-070)."""
     with connect() as conn:
         rows = conn.execute(
             "SELECT f.id AS fighter_id, f.owner_id, COALESCE(r.rating, %s) AS rating, "
@@ -326,7 +338,8 @@ def ranked_candidates(owner_id: int, providers: list[str]) -> list[Candidate]:
             "JOIN LATERAL (SELECT * FROM fighter_versions WHERE fighter_id = f.id "
             "ORDER BY version DESC LIMIT 1) v ON true "
             "LEFT JOIN ratings r ON r.fighter_id = f.id "
-            "WHERE f.owner_id <> %s AND v.verified_at IS NOT NULL AND v.provider = ANY(%s) "
+            "WHERE f.owner_id <> %s AND f.ranked_opt_in AND v.verified_at IS NOT NULL "
+            "AND v.provider = ANY(%s) "
             "AND (SELECT count(*) FROM matches m WHERE (m.fighter_id = f.id "
             "OR m.opponent_id = f.id) AND m.created_at > now() - interval '1 day') "
             "< f.daily_match_cap",

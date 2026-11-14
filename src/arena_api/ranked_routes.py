@@ -38,6 +38,12 @@ async def enter_ranked(
         raise HTTPException(
             status_code=409, detail="spar with this fighter first: ranked play needs a working key"
         )
+    if not fighter.ranked_opt_in:
+        raise HTTPException(
+            status_code=409,
+            detail="turn on ranked play for this fighter first: other players' ranked "
+            "matches will then spend its key, up to its daily cap",
+        )
     providers = list(load_config(fighters_config_path()).providers)
     if fighter.provider not in providers:
         raise HTTPException(

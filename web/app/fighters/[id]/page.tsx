@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { FighterView, MatchStatus, Options, RankedEntry } from "../../../lib/fighters";
 import { getJson } from "../../../lib/server-api";
 import { FighterForm } from "../fighter-form";
+import { DeleteFighter } from "./delete-fighter";
 import { RankedPanel } from "./ranked-panel";
 import { SparPanel } from "./spar-panel";
 
@@ -31,8 +32,14 @@ export default async function FighterPage({ params }: { params: Promise<{ id: st
         up to {fighter.daily_match_cap} matches a day
       </p>
       <SparPanel fighterId={fighter.id} spars={spars} />
-      <RankedPanel fighterId={fighter.id} verified={fighter.verified} matches={ranked} />
+      <RankedPanel
+        fighterId={fighter.id}
+        verified={fighter.verified}
+        optedIn={fighter.ranked_opt_in}
+        matches={ranked}
+      />
       <FighterForm options={options} fighter={fighter} />
+      <DeleteFighter fighterId={fighter.id} name={fighter.name} />
     </main>
   );
 }

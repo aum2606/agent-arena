@@ -32,6 +32,7 @@ def verified(client: TestClient, **changes: object) -> int:
     """A fighter whose latest version has passed a spar, the entry ticket to ranked."""
     fighter_id = make_fighter(client, **changes)
     fighters.mark_verified(fighter_id, 1)
+    client.put(f"/fighters/{fighter_id}/ranked-pool", json={"enabled": True})  # opt-in (D-070)
     return fighter_id
 
 

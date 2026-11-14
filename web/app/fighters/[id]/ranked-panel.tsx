@@ -24,10 +24,12 @@ function change(delta: number | null) {
 export function RankedPanel({
   fighterId,
   verified,
+  optedIn,
   matches,
 }: {
   fighterId: number;
   verified: boolean;
+  optedIn: boolean;
   matches: RankedEntry[];
 }) {
   const router = useRouter();
@@ -41,6 +43,20 @@ export function RankedPanel({
     const timer = setInterval(() => router.refresh(), POLL_MS);
     return () => clearInterval(timer);
   }, [busy, router]);
+
+  async function setPool(enabled: boolean) {
+    setError(null);
+    const response = await fetch(`/api/fighters/${fighterId}/ranked-pool`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) {
+      setError(errorText(await response.json().catch(() => null), "Could not change that"));
+      return;
+    }
+    router.refresh();
+  }
 
   async function start() {
     setStarting(true);
@@ -61,9 +77,17 @@ export function RankedPanel({
         A full match against the closest-rated fighter of another owner. It spends both owners&apos;
         keys. See the <Link href="/leaderboard">leaderboard</Link>.
       </p>
-      <button onClick={start} disabled={starting || busy || !verified}>
-        {busy ? "A ranked match is in progress" : "Play ranked"}
-      </button>
+      <label>
+        <input type="checkbox" checked={optedIn} onChange={(e) => setPool(e.target.checked)} /> Let
+        other players&apos; ranked matches use this fighter (they spend its key, up to its daily
+        limit)
+      </label>
+      <p>
+        <button onClick={start} disabled={starting || busy || !verified || !optedIn}>
+          {busy ? "A ranked match is in progress" : "Play ranked"}
+        </button>
+      </p>
+      {!optedIn && <p className="muted">Turn the box above on to play ranked.</p>}
       {!verified && <p className="muted">Spar once first, so we know your key works.</p>}
       {error && <p role="alert">{error}</p>}
       {matches.length > 0 && (

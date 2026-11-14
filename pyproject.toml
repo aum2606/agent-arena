@@ -70,6 +70,7 @@ ignore_decorators = ["@app.*", "@router.*"] # FastAPI registers route handlers b
 ignore_names = [
     "damage_math",
     "review_overturned",
+    "ranked_opt_in",
     "review_answered",
     "review_for_defender",
     "defender_answer",

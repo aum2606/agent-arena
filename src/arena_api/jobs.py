@@ -2,7 +2,8 @@ import asyncio
 import logging
 import os
 import random
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,7 +12,7 @@ from arq.connections import RedisSettings
 from arena.battle_log import BattleLog
 from arena.config import Config, ConfigError, load_config
 from arena.damage import MAX_TURNS
-from arena.llm import Complete, LlmClient, LlmError
+from arena.llm import Complete, Completion, LlmClient, LlmError
 from arena.models import Fighter
 from arena.orchestrator import Verify, run_match
 from arena.sandbox import ensure_ready, sandboxed_verify
@@ -27,6 +28,10 @@ logger = logging.getLogger(__name__)
 # A live match takes minutes when the free tiers rate-limit; past half an hour it is stuck, and the
 # single worker should move on (D-051).
 JOB_TIMEOUT_S = 1800
+# arq cancels the job at the timeout but cannot stop the thread that plays the match, which would
+# keep spending the users' keys; so the match stops asking models a little before (D-070).
+DEADLINE_MARGIN_S = 60
+GENERIC_ERROR = "the match failed because of a server error"  # what users see of a bug
 # The spec's "3 unranked rounds" (a round is a turn here, D-006): half a ranked match, so a spar
 # costs the user's key and the house bot's free-tier quota less.
 SPARRING_TURNS = 3
@@ -100,6 +105,20 @@ def _play(
     return log.to_dict()
 
 
+def _with_deadline(
+    complete: Complete, seconds: float, clock: Callable[[], float] = time.monotonic
+) -> Complete:
+    """`complete`, except that once `seconds` have passed it raises instead of spending a key."""
+    end = clock() + seconds
+
+    def limited(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        if clock() > end:
+            raise LlmError("the match ran out of time")
+        return complete(fighter, system, user, max_tokens)
+
+    return limited
+
+
 def _scrub(text: str, keys: Mapping[str, str]) -> str:
     """Provider errors can echo the key they rejected; never store or show one."""
     for key in keys.values():
@@ -127,15 +146,24 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
     try:
         players = _players(ctx["config"], row)
         keys = players.keys
+        complete = _with_deadline(ctx["complete_with"](keys), JOB_TIMEOUT_S - DEADLINE_MARGIN_S)
         log = await asyncio.to_thread(
-            _play, ctx["config"], ctx["complete_with"](keys), ctx["verify"], match_id, players
+            _play, ctx["config"], complete, ctx["verify"], match_id, players
         )
+        _store_result(row, match_id, log)
     except (LlmError, ConfigError) as exc:
         store.mark_failed(match_id, _scrub(str(exc), keys))
-        return
-    except Exception as exc:
-        store.mark_failed(match_id, _scrub(f"unexpected error: {exc!r}", keys))
+    except asyncio.CancelledError:
+        # arq's job timeout: the row would otherwise stay "running" until a worker restarts.
+        store.mark_failed(match_id, "the match ran out of time")
         raise
+    except Exception as exc:
+        # Users get no internals; the worker's log gets the detail, scrubbed of every key.
+        store.mark_failed(match_id, GENERIC_ERROR)
+        raise RuntimeError(_scrub(f"match {match_id} failed: {exc!r}", keys)) from None
+
+
+def _store_result(row: store.MatchRow, match_id: str, log: dict[str, Any]) -> None:
     summary = parse_replay(match_id, log).summary
     if row.mode == "ranked":
         silent = [

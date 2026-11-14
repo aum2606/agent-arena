@@ -263,3 +263,32 @@ def test_dev_login_rejects_odd_handles(
     monkeypatch.setenv("ARENA_DEV_LOGIN", "1")
 
     assert client.post("/auth/dev", json={"handle": handle}).status_code == 422
+
+
+def test_a_taken_handle_gets_a_suffix_instead_of_locking_the_user_out(database: str) -> None:
+    # `handle` is unique across providers; a clash used to end in a 500 at sign-in (D-070).
+    first = accounts.upsert_user("github", "1", "alice")
+    second = accounts.upsert_user("dev", "alice", "alice")
+    third = accounts.upsert_user("github", "3", "alice")
+
+    assert (first.handle, second.handle, third.handle) == ("alice", "alice-2", "alice-3")
+    assert len({first.id, second.id, third.id}) == 3
+
+
+def test_a_returning_user_keeps_their_handle_and_follows_a_rename(database: str) -> None:
+    alice = accounts.upsert_user("github", "1", "alice")
+
+    assert accounts.upsert_user("github", "1", "alice") == alice  # same row, same handle
+    renamed = accounts.upsert_user("github", "1", "alice-renamed")
+
+    assert renamed.id == alice.id and renamed.handle == "alice-renamed"
+
+
+def test_a_rename_onto_a_taken_handle_gets_a_suffix_and_keeps_the_account(database: str) -> None:
+    alice = accounts.upsert_user("github", "1", "alice")
+    bob = accounts.upsert_user("github", "2", "bob")
+
+    moved = accounts.upsert_user("github", "2", "alice")  # bob renames to alice's handle
+
+    assert moved.id == bob.id and moved.handle == "alice-2"
+    assert accounts.upsert_user("github", "1", "alice") == alice  # alice is untouched

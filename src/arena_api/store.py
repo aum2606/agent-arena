@@ -261,7 +261,8 @@ def finish_ranked(match_id: str, log: dict[str, Any], summary: ReplaySummary) ->
 def mark_failed(match_id: str, error: str) -> None:
     with connect() as conn:
         conn.execute(
-            "UPDATE matches SET status = 'failed', error = %s, ended_at = now() WHERE id = %s",
+            "UPDATE matches SET status = 'failed', error = %s, ended_at = now() "
+            "WHERE id = %s AND status <> 'finished'",  # a late error never undoes a finished match
             (error, match_id),
         )
 

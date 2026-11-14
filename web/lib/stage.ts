@@ -1,3 +1,5 @@
+// The build that makes no eval calls: a Content-Security-Policy without 'unsafe-eval' would stop Pixi.
+import "pixi.js/unsafe-eval";
 import { Application, Container, Graphics, Text } from "pixi.js";
 
 import type { Side } from "./api";

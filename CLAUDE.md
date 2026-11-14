@@ -73,8 +73,9 @@ Update this section if commands change.
 ```
 src/arena/      models.py  llm.py  prompts.py  verifier.py  safe_expr.py  equality.py  moderation.py  sandbox.py  codestrike.py  damage.py
                 orchestrator.py  battle_log.py  stats.py  scorer.py  cli.py   (the game engine)
-src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py limits.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
-web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi)
+src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py limits.py visitor_limits.py deps.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
+web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi);
+                proxy.ts + lib/csp.ts set the Content-Security-Policy (D-064); lib/client-address.ts passes the visitor's address on (D-063)
 docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
 tests/          one test file per module, no network calls
 config/         fighters.toml

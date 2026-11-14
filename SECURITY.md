@@ -24,10 +24,16 @@ These are known and tracked, so you do not need to report them:
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a
   "sign in as anyone" form, and the Postgres password is a published default. Bind it to localhost only.
-- **Limits and filters are basic.** Rate limits cover only signed-in users' write routes (D-050); visitors
-  who are not signed in are not limited. The problem filter (D-049) is a set of rules for instructions
-  aimed at the opponent: it does not catch hateful or adult text, or a cleverly reworded instruction.
-  There is no Content-Security-Policy yet.
+- **Limits and filters are basic.** Signed-in users' write routes are rate limited (D-050), and the
+  routes anyone can reach (replays, the leaderboard, GitHub sign-in) are limited per visitor address
+  (D-063). That only works behind a reverse proxy that overwrites one header with the visitor's address
+  and a `CLIENT_IP_HEADER` naming it; without that every visitor shares one allowance, and a header the
+  proxy passes through lets a visitor pick their own address. The problem filter (D-049) is a set of rules
+  for instructions aimed at the opponent: it does not catch hateful or adult text, or a cleverly reworded
+  instruction.
+- **The Content-Security-Policy is new** (D-064): scripts and styles run only with a per-request nonce, and
+  no eval is allowed in production. It was checked page by page in a browser, but only on a local
+  production build; HTTPS and Strict-Transport-Security still belong to the reverse proxy.
 
 ## Handling secrets
 

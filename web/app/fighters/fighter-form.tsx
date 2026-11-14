@@ -93,7 +93,7 @@ export function FighterForm({ options, fighter }: Props) {
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          autoComplete="off"
+          autoComplete="new-password"
           required={!fighter}
           minLength={8}
         />

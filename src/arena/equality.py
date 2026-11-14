@@ -37,8 +37,25 @@ def _equal_now(a: str, b: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
+MEMORY_LIMIT_BYTES = (
+    1 << 30
+)  # SymPy can eat memory fast; the 5 s limit alone does not stop that (D-071)
+# -P: do not put the working directory on the helper's import path.
+HELPER_COMMAND = [sys.executable, "-P", "-m", "arena.equality"]
+
+
+def _limit_memory() -> None:
+    if (
+        sys.platform != "win32"
+    ):  # `resource` is POSIX only; Windows runs the CLI, not the web worker
+        import resource
+
+        resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
+
+
 def _serve() -> None:
     """The helper's loop: one JSON pair per input line, one JSON result per output line."""
+    _limit_memory()
     protocol = sys.stdout
     sys.stdout = sys.stderr  # nothing a comparison prints may be mistaken for a result
     protocol.write("ready\n")
@@ -71,7 +88,7 @@ class _Helper:
 
     def _start(self) -> subprocess.Popen[str]:
         process = subprocess.Popen(
-            [sys.executable, "-m", "arena.equality"],
+            HELPER_COMMAND,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

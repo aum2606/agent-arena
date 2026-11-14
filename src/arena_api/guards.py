@@ -25,8 +25,16 @@ def _origin_allowed(origin: str) -> bool:
     return public_url_is_local() and urlparse(origin).hostname in _LOOPBACK
 
 
+# The few headers that make sense on a JSON API; the web app sets its own on pages (D-071).
+_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 def _refuse(status: int, detail: str) -> Response:
-    return JSONResponse({"detail": detail}, status_code=status)
+    return JSONResponse({"detail": detail}, status_code=status, headers=_HEADERS)
 
 
 def add_guards(app: FastAPI) -> None:
@@ -48,4 +56,6 @@ def add_guards(app: FastAPI) -> None:
                 return _refuse(411, "send a Content-Length")
             if length is not None and (not length.isdigit() or int(length) > MAX_BODY_BYTES):
                 return _refuse(413, "the request is too large")
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers.update(_HEADERS)
+        return response

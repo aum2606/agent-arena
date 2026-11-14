@@ -4,6 +4,7 @@ const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 const config: NextConfig = {
   output: "standalone",
+  poweredByHeader: false, // no "X-Powered-By: Next.js"
   // Next 16 blocks the dev server's websocket from any origin it does not list, so a page opened at
   // 127.0.0.1 (the address the docs use) never became interactive under `npm run dev`.
   allowedDevOrigins: ["127.0.0.1"],
@@ -22,6 +23,8 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },
     ];

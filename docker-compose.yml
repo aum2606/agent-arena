@@ -10,7 +10,7 @@ x-api-env: &api-env
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
     environment:
       POSTGRES_USER: arena
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena-dev}
@@ -26,7 +26,7 @@ services:
       retries: 15
 
   redis:
-    image: redis:7
+    image: redis:7@sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90
     ports:
       - "127.0.0.1:6379:6379"
 

@@ -17,7 +17,8 @@ export function DevLogin() {
       body: JSON.stringify({ handle }),
     });
     if (!response.ok) {
-      setError((await response.json()).detail ?? "Could not sign in");
+      const detail = (await response.json().catch(() => null))?.detail;
+      setError(typeof detail === "string" ? detail : "Could not sign in");
       return;
     }
     router.push("/");

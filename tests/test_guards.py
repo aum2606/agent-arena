@@ -94,3 +94,18 @@ def test_a_persona_or_model_with_invisible_characters_is_rejected(hidden: str) -
 
 def test_a_persona_may_still_have_newlines_and_tabs() -> None:
     NewFighter(**(BASE | {"persona": "line one\n\tline two\r\nline three"}))
+
+
+@pytest.mark.parametrize("path", ["/health"])
+def test_api_responses_carry_the_small_security_header_set(client: TestClient, path: str) -> None:
+    headers = client.get(path).headers
+
+    assert headers["x-content-type-options"] == "nosniff"
+    assert headers["cross-origin-resource-policy"] == "same-origin"
+    assert headers["referrer-policy"] == "no-referrer"
+
+
+def test_refusals_from_the_guard_carry_them_too(client: TestClient) -> None:
+    refused = client.post("/fighters", headers={"origin": "https://evil.example"})
+
+    assert refused.status_code == 403 and refused.headers["x-content-type-options"] == "nosniff"

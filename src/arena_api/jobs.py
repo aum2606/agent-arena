@@ -31,6 +31,7 @@ JOB_TIMEOUT_S = 1800
 # arq cancels the job at the timeout but cannot stop the thread that plays the match, which would
 # keep spending the users' keys; so the match stops asking models a little before (D-070).
 DEADLINE_MARGIN_S = 60
+RANKED_ERROR = "a fighter's model returned an error, so the match was not rated"
 GENERIC_ERROR = "the match failed because of a server error"  # what users see of a bug
 # The spec's "3 unranked rounds" (a round is a turn here, D-006): half a ranked match, so a spar
 # costs the user's key and the house bot's free-tier quota less.
@@ -152,7 +153,11 @@ async def play_match(ctx: dict[str, Any], match_id: str) -> None:
         )
         _store_result(row, match_id, log)
     except (LlmError, ConfigError) as exc:
-        store.mark_failed(match_id, _scrub(str(exc), keys))
+        detail = _scrub(str(exc), keys)
+        logger.warning("match %s failed: %s", match_id, detail)
+        # A ranked match's error is shown to both owners: nothing of a provider's reply, or of the
+        # other side's setup, may be in it (D-070).
+        store.mark_failed(match_id, RANKED_ERROR if row.mode == "ranked" else detail)
     except asyncio.CancelledError:
         # arq's job timeout: the row would otherwise stay "running" until a worker restarts.
         store.mark_failed(match_id, "the match ran out of time")

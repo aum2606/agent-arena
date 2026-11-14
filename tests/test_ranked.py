@@ -428,3 +428,31 @@ def test_a_hit_on_a_wrong_answer_is_overturned_by_the_panel_in_the_stored_replay
     reviewed = [t for t in parse_replay(match_id, log).turns if t.review_overturned is not None]
     assert len(reviewed) == 3  # bob attacks on turns 2, 4 and 6
     assert all(t.review_overturned and t.outcome == "block" for t in reviewed)
+
+
+def test_a_providers_error_text_is_not_shown_to_the_other_owner(sign_in: SignIn) -> None:
+    # A ranked match's error is visible to both owners; "HTTP 401: Invalid API Key" says too much.
+    def refused(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        raise LlmError("groq returned HTTP 401: Invalid API Key sk-secret-text")
+
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id = verified(ada)
+    verified(bob)
+    match_id = ranked(ada, ada_id).json()["id"]
+
+    play(match_id, refused)
+
+    row = store.get_match(match_id)
+    assert row is not None and row.status == "failed"
+    assert row.error == "a fighter's model returned an error, so the match was not rated"
+    assert "401" not in row.error and "sk-secret" not in row.error
+
+
+def test_ranked_requests_count_towards_the_users_waiting_limit(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ids = [verified(ada, name=f"f{i}") for i in range(3)]
+    verified(bob)
+
+    codes = [ranked(ada, i).status_code for i in ids]
+
+    assert codes == [202, 202, 429]

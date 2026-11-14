@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -160,6 +162,34 @@ def count_recent_for_fighter(fighter_id: int) -> int:
             (fighter_id, fighter_id),
         ).fetchone()
     return int(row["n"]) if row else 0
+
+
+def count_unfinished_for_user(user_id: int) -> int:
+    """Matches this user asked for that are waiting or being played."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM matches WHERE requested_by = %s "
+            "AND status IN ('queued', 'running')",
+            (user_id,),
+        ).fetchone()
+    return int(row["n"]) if row else 0
+
+
+USER_LOCK = 1  # the first key of an advisory lock held for one user's request
+
+
+@contextmanager
+def try_lock(kind: int, key: int) -> Iterator[bool]:
+    """Hold a Postgres advisory lock while the block runs; False if someone holds it already.
+    It never waits: the API serves requests on one event loop, and waiting would freeze it."""
+    with connect() as conn:
+        row = conn.execute("SELECT pg_try_advisory_lock(%s, %s) AS got", (kind, key)).fetchone()
+        got = bool(row and row["got"])
+        try:
+            yield got
+        finally:
+            if got:
+                conn.execute("SELECT pg_advisory_unlock(%s, %s)", (kind, key))
 
 
 def has_unfinished_matches(fighter_id: int) -> bool:

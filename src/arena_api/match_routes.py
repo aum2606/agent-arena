@@ -1,3 +1,4 @@
+import logging
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -12,10 +13,15 @@ from arena_api import store
 from arena_api.accounts import User
 from arena_api.auth import current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matches")
+
+BUSY = "another request of yours is still being handled: try again in a moment"
 
 # Matches wait for the single worker and the free tiers make each one slow, so few may queue.
 MAX_QUEUED = 5
+# One user must not fill the only worker's queue (D-070).
+MAX_QUEUED_PER_USER = 2
 
 
 @dataclass(frozen=True)
@@ -47,22 +53,30 @@ async def start_sparring(
     """Save a queued sparring match and hand it to the worker."""
     return await queue_match(
         queue,
+        user_id,
         lambda match_id: store.create_match(
             match_id, fighter_a, fighter_b, "sparring", user_id, fighter_id, version
         ),
     )
 
 
-async def queue_match(queue: ArqRedis, create: Callable[[str], None]) -> MatchStatus:
+async def queue_match(queue: ArqRedis, user_id: int, create: Callable[[str], None]) -> MatchStatus:
     """Save a queued match with `create` and hand it to the worker."""
     if store.count_queued() >= MAX_QUEUED:
         raise HTTPException(status_code=429, detail="too many matches are waiting; try again later")
+    if store.count_unfinished_for_user(user_id) >= MAX_QUEUED_PER_USER:
+        raise HTTPException(
+            status_code=429,
+            detail=f"you already have {MAX_QUEUED_PER_USER} matches waiting or playing: "
+            "wait for one to finish",
+        )
     match_id = f"m_{datetime.now(UTC):%Y%m%dT%H%M%S}_{secrets.token_hex(2)}"
     create(match_id)
     try:
         await queue.enqueue_job("play_match", match_id)
     except (RedisError, OSError) as exc:
-        store.mark_failed(match_id, f"could not queue the match: {exc}")
+        logger.warning("could not queue match %s: %s", match_id, exc)
+        store.mark_failed(match_id, "could not queue the match")
         raise HTTPException(status_code=503, detail="the match queue is not available") from exc
     row = store.get_match(match_id)
     assert row is not None

@@ -1761,3 +1761,30 @@ were rate limited by Groq and the run was stopped at 28; the rescued attacks' hi
 
 **Alternatives considered:** keeping 1 (leaves 28.7% of turns wasted); a third retry (the second rescued 40%,
 the third would rescue fewer and cost more calls); taking the answer from the snippet (rejected in D-021).
+
+## D-065 · 2026-11-14 · The 70%-of-turns balance gate is retired, not just waived (supersedes the waiver in D-042)
+
+**Decision:** The owner approved (2026-11-14) closing the question of the attacker's share of turns. The gate "neither
+role wins more than 70% of turns over 100+ matches" is no longer a launch condition or a target to tune toward;
+`arena sim` still prints its verdict as a number, nothing acts on it. No rule, prompt or config change comes with this.
+Balance is to be judged by whether the stronger fighter wins more often than the weaker one, which is what makes
+ranked play (D-043) mean something, and that is measured when ranked matches exist, not before.
+
+**Why:** the reason for the gate was the defender's near-total dominance in Phase 0 (D-026). The causes found since were
+mostly not the game's design: token cut-offs decided about a third of turns with the earlier fighter pool (D-055 to
+D-059), and a fighter whose reply failed to parse cost its match (D-061). With those fixed, the mixed pool gives the attacker
+22.4% of turns (D-060) and 24.4% with a second attack retry (D-062), which is the ceiling the scripted-fighter study
+predicted for these rules (D-020): the defender is simply the easier role. Raising the attacker's share further means
+making verified problems harder to solve, which is a different experiment (below), not a fix.
+
+**Evidence that the game tells fighters apart, and its limits:** in D-062's 28 matches gpt-oss won 13, gemini-lite 7 and 8
+were draws. That is not an independent measure of which model is stronger, it is one pair of models, and the draws
+(29% of matches) show many matches are decided by nothing. The real test is ranked results over many fighters.
+
+**Not done:** a reference-panel "too easy" retry (a verified problem every panel solver answers would be sent back to be made
+harder) was considered and not built: the panel costs about 4,300 tokens per scored problem on the same free-tier budget and
+its effect on the attacker's share is unknown. The `--no-panel` runs also hide that real matches use the panel's 0.5 to 2.0
+difficulty, so knockouts are possible in the real game and were impossible in these runs; how often they happen is not measured.
+
+**Alternatives considered:** chasing the gate with an attacker bonus or harder-problem pitching (D-020's levers; the owner
+chose not to); leaving the gate as a standing waiver (it would keep reading as an open failure).

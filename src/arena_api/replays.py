@@ -57,6 +57,10 @@ class TurnView:
     difficulty: float | None  # from the panel; None when the problem was not scored (D-036)
     panel_failed: int | None
     panel_answered: int | None
+    # Ranked math hits only (D-069): the panel's second look at a hit before the defender took it.
+    review_overturned: bool | None  # None when the turn was not reviewed
+    review_answered: int | None
+    review_for_defender: int | None
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,7 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
     shown = first.get("attack_verified") or (first["backfire"] if outcome == "backfire" else {})
     retry = first.get("attack_retry")
     scored = first.get("difficulty")
+    reviewed = first.get("review")
     defended = first.get("defend_result")
     hit = first.get("hit")
     hp = first["hp"]
@@ -133,6 +138,9 @@ def _turn_view(raw: dict[str, Any]) -> TurnView:
         difficulty=scored["value"] if scored else None,
         panel_failed=scored["failed"] if scored else None,
         panel_answered=scored["answered"] if scored else None,
+        review_overturned=reviewed["overturned"] if reviewed else None,
+        review_answered=reviewed["answered"] if reviewed else None,
+        review_for_defender=reviewed["for_defender"] if reviewed else None,
     )
 
 

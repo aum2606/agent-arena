@@ -26,7 +26,7 @@ def answers_match(a: str, b: str) -> bool:
     if a.lstrip().startswith("[") and b.lstrip().startswith("["):
         try:
             return _canonical(a) == _canonical(b)
-        except ValueError:
+        except (ValueError, RecursionError):  # deeply nested text raises the latter (D-069)
             return False
     return symbolic_equal(a, b)
 
@@ -41,17 +41,26 @@ class Run:
     timed_out: bool = False
 
 
+REASON_CHARS = 300  # reasons go into the battle log and the correction prompt: keep them short
+
+
+def _clip(text: str) -> str:
+    return (
+        text if len(text) <= REASON_CHARS else f"{text[:REASON_CHARS]}... ({len(text)} characters)"
+    )
+
+
 def judge(run: Run, stated_answer: str, timeout_s: float) -> Verification:
     """A snippet passes if it finished and its output equals the stated answer."""
     if run.timed_out:
         return Verification(False, f"timeout after {timeout_s}s")
     if run.returncode != 0:
         lines = run.stderr.strip().splitlines()
-        return Verification(False, f"error: {lines[-1] if lines else run.returncode}")
+        return Verification(False, f"error: {_clip(lines[-1]) if lines else run.returncode}")
     output = run.stdout.strip()
     if not answers_match(output, stated_answer):
         return Verification(
-            False, f"mismatch: snippet printed {output!r}, stated {stated_answer!r}"
+            False, f"mismatch: snippet printed {_clip(output)!r}, stated {_clip(stated_answer)!r}"
         )
     return Verification(True, "ok")
 

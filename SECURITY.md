@@ -20,6 +20,10 @@ These are known and tracked, so you do not need to report them:
   that never evaluates them (D-047) and compared in a helper process with a 5-second limit (D-052), but a
   slow answer still occupies the single worker for about 8 seconds (the limit plus a restart), and
   nothing yet limits how many a user can send.
+- **A deliberately wrong answer is only caught on ranked hits.** An attack passes if its snippet prints the stated
+  answer, so a persona can make a model state a wrong answer on purpose. Ranked matches now have the reference panel
+  look at a hit before it lands (D-069); sparring, sims and code strikes do not, and a panel member without a server
+  key (or a panel that is down) leaves the hit standing.
 - **The CLI does not sandbox model-written code** (D-002). Only the web worker uses a gVisor sandbox
   (D-044). Run the CLI on a machine you are willing to risk, with minimal credentials.
 - **The local Docker stack is not safe to expose.** Its worker runs with the sandbox off, it enables a

@@ -75,6 +75,14 @@ function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) 
               : `${turn.difficulty} (${turn.panel_failed} of ${turn.panel_answered} reference models failed it)`
           }
         />
+        <Row
+          label="Panel review"
+          value={
+            turn.review_overturned === null
+              ? null
+              : `${turn.review_overturned ? "overturned the hit" : "kept the hit"}: ${turn.review_for_defender} of ${turn.review_answered} reference models that answered gave the defender's answer`
+          }
+        />
         <Row label="Defender's score" value={turn.score} />
         <Row label="Damage" value={turn.damage_math} />
         <Row

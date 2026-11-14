@@ -35,8 +35,12 @@ Phase 0 (balance prototype) was closed without its gate (D-026); the engine in `
   `solve` problem, a reference solution, hidden test inputs and expected outputs (JSON); the reference must print the
   stated outputs (same retry and backfire); the defender's function must pass every hidden test to score 1. The
   panel scores math only (code difficulty is 1.0).
+- Review (D-069, ranked matches only): the attacker's snippet only proves its answer agrees with itself, so before a defender
+  who gave an answer takes a math hit, the `[[panel]]` solves the problem; if at least two members answered and most of them gave
+  the defender's answer the hit becomes a block (a `review` event records it). Unreviewed: sparring, sims, code strikes,
+  timeouts, and any panel member without a server key.
 - Roles swap each turn. End: HP ≤ 0 (KO) or after 6 rounds (higher HP wins).
-- Battle log events: attack_start, attack_retry, attack_verified, difficulty, backfire, defend_start, defend_result,
+- Battle log events: attack_start, attack_retry, attack_verified, difficulty, review, backfire, defend_start, defend_result,
   hit, block, timeout, hp, knockout, match_end. Each has `t` (ms since turn start); an `attack_retry` for an unreadable reply carries `reason` and `truncated` (D-040); a defender's `defend_result` and
   cut-off `timeout` carry `output_tokens` (D-037) and `truncated` (D-051: true when a reply came back, false for a real timeout). The log has a
   header (`schema: 2`, `fighters`); verified, retried and backfired attacks carry problem, answer, code (D-030), and for code strikes `domain` and `tests` (D-045).

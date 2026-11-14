@@ -40,6 +40,7 @@ class Players:
     b: Fighter
     keys: dict[str, str]  # fighter name -> that fighter's own decrypted key
     max_turns: int
+    review: tuple[Fighter, ...] = ()  # ranked only: may overturn a hit (D-069)
 
 
 def _user_fighter(
@@ -71,7 +72,8 @@ def _players(config: Config, row: store.MatchRow) -> Players:
         theirs, their_key = _user_fighter(
             config, row.fighter_b, row.opponent_id, row.opponent_version
         )
-        return Players(mine, theirs, {mine.name: mine_key, theirs.name: their_key}, MAX_TURNS)
+        keys = {mine.name: mine_key, theirs.name: their_key}
+        return Players(mine, theirs, keys, MAX_TURNS, config.panel)
     a, b = (config.fighters.get(name or "") for name in (row.fighter_a, row.fighter_b))
     if a is None or b is None:
         raise ConfigError(
@@ -93,6 +95,7 @@ def _play(
         random.Random(),
         verify=verify,
         max_turns=players.max_turns,
+        review=players.review,
     )
     return log.to_dict()
 

@@ -39,6 +39,9 @@ export interface Turn {
   difficulty: number | null;
   panel_failed: number | null;
   panel_answered: number | null;
+  review_overturned: boolean | null;
+  review_answered: number | null;
+  review_for_defender: number | null;
 }
 
 export interface ReplaySummary {

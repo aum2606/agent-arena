@@ -69,6 +69,9 @@ ignore_decorators = ["@app.*", "@router.*"] # FastAPI registers route handlers b
 # Response fields of arena_api.replays: FastAPI serialises them and nothing reads them (D-029).
 ignore_names = [
     "damage_math",
+    "review_overturned",
+    "review_answered",
+    "review_for_defender",
     "defender_answer",
     "timed_out",
     "retried",

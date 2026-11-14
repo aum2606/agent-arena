@@ -395,3 +395,35 @@ def test_only_the_owner_can_read_a_fighters_ranked_history(sign_in: SignIn) -> N
 
     assert sign_in("bob").get(f"/fighters/{ada_id}/ranked").status_code == 404
     assert TestClient(app).get(f"/fighters/{ada_id}/ranked").status_code == 401
+
+
+def test_a_hit_on_a_wrong_answer_is_overturned_by_the_panel_in_the_stored_replay(
+    sign_in: SignIn, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # bob states 41 and prints 41, so the attack verifies; ada answers 42 and would take the hit.
+    # The configured panel answers 42 too, so every such hit becomes a block (D-069).
+    refs = "\n".join(
+        f'[[panel]]\nname = "ref-{i}"\nprovider = "groq"\nmodel = "m{i}"\npersona = "a solver"\n'
+        for i in (1, 2, 3)
+    )
+    path = tmp_path / "with-panel.toml"
+    path.write_text(
+        fighters_config_path().read_text(encoding="utf-8") + "\n" + refs, encoding="utf-8"
+    )
+    monkeypatch.setenv("FIGHTERS_CONFIG", str(path))
+
+    def complete(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        if user.endswith(ATTACK_REQUEST):
+            answer, code = ("41", "print(41)") if fighter.name == "bob/rex" else ("42", "print(42)")
+            return Completion(
+                f"<problem>6 * 7?</problem><answer>{answer}</answer><code>{code}</code>", False
+            )
+        return Completion("<answer>42</answer>", False)
+
+    match_id = finished_match(sign_in, complete)
+
+    log = store.get_log(match_id)
+    assert log is not None
+    reviewed = [t for t in parse_replay(match_id, log).turns if t.review_overturned is not None]
+    assert len(reviewed) == 3  # bob attacks on turns 2, 4 and 6
+    assert all(t.review_overturned and t.outcome == "block" for t in reviewed)

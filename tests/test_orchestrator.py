@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from arena.battle_log import BattleLog
-from arena.config import Settings
+from arena.config import ConfigError, Settings
 from arena.llm import Completion, LlmError, LlmTimeout
 from arena.models import Fighter, MatchRecord
 from arena.orchestrator import run_match
@@ -745,3 +745,81 @@ def test_only_a_cut_off_defense_is_marked_truncated_not_a_real_timeout() -> None
 
     assert timeout_event(Completion("<answer>42</answer>", True, 300, 128))["truncated"] is True
     assert timeout_event(LlmTimeout("slow"))["truncated"] is False
+
+
+# A wrong answer the attacker's own snippet confirms always verifies; the review panel (D-069)
+# decides, before the defender takes the hit, whose answer the problem really favours.
+def liar_vs_honest(panel_replies: list[Reply], defender: str = "42") -> FakeLlm:
+    """alice states 41 and prints 41 (verifies); bob answers `defender`; each ref gets its reply."""
+    return FakeLlm(
+        attacks={
+            "alice": [good_attack(answer="41", code="print(41)")] * 3,
+            "bob": [good_attack()] * 3,
+        },
+        defenses={"alice": [answer("42")] * 3, "bob": [answer(defender)] * 3}
+        | {m.name: [reply] for m, reply in zip(PANEL, panel_replies, strict=True)},
+    )
+
+
+def reviewed(llm: FakeLlm) -> tuple[list[dict[str, Any]], str]:
+    log = BattleLog("m1")
+    record = run_match(A, B, llm, SETTINGS, log, random.Random(0), max_turns=1, review=PANEL)
+    return log.to_dict()["turns"][0]["events"], record.turns[0].outcome
+
+
+def test_a_hit_the_panel_disagrees_with_becomes_a_block_and_the_review_is_logged() -> None:
+    events, outcome = reviewed(liar_vs_honest([answer("42"), answer("42"), answer("41")]))
+
+    assert [e["type"] for e in events] == [
+        "attack_start", "attack_verified", "defend_start", "defend_result", "review", "block", "hp",
+        "match_end",
+    ]  # fmt: skip
+    review = events[4]
+    assert (review["overturned"], review["answered"], review["for_defender"]) == (True, 3, 2)
+    assert [m["verdict"] for m in review["panel"]] == ["defender", "defender", "attacker"]
+    assert outcome == "block"
+    assert events[-2]["a"] == 100 and events[-2]["b"] == 100  # nobody took damage
+
+
+def test_a_hit_the_panel_agrees_with_stands() -> None:
+    events, outcome = reviewed(liar_vs_honest([answer("41"), answer("41"), answer("42")]))
+
+    assert [e["type"] for e in events][3:] == ["defend_result", "review", "hit", "hp", "match_end"]
+    assert events[4]["overturned"] is False and outcome == "hit"
+
+
+def test_a_panel_that_mostly_cannot_answer_leaves_the_hit() -> None:
+    events, outcome = reviewed(liar_vs_honest([answer("42"), LlmError("429"), LlmTimeout("slow")]))
+
+    assert outcome == "hit" and events[4]["answered"] == 1
+
+
+def test_an_unconfigured_panel_member_leaves_the_hit_and_does_not_fail_the_match() -> None:
+    missing = ConfigError("GEMINI_API_KEY is not set (see .env.example)")
+    events, outcome = reviewed(liar_vs_honest([missing, missing, missing]))
+
+    assert outcome == "hit" and "review" not in [e["type"] for e in events]
+
+
+def test_without_a_review_panel_nothing_changes() -> None:
+    log = BattleLog("m1")
+    record = run_match(
+        A, B, liar_vs_honest([answer("42")] * 3), SETTINGS, log, random.Random(0), max_turns=1
+    )
+
+    assert record.turns[0].outcome == "hit"
+    assert "review" not in [e["type"] for e in log.to_dict()["turns"][0]["events"]]
+
+
+def test_a_defender_who_gave_no_answer_is_not_reviewed() -> None:
+    llm = liar_vs_honest([answer("42")] * 3)
+    llm.defenses["bob"] = [LlmTimeout("slow")]
+    events, outcome = reviewed(llm)
+
+    assert outcome == "hit" and "review" not in [e["type"] for e in events]
+
+
+def test_a_correct_defence_is_not_reviewed() -> None:
+    events, outcome = reviewed(liar_vs_honest([answer("42")] * 3, defender="41"))
+
+    assert outcome == "block" and "review" not in [e["type"] for e in events]

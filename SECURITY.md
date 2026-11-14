@@ -18,8 +18,8 @@ These are known and tracked, so you do not need to report them:
 
 - **A crafted answer can still cost the worker a few seconds.** Answers are read by a restricted parser
   that never evaluates them (D-047) and compared in a helper process with a 5-second limit (D-052), but a
-  slow answer still occupies the single worker for about 8 seconds (the limit plus a restart), and
-  nothing yet limits how many a user can send.
+  slow answer still occupies the single worker for about 8 seconds (the limit plus a restart). A user's
+  matches are capped (a daily limit per fighter, two waiting at a time), so the cost is bounded, not zero.
 - **Your key is yours to remove, with limits.** Deleting a fighter erases every version and key stored for it (D-070);
   an old version of a fighter you keep still holds its old key, and there is no rotation for `KEY_ENCRYPTION_SECRET`.
   A fighter is spent by other players' ranked matches only if you turn that on for it; then your key pays for them, up to its
@@ -44,11 +44,30 @@ These are known and tracked, so you do not need to report them:
   proxy passes through lets a visitor pick their own address. The problem filter (D-049) is a set of rules
   for instructions aimed at the opponent: it does not catch hateful or adult text, or a cleverly reworded
   instruction.
+- **Left over from the pre-deploy audit** (details in D-069 and D-070): a ranked opponent's daily cap can be overshot a
+  little by parallel requests; the problem filter is bypassable with other alphabets or languages; a code strike's reference
+  solution can be a lookup table; a snippet can run for its limit plus a 10-second start-up allowance; the panel that reviews
+  ranked hits is a majority of free-tier models, so it can be wrong; old fighter versions keep their keys until the fighter
+  is deleted; sessions are not ended by a new sign-in and expired ones are never deleted.
 - **Images and actions are pinned by digest or commit** (D-071) and Dependabot proposes updates; the base image the sandbox runs
   in is built from a pinned digest plus SymPy, and the worker builds it once. The pins are only as fresh as the last merged update.
 - **The Content-Security-Policy is new** (D-064): scripts and styles run only with a per-request nonce, and
   no eval is allowed in production. It was checked page by page in a browser, but only on a local
   production build; HTTPS and Strict-Transport-Security still belong to the reverse proxy.
+
+## Before you deploy
+
+None of this is done by the repository; it is the deployer's checklist (D-068 to D-071 say why):
+
+- Set `PUBLIC_URL` to the real `https://` address on **both** the API and the worker. The "sign in as anyone" form and
+  `ARENA_SANDBOX=off` are only refused when it says so, and the session cookie is `Secure` only for `https`.
+- Run the worker on a host with Docker and gVisor (`runsc`), never `ARENA_SANDBOX=off`, and keep it off the public network.
+- Put a reverse proxy in front that terminates TLS, sends HSTS, and **overwrites** one header with the visitor's address;
+  name it in `CLIENT_IP_HEADER` on the API and the web server. Keep the web server's port 3000 and the API's port 8000
+  reachable only from the proxy, or a visitor can pick their own address.
+- Make a production GitHub OAuth app (one callback each) and a **new** `KEY_ENCRYPTION_SECRET`, and back the secret up.
+- Give Postgres and Redis real passwords; the compose defaults are for localhost.
+- On GitHub: private vulnerability reporting, branch protection requiring CI, secret scanning and push protection.
 
 ## Handling secrets
 

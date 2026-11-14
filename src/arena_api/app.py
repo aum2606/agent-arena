@@ -15,11 +15,13 @@ from arena_api.fighter_routes import router as fighter_router
 from arena_api.match_routes import router as match_router
 from arena_api.ranked_routes import router as ranked_router
 from arena_api.replays import VALID_ID, Replay, ReplayError, ReplaySummary, parse_replay
+from arena_api.secret_box import check_secret
 from arena_api.visitor_limits import visitor_limit
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    check_secret()
     migrate()
     app.state.queue = await create_pool(RedisSettings.from_dsn(redis_url()))
     yield

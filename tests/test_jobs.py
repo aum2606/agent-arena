@@ -170,8 +170,9 @@ KEY = "gsk_test_abcdefghij1234"
 
 
 @pytest.fixture(autouse=True)
-def stand_in_redis(queue: StubQueue) -> None:
-    """Creating a fighter through the API goes through the rate limiter, which needs Redis."""
+def stand_in_redis(queue: StubQueue, encryption: None) -> None:
+    """Creating a fighter goes through the rate limiter, which needs Redis, and the worker will not
+    start without the key secret."""
 
 
 class Spar:

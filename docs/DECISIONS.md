@@ -1788,3 +1788,22 @@ difficulty, so knockouts are possible in the real game and were impossible in th
 
 **Alternatives considered:** chasing the gate with an attacker bonus or harder-problem pitching (D-020's levers; the owner
 chose not to); leaving the gate as a standing waiver (it would keep reading as an open failure).
+
+## D-066 · 2026-11-14 · The API and the worker refuse to start without a valid KEY_ENCRYPTION_SECRET
+
+**Decision:** `secret_box.check_secret()` raises `ConfigError` ("KEY_ENCRYPTION_SECRET is not set" or "is not a valid
+key") and runs first in the API's startup (`lifespan`) and the worker's (`startup`), before the database migration, so
+a process without a usable secret does not come up.
+
+**Why:** until now the secret was read lazily (D-034). A deploy that forgot it, or had a typo in it, started normally and
+failed at the first user who saved or used an API key. For a public launch that is the wrong place to find out.
+
+**Effects:** a local `docker compose up` without the secret now stops at startup with the message instead of at the first
+fighter; the README already says to set it. `docker compose up -d postgres redis` (used by the tests) is not affected, and
+the compose file still passes the variable through with an empty default, because a required variable would break that.
+The check does not tell a right secret from a wrong one: a changed secret still passes and then fails to decrypt
+the stored keys ("wrong or changed KEY_ENCRYPTION_SECRET?"), as before. Tests: the check itself, and that neither process
+touches the database or Redis before it; the worker tests set the secret.
+
+**Alternatives considered:** leaving it lazy; a required variable in compose (breaks the database-only commands); a stored
+check value to catch a changed secret (new state and a migration, and there is no rotation story yet).

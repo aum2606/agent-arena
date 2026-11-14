@@ -2,7 +2,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 from arena.config import ConfigError
-from arena_api.secret_box import decrypt, encrypt
+from arena_api.secret_box import check_secret, decrypt, encrypt
 
 
 @pytest.fixture(autouse=True)
@@ -50,3 +50,20 @@ def test_a_malformed_server_secret_is_reported_not_crashed_on(
 
     with pytest.raises(ConfigError, match="KEY_ENCRYPTION_SECRET"):
         encrypt("sk-abcdef123456")
+
+
+def test_a_valid_secret_passes_the_startup_check() -> None:
+    check_secret()
+
+
+@pytest.mark.parametrize("value", [None, "", "not-a-fernet-key"])
+def test_a_missing_or_invalid_secret_fails_the_startup_check(
+    monkeypatch: pytest.MonkeyPatch, value: str | None
+) -> None:
+    if value is None:
+        monkeypatch.delenv("KEY_ENCRYPTION_SECRET")
+    else:
+        monkeypatch.setenv("KEY_ENCRYPTION_SECRET", value)
+
+    with pytest.raises(ConfigError, match="KEY_ENCRYPTION_SECRET"):
+        check_secret()

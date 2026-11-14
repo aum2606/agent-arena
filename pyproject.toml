@@ -34,6 +34,7 @@ api = [
     "arq>=0.28.0",
     "cryptography>=50.0.2",
     "fastapi>=0.162.0",
+    "psycopg-pool>=3.3.3",
     "psycopg[binary]>=3.3.6",
     "uvicorn>=0.54.0",
 ]
@@ -70,6 +71,7 @@ ignore_decorators = ["@app.*", "@router.*"] # FastAPI registers route handlers b
 ignore_names = [
     "damage_math",
     "review_overturned",
+    "ranked_opt_in",
     "review_answered",
     "review_for_defender",
     "defender_answer",
@@ -97,6 +99,7 @@ ignore_names = [
     "WorkerSettings",
     "functions",
     "on_startup",
+    "on_shutdown",
     "redis_settings",
     "max_jobs",
     "max_tries",

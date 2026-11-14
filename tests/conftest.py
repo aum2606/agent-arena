@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from helpers import StubQueue
 from psycopg.conninfo import make_conninfo
 
+from arena_api import store
 from arena_api.app import app
 from arena_api.db import migrate
 from arena_api.deps import get_queue
@@ -37,6 +38,7 @@ def database(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
         try:
             yield url
         finally:
+            store.close_pools()  # a pool keeps connections open to the database about to be dropped
             admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
 
 

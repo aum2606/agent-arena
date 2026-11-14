@@ -1,10 +1,13 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
 from arq import create_pool
 from arq.connections import RedisSettings
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from psycopg_pool import PoolTimeout
 
 from arena_api import store
 from arena_api.accounts import User
@@ -12,11 +15,14 @@ from arena_api.auth import optional_user
 from arena_api.auth import router as auth_router
 from arena_api.db import migrate, redis_url
 from arena_api.fighter_routes import router as fighter_router
+from arena_api.guards import add_guards
 from arena_api.match_routes import router as match_router
 from arena_api.ranked_routes import router as ranked_router
 from arena_api.replays import VALID_ID, Replay, ReplayError, ReplaySummary, parse_replay
 from arena_api.secret_box import check_secret
 from arena_api.visitor_limits import visitor_limit
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -26,12 +32,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.queue = await create_pool(RedisSettings.from_dsn(redis_url()))
     yield
     await app.state.queue.aclose()
+    store.close_pools()
 
 
 # No docs pages: they load scripts from a CDN on the app's own origin (D-068).
 app = FastAPI(
     title="Agent Arena", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 )
+add_guards(app)
+
+
+@app.exception_handler(PoolTimeout)
+def busy(request: Request, exc: PoolTimeout) -> JSONResponse:
+    """Every database connection is in use: say so, and let the client try again."""
+    return JSONResponse(
+        {"detail": "the server is busy; try again in a moment"},
+        status_code=503,
+        headers={"Retry-After": "5"},
+    )
+
+
 app.include_router(auth_router)
 app.include_router(fighter_router)
 app.include_router(match_router)
@@ -63,4 +83,5 @@ def replay(replay_id: str, viewer: Annotated[User | None, Depends(optional_user)
     try:
         return parse_replay(replay_id, log)
     except ReplayError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.warning("replay %s cannot be shown: %s", replay_id, exc)
+        raise HTTPException(status_code=500, detail="this replay cannot be shown") from exc

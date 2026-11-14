@@ -2,9 +2,10 @@ from typing import Annotated
 
 from arq.connections import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from arena.config import ConfigError, load_config
+from arena.moderation import has_hidden_characters
 from arena_api import fighters, store
 from arena_api.accounts import User
 from arena_api.auth import current_user
@@ -12,7 +13,7 @@ from arena_api.db import fighters_config_path
 from arena_api.deps import get_queue
 from arena_api.fighters import FighterView
 from arena_api.limits import rate_limit
-from arena_api.match_routes import MatchStatus, start_sparring, status_of
+from arena_api.match_routes import BUSY, MatchStatus, start_sparring, status_of
 from arena_api.secret_box import encrypt
 
 router = APIRouter(prefix="/fighters")
@@ -41,6 +42,13 @@ NAME = r"^[A-Za-z0-9_-]{1,32}$"
 NO_SPACES = r"^\S+$"
 
 
+def _visible(value: str) -> str:
+    """Persona and model show in the other player's ranked replay: nothing may hide in them."""
+    if has_hidden_characters(value):
+        raise ValueError("must not contain invisible or control characters")
+    return value
+
+
 class NewFighter(BaseModel):
     name: str = Field(pattern=NAME)
     provider: str
@@ -48,6 +56,12 @@ class NewFighter(BaseModel):
     persona: str = Field(min_length=1, max_length=2000)
     api_key: str = Field(min_length=8, max_length=512, pattern=NO_SPACES)
     daily_match_cap: int = Field(DEFAULT_DAILY_CAP, ge=1, le=50)
+
+    _no_hidden = field_validator("model", "persona")(_visible)
+
+
+class RankedPool(BaseModel):
+    enabled: bool
 
 
 class NewVersion(BaseModel):
@@ -57,6 +71,8 @@ class NewVersion(BaseModel):
     # Left out: keep the saved key.
     api_key: str | None = Field(None, min_length=8, max_length=512, pattern=NO_SPACES)
     daily_match_cap: int | None = Field(None, ge=1, le=50)
+
+    _no_hidden = field_validator("model", "persona")(_visible)
 
 
 def _check_provider(name: str) -> None:
@@ -131,12 +147,40 @@ def new_version(
     _check_provider(body.provider)
     current = fighters.current_version(fighter_id)
     assert current is not None  # a fighter is created together with its first version
+    if body.provider != current.provider and not body.api_key:
+        # The saved key belongs to the old provider: it must not be sent to another one.
+        raise HTTPException(
+            status_code=422, detail="changing the provider needs a new API key for it"
+        )
     stored = _encrypted(body.api_key) if body.api_key else current.api_key_encrypted
     hint = body.api_key[-4:] if body.api_key else current.key_hint
     fighters.add_version(
         fighter_id, body.provider, body.model, body.persona, stored, hint, body.daily_match_cap
     )
     return _mine(user, fighter_id)
+
+
+@router.put("/{fighter_id}/ranked-pool", dependencies=[Depends(rate_limit("fighter_edit"))])
+def ranked_pool(
+    fighter_id: int, body: RankedPool, user: Annotated[User, Depends(current_user)]
+) -> FighterView:
+    """Let other players' ranked matches use this fighter (they spend its key), or stop them."""
+    _mine(user, fighter_id)
+    fighters.set_ranked_opt_in(fighter_id, body.enabled)
+    return _mine(user, fighter_id)
+
+
+@router.delete("/{fighter_id}", status_code=204, dependencies=[Depends(rate_limit("fighter_edit"))])
+def delete(fighter_id: int, user: Annotated[User, Depends(current_user)]) -> None:
+    """Erase the fighter and every key it stored; refused while one of its matches is waiting or
+    being played."""
+    _mine(user, fighter_id)
+    if store.has_unfinished_matches(fighter_id):
+        raise HTTPException(
+            status_code=409,
+            detail="a match of this fighter is waiting or running: try again after it",
+        )
+    fighters.delete(user.id, fighter_id)
 
 
 @router.post("/{fighter_id}/spar", status_code=202, dependencies=[Depends(rate_limit("spar"))])
@@ -147,6 +191,14 @@ async def spar(
 ) -> MatchStatus:
     """Queue a sparring match between this fighter's latest version and the house bot."""
     fighter = _mine(user, fighter_id)
+    with store.try_lock(store.USER_LOCK, user.id) as got:
+        if not got:
+            raise HTTPException(status_code=429, detail=BUSY)
+        return await _spar(fighter, user, queue)
+
+
+async def _spar(fighter: FighterView, user: User, queue: ArqRedis) -> MatchStatus:
+    fighter_id = fighter.id
     config = load_config(fighters_config_path())
     if config.house_bot is None:
         raise HTTPException(status_code=503, detail="no house bot is configured to spar against")

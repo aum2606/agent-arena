@@ -20,6 +20,10 @@ These are known and tracked, so you do not need to report them:
   that never evaluates them (D-047) and compared in a helper process with a 5-second limit (D-052), but a
   slow answer still occupies the single worker for about 8 seconds (the limit plus a restart), and
   nothing yet limits how many a user can send.
+- **Your key is yours to remove, with limits.** Deleting a fighter erases every version and key stored for it (D-070);
+  an old version of a fighter you keep still holds its old key, and there is no rotation for `KEY_ENCRYPTION_SECRET`.
+  A fighter is spent by other players' ranked matches only if you turn that on for it; then your key pays for them, up to its
+  daily cap.
 - **A deliberately wrong answer is only caught on ranked hits.** An attack passes if its snippet prints the stated
   answer, so a persona can make a model state a wrong answer on purpose. Ranked matches now have the reference panel
   look at a hit before it lands (D-069); sparring, sims and code strikes do not, and a panel member without a server

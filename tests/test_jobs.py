@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from typing import Any
 
 import pytest
@@ -98,12 +99,15 @@ def test_an_unexpected_error_is_recorded_and_raised(database: str) -> None:
     def broken(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
         raise ZeroDivisionError("boom")
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(
+        RuntimeError, match="ZeroDivisionError"
+    ):  # the worker's log keeps the detail
         run(broken)
 
     row = store.get_match("m1")
     assert row is not None and row.status == "failed"
-    assert row.error is not None and "ZeroDivisionError" in row.error
+    # What users see says nothing of the server's internals (D-070).
+    assert row.error == "the match failed because of a server error"
 
 
 def test_a_match_that_is_not_queued_is_never_played_twice(database: str) -> None:
@@ -402,3 +406,81 @@ def test_a_match_is_played_with_the_players_review_panel(monkeypatch: pytest.Mon
         )
     assert seen["review"] == (ref,)
     assert jobs.Players(a, b, {}, 6).review == ()  # sparring and sims have no review
+
+
+def test_a_match_past_its_time_limit_stops_asking_models() -> None:
+    from arena_api.jobs import _with_deadline
+
+    now = [0.0]
+    asked: list[str] = []
+
+    def complete(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        asked.append(fighter.name)
+        return Completion("x", False)
+
+    limited = _with_deadline(complete, 100.0, clock=lambda: now[0])
+    alice = Fighter("alice", "p", "m", "persona")
+
+    limited(alice, "s", "u", 10)
+    now[0] = 101.0
+    with pytest.raises(LlmError, match="ran out of time"):
+        limited(alice, "s", "u", 10)
+
+    assert asked == ["alice"]  # no key is spent after the limit
+
+
+def test_a_match_the_job_timeout_cancels_is_marked_failed_and_its_thread_stops(
+    database: str,
+) -> None:
+    import threading
+
+    store.create_match("m1", "alice", "bob")
+    started, release = threading.Event(), threading.Event()
+
+    def stuck(fighter: Fighter, system: str, user: str, max_tokens: int) -> Completion:
+        started.set()
+        release.wait(10)
+        return blocking(fighter, system, user, max_tokens)
+
+    async def main() -> None:
+        ctx = {"config": CONFIG, "complete_with": lambda keys: stuck, "verify": verify_attack}
+        task = asyncio.ensure_future(play_match(ctx, "m1"))
+        while not started.is_set():
+            await asyncio.sleep(0.01)
+        task.cancel()  # what arq does when the job timeout passes
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    try:
+        asyncio.run(main())
+        row = store.get_match("m1")
+        assert row is not None and row.status == "failed" and "ran out of time" in str(row.error)
+    finally:
+        release.set()
+
+
+def test_a_failure_after_the_match_was_played_still_fails_it(
+    database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.create_match("m1", "alice", "bob")
+
+    def broken(*args: Any) -> None:
+        raise ValueError("the stored log is unreadable")
+
+    monkeypatch.setattr("arena_api.jobs.parse_replay", broken)
+
+    with pytest.raises(RuntimeError):
+        run(blocking)
+
+    row = store.get_match("m1")
+    assert row is not None and row.status == "failed"  # it used to stay "running" for ever
+
+
+def test_marking_a_match_failed_never_overwrites_a_finished_one(database: str) -> None:
+    store.create_match("m1", "alice", "bob")
+    run(blocking)
+
+    store.mark_failed("m1", "a late error")
+
+    row = store.get_match("m1")
+    assert row is not None and row.status == "finished" and row.error is None

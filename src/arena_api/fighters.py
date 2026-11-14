@@ -23,6 +23,7 @@ class FighterView:
     key_hint: str
     verified: bool
     daily_match_cap: int
+    ranked_opt_in: bool  # other players' ranked matches may spend this fighter's key
 
 
 @dataclass(frozen=True)
@@ -39,8 +40,8 @@ class Version:
 
 
 _VIEW_SQL = (
-    "SELECT f.id, f.name, f.daily_match_cap, v.version, v.provider, v.model, v.persona, "
-    "v.key_hint, v.verified_at IS NOT NULL AS verified FROM fighters f "
+    "SELECT f.id, f.name, f.daily_match_cap, f.ranked_opt_in, v.version, v.provider, v.model, "
+    "v.persona, v.key_hint, v.verified_at IS NOT NULL AS verified FROM fighters f "
     "JOIN LATERAL (SELECT * FROM fighter_versions WHERE fighter_id = f.id "
     "ORDER BY version DESC LIMIT 1) v ON true WHERE f.owner_id = %s"
 )
@@ -140,6 +141,21 @@ def version(fighter_id: int, number: int) -> Version | None:
             (fighter_id, number),
         ).fetchone()
     return _version_from(row)
+
+
+def set_ranked_opt_in(fighter_id: int, enabled: bool) -> None:
+    with store.connect() as conn:
+        conn.execute("UPDATE fighters SET ranked_opt_in = %s WHERE id = %s", (enabled, fighter_id))
+
+
+def delete(owner_id: int, fighter_id: int) -> bool:
+    """Erase a fighter, all its versions (so every key it stored) and its rating. Matches it played
+    stay on record with the link to it cleared. False if the owner has no such fighter."""
+    with store.connect() as conn:
+        done = conn.execute(
+            "DELETE FROM fighters WHERE id = %s AND owner_id = %s", (fighter_id, owner_id)
+        )
+    return done.rowcount == 1
 
 
 def mark_verified(fighter_id: int, number: int) -> None:

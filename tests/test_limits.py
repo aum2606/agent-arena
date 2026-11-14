@@ -12,7 +12,7 @@ def setup(config_file: object, encryption: None, queue: StubQueue) -> None:
 
 
 def test_the_write_routes_have_a_limit_each() -> None:
-    assert set(RULES) == {"create_fighter", "new_version", "spar", "ranked"}
+    assert set(RULES) == {"create_fighter", "new_version", "fighter_edit", "spar", "ranked"}
 
 
 def test_a_user_past_the_limit_is_turned_away_with_a_wait_time(

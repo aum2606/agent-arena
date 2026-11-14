@@ -372,3 +372,19 @@ def test_a_turn_without_a_review_shows_none() -> None:
     replay = parse_replay("m1", {"match_id": "m1", "turns": [hit_turn(1, "a", "b")]})
 
     assert replay.turns[0].review_overturned is None
+
+
+def test_an_unreadable_replay_does_not_show_the_parsers_error(
+    database: str, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_log("m1", [hit_turn(1, "a", "b")])
+
+    def broken(*args: Any) -> None:
+        raise ReplayError("replay 'm1' is unreadable: KeyError('hp')")
+
+    monkeypatch.setattr("arena_api.app.parse_replay", broken)
+
+    response = client.get("/replays/m1")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "this replay cannot be shown"

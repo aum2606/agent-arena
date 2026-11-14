@@ -1,9 +1,14 @@
+import os
+import threading
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from psycopg_pool import ConnectionPool
 
 from arena_api.db import database_url
 from arena_api.ratings import START_RATING, Candidate, rate
@@ -69,9 +74,41 @@ _MATCH_COLUMNS = (
 )
 
 
-def connect() -> psycopg.Connection[dict[str, Any]]:
-    """A connection that commits when its `with` block ends."""
-    return psycopg.connect(database_url(), row_factory=dict_row)
+# One bounded pool per database instead of a connection per call: a flood of cheap requests (each
+# session check opens one) could use up Postgres's connections (D-070).
+POOL_SIZE_ENV = "ARENA_DB_POOL"
+DEFAULT_POOL_SIZE = 10
+POOL_WAIT_S = 5.0  # how long a request waits for a free connection before the API says "busy"
+_pools: dict[str, ConnectionPool[psycopg.Connection[dict[str, Any]]]] = {}
+_pools_lock = threading.Lock()
+
+
+def _pool() -> ConnectionPool[psycopg.Connection[dict[str, Any]]]:
+    url = database_url()
+    with _pools_lock:
+        pool = _pools.get(url)
+        if pool is None:
+            pool = ConnectionPool(
+                url,
+                min_size=1,
+                max_size=int(os.environ.get(POOL_SIZE_ENV, DEFAULT_POOL_SIZE)),
+                kwargs={"row_factory": dict_row},
+                open=True,
+            )
+            _pools[url] = pool
+    return pool
+
+
+def connect() -> AbstractContextManager[psycopg.Connection[dict[str, Any]]]:
+    """A pooled connection that commits when its `with` block ends, or rolls back on an error."""
+    return _pool().connection(timeout=POOL_WAIT_S)
+
+
+def close_pools() -> None:
+    with _pools_lock:
+        for pool in _pools.values():
+            pool.close()
+        _pools.clear()
 
 
 def create_match(
@@ -162,6 +199,45 @@ def count_recent_for_fighter(fighter_id: int) -> int:
     return int(row["n"]) if row else 0
 
 
+def count_unfinished_for_user(user_id: int) -> int:
+    """Matches this user asked for that are waiting or being played."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM matches WHERE requested_by = %s "
+            "AND status IN ('queued', 'running')",
+            (user_id,),
+        ).fetchone()
+    return int(row["n"]) if row else 0
+
+
+USER_LOCK = 1  # the first key of an advisory lock held for one user's request
+
+
+@contextmanager
+def try_lock(kind: int, key: int) -> Iterator[bool]:
+    """Hold a Postgres advisory lock while the block runs; False if someone holds it already.
+    It never waits: the API serves requests on one event loop, and waiting would freeze it."""
+    with connect() as conn:
+        row = conn.execute("SELECT pg_try_advisory_lock(%s, %s) AS got", (kind, key)).fetchone()
+        got = bool(row and row["got"])
+        try:
+            yield got
+        finally:
+            if got:
+                conn.execute("SELECT pg_advisory_unlock(%s, %s)", (kind, key))
+
+
+def has_unfinished_matches(fighter_id: int) -> bool:
+    """A match of this fighter is waiting or being played, as either side."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM matches WHERE (fighter_id = %s OR opponent_id = %s) "
+            "AND status IN ('queued', 'running') LIMIT 1",
+            (fighter_id, fighter_id),
+        ).fetchone()
+    return row is not None
+
+
 def count_recent_spars(user_id: int) -> int:
     with connect() as conn:
         row = conn.execute(
@@ -250,7 +326,8 @@ def finish_ranked(match_id: str, log: dict[str, Any], summary: ReplaySummary) ->
 def mark_failed(match_id: str, error: str) -> None:
     with connect() as conn:
         conn.execute(
-            "UPDATE matches SET status = 'failed', error = %s, ended_at = now() WHERE id = %s",
+            "UPDATE matches SET status = 'failed', error = %s, ended_at = now() "
+            "WHERE id = %s AND status <> 'finished'",  # a late error never undoes a finished match
             (error, match_id),
         )
 
@@ -317,7 +394,8 @@ def rating_of(fighter_id: int) -> float:
 
 def ranked_candidates(owner_id: int, providers: list[str]) -> list[Candidate]:
     """Other owners' fighters that can be paired now: their latest version has passed a spar, its
-    provider is still configured, and the fighter is under its daily cap."""
+    provider is still configured, and the fighter is under its daily cap. Only fighters whose
+    owner opted in are paired, because the match spends their key (D-070)."""
     with connect() as conn:
         rows = conn.execute(
             "SELECT f.id AS fighter_id, f.owner_id, COALESCE(r.rating, %s) AS rating, "
@@ -326,7 +404,8 @@ def ranked_candidates(owner_id: int, providers: list[str]) -> list[Candidate]:
             "JOIN LATERAL (SELECT * FROM fighter_versions WHERE fighter_id = f.id "
             "ORDER BY version DESC LIMIT 1) v ON true "
             "LEFT JOIN ratings r ON r.fighter_id = f.id "
-            "WHERE f.owner_id <> %s AND v.verified_at IS NOT NULL AND v.provider = ANY(%s) "
+            "WHERE f.owner_id <> %s AND f.ranked_opt_in AND v.verified_at IS NOT NULL "
+            "AND v.provider = ANY(%s) "
             "AND (SELECT count(*) FROM matches m WHERE (m.fighter_id = f.id "
             "OR m.opponent_id = f.id) AND m.created_at > now() - interval '1 day') "
             "< f.daily_match_cap",

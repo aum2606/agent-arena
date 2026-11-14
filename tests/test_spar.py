@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from helpers import FIGHTER, SignIn, StubQueue, make_fighter
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from arena_api import store
+from arena_api import match_routes, store
 from arena_api.app import app
 from arena_api.fighter_routes import MAX_SPARS_PER_USER_PER_DAY
 from arena_api.match_routes import MAX_QUEUED
@@ -80,7 +80,10 @@ def test_a_fighter_stops_at_its_daily_cap(sign_in: SignIn, queue: StubQueue) -> 
     assert len(queue.jobs) == 1
 
 
-def test_a_user_stops_at_the_daily_spar_limit_across_fighters(sign_in: SignIn) -> None:
+def test_a_user_stops_at_the_daily_spar_limit_across_fighters(
+    sign_in: SignIn, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(match_routes, "MAX_QUEUED_PER_USER", 100)  # these stay queued here
     ada = sign_in("ada")
     ids = [make_fighter(ada, name=f"f{i}") for i in range(MAX_SPARS_PER_USER_PER_DAY + 1)]
 
@@ -174,3 +177,52 @@ def test_sparring_matches_are_not_in_the_public_replay_list(
     finished_spar(sign_in("ada"), sample_log)
 
     assert TestClient(app).get("/replays").json() == []
+
+
+def test_a_user_can_only_have_so_many_matches_waiting_or_playing(sign_in: SignIn) -> None:
+    # One user must not fill the only worker's queue (D-070).
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ids = [make_fighter(ada, name=f"f{i}") for i in range(3)]
+    bob_id = make_fighter(bob)
+
+    first, second, third = (spar(ada, i) for i in ids)
+
+    assert (first.status_code, second.status_code) == (202, 202)
+    assert third.status_code == 429 and "waiting" in third.json()["detail"]
+    assert spar(bob, bob_id).status_code == 202  # another user is not held back
+    store.mark_failed(first.json()["id"], "done")
+    assert spar(ada, ids[2]).status_code == 202  # a finished match frees a place
+
+
+def test_two_requests_of_one_user_cannot_be_handled_at_the_same_time(sign_in: SignIn) -> None:
+    # The cap checks and the insert are separate steps; a lock per user keeps parallel requests
+    # from both passing the check (D-070). The second one is told to try again.
+    ada = sign_in("ada")
+    fighter_id = make_fighter(ada)
+    with store.connect() as conn:
+        owner = conn.execute(
+            "SELECT owner_id FROM fighters WHERE id = %s", (fighter_id,)
+        ).fetchone()
+    assert owner is not None
+
+    with store.try_lock(store.USER_LOCK, owner["owner_id"]) as got:
+        assert got
+        busy = spar(ada, fighter_id)
+
+    assert busy.status_code == 429 and "another request" in busy.json()["detail"]
+    assert spar(ada, fighter_id).status_code == 202  # the lock was released
+
+
+def test_a_failure_to_queue_a_match_does_not_show_the_servers_address(
+    sign_in: SignIn, queue: StubQueue
+) -> None:
+    queue.error = RedisConnectionError("Error 111 connecting to redis:6379. Connection refused.")
+    ada = sign_in("ada")
+    fighter_id = make_fighter(ada)
+
+    response = spar(ada, fighter_id)
+
+    assert response.status_code == 503
+    with store.connect() as conn:
+        failed = conn.execute("SELECT error FROM matches").fetchone()
+    assert failed == {"error": "could not queue the match"}  # no host, no port

@@ -10,8 +10,9 @@ from arena_api.accounts import User
 from arena_api.auth import current_user
 from arena_api.db import fighters_config_path
 from arena_api.deps import get_queue
+from arena_api.fighters import FighterView
 from arena_api.limits import rate_limit
-from arena_api.match_routes import MatchStatus, queue_match
+from arena_api.match_routes import BUSY, MatchStatus, queue_match
 from arena_api.ratings import pick_opponent
 from arena_api.store import Entrant, LeaderboardRow, RankedRow
 from arena_api.visitor_limits import visitor_limit
@@ -38,6 +39,20 @@ async def enter_ranked(
         raise HTTPException(
             status_code=409, detail="spar with this fighter first: ranked play needs a working key"
         )
+    with store.try_lock(store.USER_LOCK, user.id) as got:
+        if not got:
+            raise HTTPException(status_code=429, detail=BUSY)
+        return await _enter(fighter, user, queue)
+
+
+async def _enter(fighter: FighterView, user: User, queue: ArqRedis) -> MatchStatus:
+    fighter_id = fighter.id
+    if not fighter.ranked_opt_in:
+        raise HTTPException(
+            status_code=409,
+            detail="turn on ranked play for this fighter first: other players' ranked "
+            "matches will then spend its key, up to its daily cap",
+        )
     providers = list(load_config(fighters_config_path()).providers)
     if fighter.provider not in providers:
         raise HTTPException(
@@ -55,7 +70,7 @@ async def enter_ranked(
     mine = Entrant(fighter.id, fighter.version, user.id, f"{user.handle}/{fighter.name}")
     theirs = Entrant(opponent.fighter_id, opponent.version, opponent.owner_id, opponent.name)
     return await queue_match(
-        queue, lambda match_id: store.create_ranked_match(match_id, mine, theirs)
+        queue, user.id, lambda match_id: store.create_ranked_match(match_id, mine, theirs)
     )
 
 

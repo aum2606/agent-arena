@@ -63,7 +63,7 @@ _AIMED_AT_THE_OPPONENT = (
 )
 
 
-def _has_hidden_characters(text: str) -> bool:
+def has_hidden_characters(text: str) -> bool:
     return any(low <= ord(char) <= high for char in text for low, high in _HIDDEN)
 
 
@@ -73,7 +73,7 @@ def check_problem(problem: str) -> str | None:
         return "the problem is empty"
     if len(problem) > MAX_PROBLEM_CHARS:
         return f"the problem is over {MAX_PROBLEM_CHARS} characters"
-    if _has_hidden_characters(problem):
+    if has_hidden_characters(problem):
         return "the problem contains invisible or control characters"
     # Full-width and other compatibility forms of letters read as plain letters to a model.
     plain = unicodedata.normalize("NFKC", problem)

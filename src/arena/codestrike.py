@@ -4,6 +4,7 @@ from typing import Any
 # Limits on what an attacker may ask the sandbox to run (D-045).
 MAX_TESTS = 10
 MAX_CHARS = 20_000
+MAX_DEPTH = 20  # nesting of the JSON; deeper is never a real test and can exhaust the stack (D-069)
 
 # Runs a solution on the inputs and prints only the results. The expected outputs never enter the
 # sandbox, so a defender's code cannot read them; the comparison happens outside (answers_match).
@@ -19,16 +20,18 @@ print(json.dumps(_results))
 """
 
 
-def _exact(value: Any) -> None:
+def _exact(value: Any, depth: int = 0) -> None:
     """Floats are out: exact equality of JSON text would fail on 0.1 + 0.2."""
+    if depth > MAX_DEPTH:
+        raise ValueError(f"nested too deeply (over {MAX_DEPTH} levels)")
     if isinstance(value, float):
         raise ValueError("floats are not allowed: use integers, strings, booleans, null and lists")
     if isinstance(value, list):
         for item in value:
-            _exact(item)
+            _exact(item, depth + 1)
     elif isinstance(value, dict):
         for item in value.values():
-            _exact(item)
+            _exact(item, depth + 1)
 
 
 def _load(text: str, what: str) -> Any:
@@ -36,6 +39,8 @@ def _load(text: str, what: str) -> Any:
         raise ValueError(f"the {what} are too long (over {MAX_CHARS} characters)")
     try:
         value = json.loads(text)
+    except RecursionError as exc:  # the parser's own stack runs out before _exact can look
+        raise ValueError(f"the {what} are nested too deeply") from exc
     except ValueError as exc:
         raise ValueError(f"the {what} are not valid JSON") from exc
     _exact(value)

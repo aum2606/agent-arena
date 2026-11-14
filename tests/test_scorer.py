@@ -123,3 +123,85 @@ def test_members_are_asked_at_the_same_time() -> None:
     scored = score_problem(PANEL, ATTACK, complete, SETTINGS)
 
     assert scored.answered == 3
+
+
+# The attacker's snippet confirms its own answer, so a deliberately wrong one verifies. When the
+# defender is about to take a hit, the panel decides whose answer the problem favours (D-069).
+FIRST_ATTACK = Attack("What is 6 * 7?", "41", "print(41)")  # wrong on purpose
+
+
+def test_a_hit_is_overturned_when_most_of_the_panel_sides_with_the_defender() -> None:
+    from arena.scorer import review_hit
+
+    review = review_hit(PANEL, FIRST_ATTACK, "42", panel_replies(SOLVED, SOLVED, WRONG), SETTINGS)
+
+    assert review.overturned and (review.answered, review.for_defender, review.for_attacker) == (
+        3,
+        2,
+        1,
+    )
+
+
+def test_a_hit_stands_when_most_of_the_panel_sides_with_the_attacker() -> None:
+    from arena.scorer import review_hit
+
+    review = review_hit(PANEL, FIRST_ATTACK, "42", panel_replies(WRONG, WRONG, SOLVED), SETTINGS)
+
+    assert not review.overturned and review.for_attacker == 2
+
+
+def test_a_split_panel_does_not_overturn() -> None:
+    from arena.scorer import review_hit
+
+    other = Completion("<answer>7</answer>", False)
+    review = review_hit(PANEL, FIRST_ATTACK, "42", panel_replies(SOLVED, WRONG, other), SETTINGS)
+
+    assert not review.overturned
+
+
+def test_one_answering_member_is_not_enough_to_overturn() -> None:
+    from arena.scorer import review_hit
+
+    review = review_hit(
+        PANEL,
+        FIRST_ATTACK,
+        "42",
+        panel_replies(SOLVED, LlmError("429"), LlmTimeout("slow")),
+        SETTINGS,
+    )
+
+    assert not review.overturned and review.answered == 1
+
+
+def test_two_answering_members_who_agree_with_the_defender_are_enough() -> None:
+    from arena.scorer import review_hit
+
+    review = review_hit(
+        PANEL, FIRST_ATTACK, "42", panel_replies(SOLVED, SOLVED, LlmError("429")), SETTINGS
+    )
+
+    assert review.overturned and review.answered == 2
+
+
+def test_members_who_ran_out_of_tokens_or_gave_no_answer_do_not_vote() -> None:
+    from arena.scorer import review_hit
+
+    cut = Completion("<answer>42", True)
+    mush = Completion("no tags here", False)
+    review = review_hit(PANEL, FIRST_ATTACK, "42", panel_replies(cut, mush, SOLVED), SETTINGS)
+
+    assert review.answered == 1 and not review.overturned
+
+
+def test_the_review_reports_each_members_verdict_and_what_the_panel_spent() -> None:
+    from arena.scorer import review_hit
+
+    done = Completion("<answer>42</answer>", False, tokens=100)
+    review = review_hit(PANEL, FIRST_ATTACK, "42", panel_replies(done, WRONG, done), SETTINGS)
+
+    assert [(m.name, m.verdict) for m in review.members] == [
+        ("ref-1", "defender"),
+        ("ref-2", "attacker"),
+        ("ref-3", "defender"),
+    ]
+    assert review.tokens == 200

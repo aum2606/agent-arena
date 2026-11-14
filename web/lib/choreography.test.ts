@@ -30,6 +30,9 @@ function turn(over: Partial<Turn> = {}): Turn {
     difficulty: null,
     panel_failed: null,
     panel_answered: null,
+    review_overturned: null,
+    review_answered: null,
+    review_for_defender: null,
     ...over,
   };
 }

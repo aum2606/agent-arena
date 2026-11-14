@@ -37,7 +37,11 @@ sequenceDiagram
             O->>P: parse_defense(reply)
             O->>V: answers_match(reply, answer)
             alt timeout or wrong answer
-                O->>G: timeout or defend_result, hit
+                opt ranked math hit, defender answered (D-069)
+                    O->>S: review_hit(panel, attack, answer): members solve it, majority for the defender overturns
+                    O->>G: review (overturned, who agreed with whom, tokens)
+                end
+                O->>G: timeout or defend_result, hit (or block when overturned)
             else correct
                 O->>G: defend_result, block
             end
@@ -62,13 +66,13 @@ saved records.
 
 - `models`: dataclasses (`Fighter`, `Attack`, `TurnResult`, `MatchRecord`, `MatchResult`).
 - `damage`: pure rule functions and the constants (HP, base damage, max turns, difficulty range and its mapping from the panel).
-- `scorer`: `score_problem` asks the reference panel to solve a verified problem (parallel, defender budget) and returns the difficulty.
+- `scorer`: `score_problem` asks the reference panel to solve a verified problem (parallel, defender budget) and returns the difficulty; `review_hit` (D-069) asks it again before a ranked math hit lands and overturns the hit when most members who answered gave the defender's answer.
 - `verifier`: SymPy answer equality, the local snippet runner (subprocess, timeout, temp dir) and `judge`, which decides pass or fail from a `Run`.
 - `codestrike` (D-045): validates a code attack's tests and builds the harness snippet that runs a `solve` function on them and prints the results as JSON; the orchestrator runs it through `verify` for both the attacker's reference solution and the defender's code.
 - `safe_expr` (D-047): reads an answer's text with `ast` and builds its SymPy value; anything but plain math, or anything huge, is refused. `answers_match` uses it, so it never evaluates a model's reply.
 - `equality` (D-052): `symbolic_equal` sends two answers to one long-lived helper (`python -m arena.equality`, JSON lines over its pipes) that runs `parse_answer` and `simplify`; past 5 s it is killed and the answer is not equal.
 - `moderation` (D-049): `check_problem` returns why a problem is a foul (empty, too long, hidden characters, instructions aimed at the opponent); the orchestrator turns a foul into a backfire before the defender is asked.
-- `sandbox` (D-044): `run_sandboxed` runs a snippet in a gVisor container and `sandboxed_verify` judges it like `verify_attack`; `ensure_ready` checks Docker has `runsc`. The worker passes `sandboxed_verify` to `run_match` as `verify`.
+- `sandbox` (D-044): `run_sandboxed` runs a snippet in a gVisor container and `sandboxed_verify` judges it like `verify_attack`; `ensure_ready` checks Docker has `runsc`, builds the `arena-sandbox:1` image (docker/sandbox.Dockerfile: the base pinned by digest plus SymPy) if it is missing and removes containers a dead worker left; a snippet's own exit code of 125 or more becomes 1 so it cannot pass for a Docker failure. The worker passes `sandboxed_verify` to `run_match` as `verify`.
 - `battle_log`: per-turn event list with `t` in ms, a schema 2 header (fighters with personas), JSON writer.
 - `config`: loads `config/fighters.toml` into settings, providers and fighters.
 - `llm`: OpenAI-compatible client per provider, 429 backoff, delay between calls.

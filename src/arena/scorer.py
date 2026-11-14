@@ -27,25 +27,42 @@ class Scored:
     members: list[MemberResult]
 
 
-def _ask(member: Fighter, attack: Attack, complete: Complete, settings: Settings) -> MemberResult:
+@dataclass(frozen=True)
+class _Answer:
+    name: str
+    status: Literal["answered", "failed", "error"]
+    text: str | None  # the parsed answer, when answered
+    tokens: int | None
+
+
+def _solve(member: Fighter, attack: Attack, complete: Complete, settings: Settings) -> _Answer:
     """One member solves the problem under the defender's budget, as a defender would."""
     try:
         reply = complete(
             member, *defense_prompts(member, attack.problem), settings.defender_max_tokens
         )
     except LlmTimeout:
-        return MemberResult(member.name, "failed", None)
+        return _Answer(member.name, "failed", None, None)
     except LlmError:
         # A rate limit says nothing about the problem, so this member does not vote.
-        return MemberResult(member.name, "error", None)
+        return _Answer(member.name, "error", None, None)
     if reply.truncated:
-        return MemberResult(member.name, "failed", reply.tokens)
+        return _Answer(member.name, "failed", None, reply.tokens)
     try:
         given = parse_defense(reply.text)
     except ParseError:
-        return MemberResult(member.name, "failed", reply.tokens)
-    solved = answers_match(given, attack.answer)
-    return MemberResult(member.name, "solved" if solved else "failed", reply.tokens)
+        return _Answer(member.name, "failed", None, reply.tokens)
+    return _Answer(member.name, "answered", given, reply.tokens)
+
+
+def _ask(member: Fighter, attack: Attack, complete: Complete, settings: Settings) -> MemberResult:
+    answer = _solve(member, attack, complete, settings)
+    if answer.text is None:
+        return MemberResult(
+            answer.name, "error" if answer.status == "error" else "failed", answer.tokens
+        )
+    solved = answers_match(answer.text, attack.answer)
+    return MemberResult(answer.name, "solved" if solved else "failed", answer.tokens)
 
 
 def score_problem(
@@ -60,3 +77,56 @@ def score_problem(
     difficulty = difficulty_from_panel(failed, answered) if answered else DIFFICULTY
     tokens = sum(m.tokens or 0 for m in members)
     return Scored(difficulty, failed, answered, tokens, members)
+
+
+@dataclass(frozen=True)
+class ReviewMember:
+    name: str
+    verdict: Literal["defender", "attacker", "neither", "none"]  # whose answer it gave, or none
+    tokens: int | None
+
+
+@dataclass(frozen=True)
+class Review:
+    overturned: bool
+    answered: int  # members that gave an answer
+    for_defender: int
+    for_attacker: int
+    tokens: int
+    members: list[ReviewMember]
+
+
+def review_hit(
+    panel: Sequence[Fighter],
+    attack: Attack,
+    defender_answer: str,
+    complete: Complete,
+    settings: Settings,
+) -> Review:
+    """Before a defender takes a hit, the panel solves the problem. The attacker's snippet only
+    proves its answer agrees with itself, so a deliberately wrong answer always verifies (D-069):
+    if most of the members who answered (at least two) gave the defender's answer, the hit is
+    overturned. A member that errors, times out, is cut off or gives no answer does not vote."""
+    with ThreadPoolExecutor(max_workers=max(len(panel), 1)) as pool:
+        answers = list(pool.map(lambda m: _solve(m, attack, complete, settings), panel))
+    members = []
+    for a in answers:
+        verdict: Literal["defender", "attacker", "neither", "none"] = "none"
+        if a.text is not None:
+            if answers_match(a.text, defender_answer):
+                verdict = "defender"
+            elif answers_match(a.text, attack.answer):
+                verdict = "attacker"
+            else:
+                verdict = "neither"
+        members.append(ReviewMember(a.name, verdict, a.tokens))
+    answered = sum(m.verdict != "none" for m in members)
+    for_defender = sum(m.verdict == "defender" for m in members)
+    return Review(
+        overturned=answered >= 2 and for_defender * 2 > answered,
+        answered=answered,
+        for_defender=for_defender,
+        for_attacker=sum(m.verdict == "attacker" for m in members),
+        tokens=sum(m.tokens or 0 for m in members),
+        members=members,
+    )

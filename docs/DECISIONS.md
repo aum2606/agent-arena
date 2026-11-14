@@ -1870,3 +1870,50 @@ phases and the deploy step).
 **Alternatives considered:** removing the dev-login default from compose (breaks the one-command local try-out); refusing to
 start the API at all on a public `PUBLIC_URL` without a sandboxed worker (it cannot see the worker); dropping `ARENA_SANDBOX=off`
 from compose (the compose worker has no Docker, so it could not start).
+
+## D-069 · 2026-11-15 · Match integrity in the engine: a panel review on ranked hits, and the sandbox and parser holes closed
+
+**Decision:** Second phase of the pre-deploy security work. From the audit, with the owner's choice on the first item:
+- **Review on hits (ranked math only).** `scorer.review_hit` (new) asks the `[[panel]]` to solve the problem just before a
+  defender who gave an answer takes a hit; if at least two members answered and most of them gave the defender's answer, the hit
+  becomes a block and a `review` event (overturned, who answered what, tokens) is logged. The worker passes `config.panel` for
+  ranked matches only (`Players.review`); sparring, sims, code strikes, timeouts and unparsed answers are never reviewed, and a
+  panel member with no key on the server leaves the hit standing (logged as a warning, the match goes on). The replay shows it
+  ("Panel review: overturned the hit: 2 of 3 ...").
+- **Exit code 125 can no longer void a match.** The snippet runs as `sh -c 'python -I -; ...'` and any exit code of 125 or more
+  becomes 1, so only Docker can produce 125 (`ConfigError`). `SystemExit(125)` used to make the worker fail the match, so a losing
+  attacker or a defender could void a ranked game.
+- **Output flood:** the size cap is also checked after the process exits (a burst between two polls was read whole), the docker
+  client is killed before `docker rm` (it kept copying a flood into the temp files), `docker rm` has a 30 s timeout, and the worker
+  removes `arena-snippet-*` containers a dead worker left, at startup.
+- **Sandbox image:** `docker/sandbox.Dockerfile` (base pinned by digest, SymPy 1.14.0 as in uv.lock), built by the worker as
+  `arena-sandbox:1` when missing, run with `--pull=never`. The attacker prompt allows SymPy and the plain Python image had none, so
+  those snippets failed with `ModuleNotFoundError` and backfired in the web worker.
+- **Deep nesting:** JSON nested too deeply (in a snippet's output, a code attack's tests or its expected outputs) raises
+  `RecursionError`, which was not caught and aborted the match; it is now a mismatch or a rejected test, and tests are limited to
+  20 levels.
+- **Short reasons:** a mismatch or error reason keeps at most 300 characters of what the snippet printed, so the battle log and the
+  correction prompt cannot carry up to 64 KB per attempt.
+- **Earlier problems in the attacker prompt** are framed as untrusted data inside `<problems>` tags with tags stripped (one
+  player's problem used to reach the other's attacker prompt as plain text).
+- **Moderation:** more invisible characters (soft hyphen, C1 controls, "tag" characters, variation selectors, fillers, invisible
+  operators) are fouls, and the instruction patterns run on the NFKC-normalised text, so full-width letters do not hide them.
+
+**Why:** the audit's engine findings. The wrong-answer one needs no special access: a ranked user's persona can make its model state
+a wrong answer and print it, the self-check passes, and every such attack is a hit; the panel is the only independent check there is.
+
+**Checked:** the new tests, including the exit-125, burst-flood and SymPy-image cases under real gVisor in WSL, an end-to-end ranked
+match through the worker with a configured panel (the stored replay shows overturned hits), and the full suite on Linux.
+
+**Not solved, and not claimed:**
+- The review is a majority of free-tier models: two weak members who agree can overturn a correct hit, and a problem the panel cannot
+  solve leaves a wrong attacker answer standing. It costs server-key tokens on every ranked math hit (about three panel calls).
+- Moderation stays a rule filter: homoglyphs from other alphabets (Cyrillic `і`), other languages, base64 and "answer in LaTeX"-style
+  sabotage still pass.
+- An attacker's reference in a code strike can still be a lookup table; verification proves only that it agrees with its own outputs.
+- Code strikes and sparring are not reviewed, and a snippet can still run for up to timeout plus the 10 s start-up allowance.
+- The equality helper still has no memory limit (Phase 4).
+
+**Alternatives considered:** a panel check on every attack (about 4,300 tokens a problem on every match); a lower bar for overturning
+(two agreeing weak models would overturn too easily); counting an overturned hit as a backfire for the attacker (it punishes an honest
+mistake as if it were cheating, and the owner chose "overturn to a block").

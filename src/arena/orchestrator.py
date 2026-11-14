@@ -1,10 +1,11 @@
+import logging
 import random
 from collections.abc import Callable, Sequence
 from typing import Literal
 
 from arena.battle_log import BattleLog
 from arena.codestrike import harness
-from arena.config import Settings
+from arena.config import ConfigError, Settings
 from arena.damage import (
     BASE_DAMAGE,
     DIFFICULTY,
@@ -30,8 +31,10 @@ from arena.prompts import (
     parse_defense,
     unparsed_prompt,
 )
-from arena.scorer import score_problem
+from arena.scorer import review_hit, score_problem
 from arena.verifier import Verification, answers_match, verify_attack
+
+logger = logging.getLogger(__name__)
 
 # (stated answer, snippet, timeout in seconds); the synthetic simulator swaps in a fast stand-in.
 Verify = Callable[[str, str, float], Verification]
@@ -140,9 +143,9 @@ def _defend(
     verify: Verify,
     settings: Settings,
     log: BattleLog,
-) -> float:
-    """Returns the defender's score: 1.0 for a correct answer (or code passing every hidden test),
-    else 0.0."""
+) -> tuple[float, str | None]:
+    """Returns the defender's score, 1.0 for a correct answer (or code passing every hidden test)
+    and else 0.0, and the answer it gave (None when it gave none)."""
     code = attack.domain == "code"
     try:
         reply: Completion | None = complete(
@@ -160,7 +163,7 @@ def _defend(
             output_tokens=reply.output_tokens if reply else None,
             truncated=reply is not None,
         )
-        return 0.0
+        return 0.0, None
     try:
         given = parse_code_defense(reply.text) if code else parse_defense(reply.text)
     except ParseError as exc:
@@ -172,7 +175,7 @@ def _defend(
             reason=str(exc),
             output_tokens=reply.output_tokens,
         )
-        return 0.0
+        return 0.0, None
     extra: dict[str, str] = {}
     if code:
         check = verify(attack.answer, harness(given, attack.inputs), settings.snippet_timeout_s)
@@ -189,7 +192,33 @@ def _defend(
         output_tokens=reply.output_tokens,
         **extra,
     )
-    return score
+    return score, given
+
+
+def _overturned(
+    panel: Sequence[Fighter],
+    attack: Attack,
+    given: str,
+    complete: Complete,
+    settings: Settings,
+    log: BattleLog,
+) -> bool:
+    try:
+        result = review_hit(panel, attack, given, complete, settings)
+    except ConfigError as exc:
+        # A panel member with no key on this server: the hit stands, the match carries on.
+        logger.warning("panel review skipped, a member is not configured: %s", exc)
+        return False
+    log.emit(
+        "review",
+        overturned=result.overturned,
+        answered=result.answered,
+        for_defender=result.for_defender,
+        for_attacker=result.for_attacker,
+        tokens=result.tokens,
+        panel=[{"name": m.name, "verdict": m.verdict, "tokens": m.tokens} for m in result.members],
+    )
+    return result.overturned
 
 
 def _hit(log: BattleLog, turn: int, attacker: Side, target: Side, amount: float) -> TurnResult:
@@ -211,8 +240,10 @@ def play_turn(
     recent_outcomes: list[Outcome],
     panel: Sequence[Fighter] = (),
     domain: Domain = "math",
+    review: Sequence[Fighter] = (),
 ) -> TurnResult:
-    """Plays one turn; a verified problem is appended to `used_problems`."""
+    """Plays one turn; a verified problem is appended to `used_problems`. `review` is the panel
+    that can overturn a hit on a math problem (D-069)."""
     defender_side = _other(attacker_side)
     log.start_turn(turn)
     log.emit("attack_start", actor=attacker_side)
@@ -252,7 +283,18 @@ def play_turn(
             ],
         )
     log.emit("defend_start", actor=defender_side)
-    score = _defend(fighters[defender_side], defender_side, attack, complete, verify, settings, log)
+    score, given = _defend(
+        fighters[defender_side], defender_side, attack, complete, verify, settings, log
+    )
+    # Only a defender that answered, on a math problem, is reviewed: a timeout is its own doing.
+    if (
+        score == 0.0
+        and review
+        and given is not None
+        and attack.domain == "math"
+        and _overturned(review, attack, given, complete, settings, log)
+    ):
+        score = 1.0
     if score == 1.0:
         log.emit("block", actor=defender_side)
         return TurnResult(turn, attacker_side, "block", defender_side, 0.0)
@@ -270,6 +312,7 @@ def run_match(
     history: dict[Side, list[Outcome]] | None = None,
     max_turns: int = MAX_TURNS,
     panel: Sequence[Fighter] = (),
+    review: Sequence[Fighter] = (),
 ) -> MatchRecord:
     """Fighter A attacks first and roles swap every turn. `rng` picks each turn's topic."""
     log.record_fighters(fighter_a, fighter_b)
@@ -303,6 +346,7 @@ def run_match(
             outcomes[attacker_side],
             panel,
             domain,
+            review,
         )
         turns.append(result)
         outcomes[attacker_side].append(result.outcome)

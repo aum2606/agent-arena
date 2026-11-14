@@ -15,6 +15,7 @@ EVENT_TYPES = frozenset(
         "attack_verified",
         "attack_retry",
         "difficulty",
+        "review",
         "backfire",
         "defend_start",
         "defend_result",

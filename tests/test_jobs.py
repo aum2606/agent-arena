@@ -377,3 +377,28 @@ def test_a_match_checks_attacks_with_the_workers_verify(database: str) -> None:
     )
 
     assert seen and set(seen) == {"print(42)"}
+
+
+def test_a_match_is_played_with_the_players_review_panel(monkeypatch: pytest.MonkeyPatch) -> None:
+    from arena_api import jobs
+
+    seen: dict[str, Any] = {}
+
+    def run(*args: Any, **kwargs: Any) -> None:
+        seen.update(kwargs)
+        raise LlmError("stop here")
+
+    monkeypatch.setattr(jobs, "run_match", run)
+    a, b, ref = (Fighter(n, "groq", "m", "p") for n in ("a", "b", "ref"))
+    config = Config(Settings(30.0, 256, 128, 5.0, 0.0, 0, 0.0), {}, {})
+
+    with pytest.raises(LlmError):
+        jobs._play(
+            config,
+            lambda *_: Completion("", False),
+            verify_attack,
+            "m1",
+            jobs.Players(a, b, {}, 6, (ref,)),
+        )
+    assert seen["review"] == (ref,)
+    assert jobs.Players(a, b, {}, 6).review == ()  # sparring and sims have no review

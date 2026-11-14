@@ -86,3 +86,25 @@ def test_snippet_runs_in_its_own_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.chdir(tmp_path)
     code = "import os; print(int(os.path.exists('marker.txt')))"
     assert verify_attack("0", code, TIMEOUT_S).passed
+
+
+def test_a_deeply_nested_list_is_a_mismatch_not_a_crash() -> None:
+    # json.loads raises RecursionError, not ValueError, on this; it once aborted the whole match.
+    assert answers_match("[" * 5000 + "]" * 5000, "[1]") is False
+    assert answers_match("[1]", "[" * 5000) is False
+
+
+def test_a_mismatch_reason_is_short_however_much_the_snippet_printed() -> None:
+    from arena.verifier import Run, judge
+
+    reason = judge(Run(0, "9" * 60_000, ""), "1", 5.0).reason
+
+    assert reason.startswith("mismatch") and len(reason) < 800
+
+
+def test_an_error_reason_is_short_however_long_the_last_line_is() -> None:
+    from arena.verifier import Run, judge
+
+    reason = judge(Run(1, "", "x" * 60_000), "1", 5.0).reason
+
+    assert reason.startswith("error") and len(reason) < 400

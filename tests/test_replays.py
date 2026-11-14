@@ -126,6 +126,7 @@ def test_replay_turns_carry_what_the_reveal_panel_shows(database: str, client: T
         "failure_reason": None, "hp_a": 100.0, "hp_b": 80.0, "duration_ms": 3000,
         "code": None, "domain": "math", "tests": None, "first_attempt": None,
         "difficulty": None, "panel_failed": None, "panel_answered": None,
+        "review_overturned": None, "review_answered": None, "review_for_defender": None,
     }  # fmt: skip
     assert (turns[1]["outcome"], turns[1]["damage"], turns[1]["damage_math"]) == (
         "block", 0.0, "no damage",
@@ -329,3 +330,45 @@ def test_a_log_header_with_extra_fighter_fields_still_replays() -> None:
 
     assert replay.fighter_a == FighterInfo("alice", "groq", "model-a", "You are bold.")
     assert replay.fighter_b == FighterInfo("bob", "gemini", "model-b", "You are careful.")
+
+
+def reviewed_turn(overturned: bool) -> dict[str, Any]:
+    return turn(
+        1,
+        [
+            {"t": 0, "type": "attack_start", "actor": "a"},
+            {"t": 800, "type": "attack_verified", "actor": "a", "problem": "6*7?", "answer": "41"},
+            {"t": 800, "type": "defend_start", "actor": "b"},
+            {"t": 2000, "type": "defend_result", "actor": "b", "score": 0.0, "answer": "42"},
+            {
+                "t": 4000,
+                "type": "review",
+                "overturned": overturned,
+                "answered": 3,
+                "for_defender": 2 if overturned else 1,
+                "for_attacker": 1 if overturned else 2,
+                "tokens": 300,
+                "panel": [],
+            },
+            {"t": 4000, "type": "block" if overturned else "hit", "actor": "b"}
+            if overturned
+            else {"t": 4000, "type": "hit", "target": "b", "damage": 20.0},
+            {"t": 4000, "type": "hp", "a": 100.0, "b": 100.0 if overturned else 80.0},
+        ],
+    )
+
+
+@pytest.mark.parametrize("overturned", [True, False])
+def test_a_turn_shows_what_the_review_panel_decided(overturned: bool) -> None:
+    replay = parse_replay("m1", {"match_id": "m1", "turns": [reviewed_turn(overturned)]})
+    shown = replay.turns[0]
+
+    assert shown.outcome == ("block" if overturned else "hit")
+    assert (shown.review_overturned, shown.review_answered) == (overturned, 3)
+    assert shown.review_for_defender == (2 if overturned else 1)
+
+
+def test_a_turn_without_a_review_shows_none() -> None:
+    replay = parse_replay("m1", {"match_id": "m1", "turns": [hit_turn(1, "a", "b")]})
+
+    assert replay.turns[0].review_overturned is None

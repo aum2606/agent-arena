@@ -55,6 +55,8 @@ def test_valid_tests_pass(inputs: str, expected: str) -> None:
             "most",
         ),
         (f"[[{'1' * 30000}]]", "[1]", "long"),
+        ("[" * 5000 + "]" * 5000, "[1]", "nested"),  # json.loads itself raises RecursionError
+        ("[" * 300 + "]" * 300, "[1]", "nested"),  # parses, but is not a sane test
     ],
 )
 def test_bad_tests_are_rejected(inputs: str, expected: str, problem: str) -> None:

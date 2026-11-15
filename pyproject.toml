@@ -7,7 +7,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "openai>=3.0",
+    "openai>=3.49.0",
     "sympy>=1.12",
     "python-dotenv>=1.0",
     "httpx2>=2.16",  # imported directly (arena.llm); it also comes with openai

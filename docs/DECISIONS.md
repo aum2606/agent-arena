@@ -2000,3 +2000,47 @@ secret scanning and push protection on GitHub (repository settings, the owner's)
 
 **Alternatives considered:** `-I` for the checker (breaks its source-tree start); pinning actions by tag only (a retagged release would run in CI with
 no review); leaving Dependabot out and pinning once (the pins would age into known-vulnerable images).
+
+## D-072 · 2026-11-15 · Self-hosting: a production compose override, a host worker script and a guide
+
+**Decision:** Agent Arena is open source and has no hosted instance, so the deployment work is a kit anyone can follow, not one
+owner's setup. It adds:
+- `docker-compose.prod.yml`, an override on the local stack. Compose refuses to start (naming the setting) without
+  `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `KEY_ENCRYPTION_SECRET`, `PUBLIC_URL` and `CLIENT_IP_HEADER`, instead of falling back to a local
+  default. It turns the sign-in-as-anyone form off, puts a password on Redis, restarts services, and leaves the container worker out
+  (profile `container-worker`, off by default). Everything it publishes stays on 127.0.0.1.
+- `deploy/run-worker.sh`, which runs the worker on the host: it needs Docker with `runsc`, an `https` `PUBLIC_URL`, the required
+  secrets, and never `ARENA_SANDBOX=off`; it refuses an env file with Windows line endings; it builds the database and Redis URLs from
+  the two passwords. `.gitattributes` keeps `*.sh` on LF checkouts.
+- `docs/SELF_HOSTING.md`: a local try-it path (today's compose stack), and a public path with the gVisor install, the GitHub OAuth
+  app, `.env`, three ways to get an `https` address (Caddy, Cloudflare Tunnel, Tailscale Funnel), the worker as a systemd service,
+  a test that the visitor-address header really is overwritten, backups, updates and troubleshooting.
+
+**Why:**
+- The worker cannot live in the compose stack on a public host: a container would run model-written code unsandboxed, or need the Docker
+  socket, which is the whole machine (D-044, D-068).
+- The public address layer is the host's choice (a domain and Caddy, a Cloudflare domain, or a free Tailscale name), so the repository
+  does not pick one; it only needs an `https` address and a header the layer overwrites (D-063).
+- A secret that falls back to a default is a secret that is never set.
+
+**Checked (WSL2 Ubuntu 24.04, Docker, 2026-11-15):**
+- Compose without the secrets refuses and names each setting; with them it lists postgres, redis, api and web and no worker.
+- The stack starts. Redis answers `NOAUTH` without the password. The API limits one address to 60 reads a minute.
+- The header test in the guide tells the two cases apart. With no proxy and a made-up `X-Forwarded-For` per request, all 80 answers are
+  200, so the limits are bypassed. Behind a real Caddy it was 59 answers of 200 and 21 of 429: Caddy replaced the made-up header and the
+  Next.js `/api` relay passed it on unchanged.
+- The worker script's refusals (missing setting, `http` address, sandbox off, no `runsc`, CRLF) and its success path are tested, with
+  stubbed `docker` and `uv`, in `tests/test_deploy.py`.
+- On the page `/leaderboard` a limited visitor still gets HTTP 200 and the page text "The API is unreachable", so the guide's test
+  uses `/api/leaderboard`.
+
+**Not checked:** Cloudflare Tunnel and Tailscale Funnel (no account here); their header behaviour is from vendor documentation. Tailscale
+adds `X-Forwarded-For` for the visitor; if it appended to a made-up one instead of replacing it, the API sees a value that is not one
+address and counts the visitor under the web server's address, so the limits become shared, not bypassed. The real worker started by the
+script, and the systemd unit, were not run end to end. The guide has not been followed by anyone but its author.
+
+**Not done:** a Caddy service in compose, a one-command installer, Kubernetes, a hosted instance, and content moderation beyond the
+existing problem filter.
+
+**Alternatives considered:** a worker in the compose stack with the Docker socket mounted (gives the machine away); picking one tunnel
+vendor for everyone (ties an open-source project to one company's free plan); defaulting the secrets for convenience (see Why).

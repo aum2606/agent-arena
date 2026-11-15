@@ -32,8 +32,8 @@ Not done yet, and you should know before running it for other people (details in
   three turns in four, and balance is to be judged by ranked results once they exist. See D-065.
 - Real GitHub sign-in was checked once, locally, against the owner's own GitHub app (D-067); production domains and HTTPS were not.
 - Launch hardening is done short of deployment: a pre-deploy security audit was worked through (D-068 to D-071;
-  what it left is in [`SECURITY.md`](SECURITY.md), with a checklist for whoever deploys). Deployment files and a
-  runbook do not exist yet.
+  what it left is in [`SECURITY.md`](SECURITY.md)). There is no hosted instance: run your own, with the
+  production compose file, a worker script and the guide in [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) (D-072).
 - No real ranked match between two real users has been played yet.
 
 Every design choice, rule number and trade-off is logged in [`docs/DECISIONS.md`](docs/DECISIONS.md).
@@ -72,7 +72,8 @@ yourself only. Then:
 docker compose up --build
 ```
 
-Open <http://127.0.0.1:3100>. The stack is local-only, with a "sign in as anyone" form (D-033).
+Open <http://127.0.0.1:3100>. The stack is local-only, with a "sign in as anyone" form (D-033). To run it for
+other people, see [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
 ### Run the checks
 

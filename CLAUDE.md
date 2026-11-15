@@ -65,6 +65,8 @@ uv run arq arena_api.jobs.WorkerSettings  # the match worker; needs the provider
 uv run python -m arena_api.import_logs runs/logs_gate48 --prefix gate48-   # load old logs (D-032)
 cd web && npm install && npm run dev      # web app on :3000; `npm run typecheck`, `npm test`, `npm run build`
 docker compose up --build                 # postgres :5442, redis, api :8100, web :3100 (localhost)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build   # public deployment: see docs/SELF_HOSTING.md (D-072)
+deploy/run-worker.sh                      # its worker, on the host with Docker + gVisor
 uv run pytest                             # tests
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src
@@ -80,10 +82,11 @@ src/arena/      models.py  llm.py  prompts.py  verifier.py  safe_expr.py  equali
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py limits.py visitor_limits.py guards.py deps.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi);
                 proxy.ts + lib/csp.ts set the Content-Security-Policy (D-064); lib/client-address.ts passes the visitor's address on (D-063)
-docker/         api.Dockerfile  web.Dockerfile      docker-compose.yml at the root
+docker/         api.Dockerfile  web.Dockerfile  sandbox.Dockerfile      docker-compose.yml and docker-compose.prod.yml at the root
+deploy/         run-worker.sh (the public deployment's worker, on the host; D-072)
 tests/          one test file per module, no network calls
 config/         fighters.toml
-docs/           PRODUCT_SPEC.md  DECISIONS.md  PROGRESS.md  FLOW.md
+docs/           PRODUCT_SPEC.md  DECISIONS.md  PROGRESS.md  FLOW.md  SELF_HOSTING.md
 runs/           match logs + sim results (gitignored)
 ```
 

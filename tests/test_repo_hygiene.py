@@ -107,3 +107,14 @@ def test_the_answer_checker_does_not_put_the_working_directory_on_its_path() -> 
     from arena import equality
 
     assert "-P" in equality.HELPER_COMMAND
+
+
+def test_shell_scripts_keep_unix_line_endings_even_on_a_windows_checkout() -> None:
+    done = subprocess.run(
+        ["git", "check-attr", "eol", "deploy/run-worker.sh"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert done.stdout.strip().endswith("eol: lf")

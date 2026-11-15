@@ -57,7 +57,8 @@ These are known and tracked, so you do not need to report them:
 
 ## Before you deploy
 
-None of this is done by the repository; it is the deployer's checklist (D-068 to D-071 say why):
+None of this is done by the repository; it is the deployer's checklist (D-068 to D-071 say why).
+[`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) is the step-by-step version (D-072):
 
 - Set `PUBLIC_URL` to the real `https://` address on **both** the API and the worker. The "sign in as anyone" form and
   `ARENA_SANDBOX=off` are only refused when it says so, and the session cookie is `Secure` only for `https`.

@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "pixi.js": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

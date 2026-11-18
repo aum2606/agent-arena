@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from arena.config import ConfigError, load_config
-from arena.moderation import has_hidden_characters
+from arena.moderation import check_text, has_hidden_characters
 from arena_api import fighters, store
 from arena_api.accounts import User
 from arena_api.auth import current_user
@@ -83,6 +83,14 @@ def _check_provider(name: str) -> None:
         raise HTTPException(status_code=422, detail=f"unknown provider {name!r} (known: {known})")
 
 
+def _check_terms(name: str | None, model: str, persona: str) -> None:
+    """Refuse text with a term the deployer blocked (D-080); the message never repeats the term."""
+    terms = load_config(fighters_config_path()).settings.blocked_terms
+    for field, text in (("name", name), ("model", model), ("persona", persona)):
+        if text and (reason := check_text(text, terms)):
+            raise HTTPException(status_code=422, detail=f"the {field} {reason}")
+
+
 def _encrypted(api_key: str) -> str:
     try:
         return encrypt(api_key)
@@ -121,6 +129,7 @@ def options(user: Annotated[User, Depends(current_user)]) -> dict[str, object]:
 @router.post("", status_code=201, dependencies=[Depends(rate_limit("create_fighter"))])
 def create(body: NewFighter, user: Annotated[User, Depends(current_user)]) -> FighterView:
     _check_provider(body.provider)
+    _check_terms(body.name, body.model, body.persona)
     if fighters.count_for_owner(user.id) >= MAX_FIGHTERS_PER_USER:
         raise HTTPException(status_code=409, detail="you have reached the fighter limit")
     try:
@@ -156,6 +165,7 @@ def new_version(
 ) -> FighterView:
     _mine(user, fighter_id)
     _check_provider(body.provider)
+    _check_terms(None, body.model, body.persona)
     current = fighters.current_version(fighter_id)
     assert current is not None  # a fighter is created together with its first version
     if body.provider != current.provider and not body.api_key:

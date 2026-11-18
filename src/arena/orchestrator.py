@@ -18,7 +18,7 @@ from arena.damage import (
 )
 from arena.llm import Complete, Completion, LlmTimeout
 from arena.models import Attack, Domain, Fighter, MatchRecord, Outcome, Side, TurnResult
-from arena.moderation import check_problem
+from arena.moderation import check_problem, strip_hidden
 from arena.prompts import (
     CODE_TOPICS,
     TOPICS,
@@ -59,7 +59,12 @@ class _Unparsed(_Backfire):
 
 
 def _attempt(attack: Attack) -> dict[str, str]:
-    fields = {"problem": attack.problem, "answer": attack.answer, "code": attack.snippet}
+    # What the log keeps is shown to people in a replay: nothing in it may be invisible to them.
+    fields = {
+        "problem": strip_hidden(attack.problem),
+        "answer": strip_hidden(attack.answer),
+        "code": strip_hidden(attack.snippet),
+    }
     if attack.domain == "code":
         fields |= {"domain": attack.domain, "tests": attack.inputs}
     return fields
@@ -188,7 +193,7 @@ def _defend(
         "defend_result",
         actor=side,
         score=score,
-        answer=given,
+        answer=strip_hidden(given),
         output_tokens=reply.output_tokens,
         **extra,
     )
@@ -254,7 +259,7 @@ def play_turn(
             fighter, attacker_side, prompts, complete, verify, settings, log, domain
         )
         # A foul gets no retry and the defender is never asked: it is the attacker's doing (D-049).
-        if foul := check_problem(attack.problem):
+        if foul := check_problem(attack.problem, settings.blocked_terms):
             raise _Backfire(f"foul: {foul}", attack)
     except _Backfire as exc:
         log.emit(

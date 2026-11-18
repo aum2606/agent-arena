@@ -1,8 +1,10 @@
+import os
+
 import pytest
 from cryptography.fernet import Fernet
 
 from arena.config import ConfigError
-from arena_api.secret_box import check_secret, decrypt, encrypt
+from arena_api.secret_box import check_secret, decrypt, encrypt, reencrypt
 
 
 @pytest.fixture(autouse=True)
@@ -66,4 +68,47 @@ def test_a_missing_or_invalid_secret_fails_the_startup_check(
         monkeypatch.setenv("KEY_ENCRYPTION_SECRET", value)
 
     with pytest.raises(ConfigError, match="KEY_ENCRYPTION_SECRET"):
+        check_secret()
+
+
+def test_a_key_stored_under_an_old_secret_stays_readable_while_that_secret_is_listed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = os.environ["KEY_ENCRYPTION_SECRET"]
+    stored = encrypt("sk-abcdef123456")
+    monkeypatch.setenv("KEY_ENCRYPTION_SECRET", Fernet.generate_key().decode())
+
+    with pytest.raises(ConfigError, match="could not be decrypted"):
+        decrypt(stored)
+    monkeypatch.setenv("KEY_ENCRYPTION_OLD_SECRETS", old)
+
+    assert decrypt(stored) == "sk-abcdef123456"
+
+
+def test_new_keys_are_stored_under_the_current_secret_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEY_ENCRYPTION_OLD_SECRETS", Fernet.generate_key().decode())
+    stored = encrypt("sk-abcdef123456")
+    monkeypatch.delenv("KEY_ENCRYPTION_OLD_SECRETS")
+
+    assert decrypt(stored) == "sk-abcdef123456"
+
+
+def test_reencrypting_moves_a_stored_key_to_the_current_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = os.environ["KEY_ENCRYPTION_SECRET"]
+    stored = encrypt("sk-abcdef123456")
+    monkeypatch.setenv("KEY_ENCRYPTION_SECRET", Fernet.generate_key().decode())
+    monkeypatch.setenv("KEY_ENCRYPTION_OLD_SECRETS", old)
+
+    moved = reencrypt(stored)
+
+    monkeypatch.delenv("KEY_ENCRYPTION_OLD_SECRETS")  # the old secret can be dropped now
+    assert decrypt(moved) == "sk-abcdef123456"
+
+
+def test_a_malformed_old_secret_is_refused_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEY_ENCRYPTION_OLD_SECRETS", "not-a-key")
+
+    with pytest.raises(ConfigError, match="KEY_ENCRYPTION_OLD_SECRETS"):
         check_secret()

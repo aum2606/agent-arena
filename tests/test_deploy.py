@@ -32,7 +32,12 @@ def stub(directory: Path, name: str, body: str) -> None:
 def run(tmp_path: Path, env_file: dict[str, str], runtimes: str = '{"runc":{},"runsc":{}}'):
     (tmp_path / "bin").mkdir(exist_ok=True)
     stub(tmp_path / "bin", "docker", f"echo '{runtimes}'")
-    stub(tmp_path / "bin", "uv", 'echo "uv $*"; echo "DB=$DATABASE_URL"; echo "REDIS=$REDIS_URL"')
+    stub(
+        tmp_path / "bin",
+        "uv",
+        'echo "uv $*"; echo "DB=$DATABASE_URL"; echo "REDIS=$REDIS_URL"; '
+        'echo "GITHUB=${GITHUB_CLIENT_SECRET:-none}"; echo "GROQ=${GROQ_API_KEY:-none}"',
+    )
     env_path = tmp_path / "test.env"
     env_path.write_text("".join(f"{k}={v}\n" for k, v in env_file.items()), encoding="utf-8")
     path = f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}"
@@ -86,3 +91,13 @@ def test_it_refuses_an_env_file_with_windows_line_endings(tmp_path: Path) -> Non
 
     assert done.returncode != 0
     assert "line endings" in done.stderr
+
+
+def test_the_worker_gets_only_the_settings_it_needs(tmp_path: Path) -> None:
+    extra = {"GITHUB_CLIENT_SECRET": "ghs_secret", "GROQ_API_KEY": "gsk_provider_key"}
+
+    done = run(tmp_path, GOOD_ENV | extra)
+
+    assert done.returncode == 0, done.stderr
+    assert "GITHUB=none" in done.stdout  # model-written code must never be near it (D-068)
+    assert "GROQ=gsk_provider_key" in done.stdout  # the worker does need the provider keys

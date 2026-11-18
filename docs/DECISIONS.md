@@ -2115,3 +2115,19 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done:** weighting a match by what it really costs in tokens; per-address caps on creating accounts (GitHub sign-in is the gate); detecting collusion beyond the pair limit.
 
 **Alternatives considered:** a per-account budget (bypassed by new accounts); blocking an address after failed lookups only (a generous limit on every session check is simpler and covers the same flood).
+
+## D-078 · 2026-11-18 · Key rotation, session controls, account deletion, a narrower worker environment
+
+**Decision:** Second phase of the security hardening.
+- **Key rotation:** `KEY_ENCRYPTION_OLD_SECRETS` (comma-separated) lets retired secrets decrypt while the current one encrypts (a `MultiFernet`); `python -m arena_api.rotate_keys` re-encrypts every saved key under the current secret, after which the old one can be dropped. A malformed old secret fails startup.
+- **Sessions:** `POST /auth/logout-all` signs the user out everywhere; signing in deletes every expired session (nothing else did).
+- **Account deletion:** `DELETE /auth/me` erases the user, their fighters, versions and saved keys (the database cascades) and their sparring matches. Ranked matches stay, because the other player's rating and history came from them, with this user's side renamed `deleted` and its persona replaced by `[removed]` in the stored log header. Refused (409) while a match of theirs is queued or running. The fighters page has "Sign out everywhere" and "Delete my account".
+- **Worker environment:** `deploy/run-worker.sh` starts the worker with `env -i` and an allowlist (paths, the database and Redis URLs, the key secrets, the provider keys, `PUBLIC_URL`), so the GitHub client secret is not in its environment, as D-068 required of the compose worker.
+
+**Why:** a leaked or old key secret had no way out; a stolen session could not be revoked in one step; users could not take their data and keys off the site; and the host worker loaded the whole `.env`.
+
+**Checked:** tests for each (`tests/test_account_controls.py`, `tests/test_secret_box.py`, `tests/test_deploy.py`) on Linux with Postgres.
+
+**Not done:** deleting a user's name from other people's ranked replays beyond the header (problem text written by their model stays); an export of the user's data; ending older sessions on a new sign-in (several devices at once is allowed on purpose).
+
+**Alternatives considered:** deleting the user's ranked matches (would change the opponent's history and leave ratings unexplained); soft-deleting the account (keeps the keys).

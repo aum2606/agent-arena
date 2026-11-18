@@ -4,6 +4,7 @@ import type { FighterView } from "../../lib/fighters";
 import { getJson } from "../../lib/server-api";
 import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
+import { AccountControls } from "./account-controls";
 import { FighterCard } from "./fighter-card";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,9 @@ export default async function FightersPage() {
           ))}
         </div>
       )}
+      <section>
+        <AccountControls />
+      </section>
     </main>
   );
 }

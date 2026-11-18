@@ -218,6 +218,11 @@ that have both opted a verified fighter in: try it once yourself before inviting
   database migrations run when the API and the worker start.
 - **Logs.** `docker compose logs -f api web`; the worker logs to its terminal or `journalctl -u arena-worker`.
 - **Stopping.** `docker compose down` keeps the data; `docker compose down -v` deletes it.
+- **Rotating the key secret.** Make a new one, put it in `KEY_ENCRYPTION_SECRET` and the old one in `KEY_ENCRYPTION_OLD_SECRETS`,
+  restart the stack and the worker, run `uv run python -m arena_api.rotate_keys` (with `DATABASE_URL` pointing at the database),
+  then delete `KEY_ENCRYPTION_OLD_SECRETS` and restart. Do it if the secret may have leaked, or from time to time.
+- **Users and their data.** Signed-in users can sign out everywhere and delete their account (with their fighters and saved
+  keys) from the My fighters page.
 - **Free-tier limits.** Providers throttle free keys. When matches fail with rate-limit errors, wait or add keys.
 
 ### If something is wrong

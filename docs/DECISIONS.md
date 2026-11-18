@@ -2099,3 +2099,19 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Why:** the lock written by `npm audit fix` on Windows (D-073) lacked two optional cross-platform packages (`@emnapi/core`, `@emnapi/runtime`). `npm ci` accepted it on Windows but refused it on Linux, so CI's web job and the web Docker image build both failed on the first push of the UI redesign. CI is the Linux check; the lock has to be valid there.
 
 **Alternatives considered:** deleting the lock and reinstalling on Windows (same platform pruning); making CI use `npm install` (loses the lock's reproducibility).
+
+## D-077 · 2026-11-18 · Limits on what accounts can spend or distort
+
+**Decision:** First phase of the security hardening (the 2026-11-18 audit). Four limits:
+- **A site-wide budget of server-paid matches:** `server_matches_per_day` (default 100, in `[settings]`), counted in Redis under `budget:server-matches` with a 24 h life, checked in `queue_match` for sparring and ranked alike. Past it the API answers 429 "today's shared free-tier model budget is used up". It is not a per-account limit: accounts are free, so only a shared number protects the server's own keys.
+- **A daily ranked limit per user** (`MAX_RANKED_PER_USER_PER_DAY` = 10) over all their fighters; the per-fighter cap alone allowed 10 fighters x 50.
+- **A pair limit:** two owners can be paired at most 3 times a day (`MAX_PAIR_MATCHES_PER_DAY`, counting any status), so two accounts cannot trade wins to farm rating. Pairing still finds a third owner's fighter.
+- **A per-address limit for session checks** (`session`, 300 a minute) on the fighter and match routes, `/auth/me` and a fighter's ranked history: each costs a database lookup, and 120 junk-cookie requests had all been served.
+
+**Why:** the audit found nothing that exposes other people's data, but cost and rating integrity rested on per-account caps that a handful of free accounts get round.
+
+**Checked:** a test for each limit (`tests/test_abuse_guards.py`); the full Linux suite with Postgres and gVisor. Two older tests needed the stand-in Redis because the session limit now counts in it.
+
+**Not done:** weighting a match by what it really costs in tokens; per-address caps on creating accounts (GitHub sign-in is the gate); detecting collusion beyond the pair limit.
+
+**Alternatives considered:** a per-account budget (bypassed by new accounts); blocking an address after failed lookups only (a generous limit on every session check is simpler and covers the same flood).

@@ -2,6 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 from pydantic import ValidationError
 
 from arena_api.app import app
@@ -12,7 +13,8 @@ PUBLIC = "https://arena.example.com"
 
 
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch, queue: StubQueue) -> TestClient:
+    # The stand-in Redis: the session limit counts in it (D-077).
     monkeypatch.setenv("PUBLIC_URL", PUBLIC)
     return TestClient(app)
 

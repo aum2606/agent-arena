@@ -15,8 +15,9 @@ from arena_api.fighters import FighterView
 from arena_api.limits import rate_limit
 from arena_api.match_routes import BUSY, MatchStatus, start_sparring, status_of
 from arena_api.secret_box import encrypt
+from arena_api.visitor_limits import visitor_limit
 
-router = APIRouter(prefix="/fighters")
+router = APIRouter(prefix="/fighters", dependencies=[Depends(visitor_limit("session"))])
 
 MAX_FIGHTERS_PER_USER = 10
 MAX_SPARS_PER_USER_PER_DAY = 5  # sparring spends the house bot's free-tier quota

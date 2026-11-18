@@ -9,6 +9,8 @@ snippet_timeout_s = 20.0
 call_delay_s = 2.0
 max_retries = 8
 backoff_base_s = 2.0
+# Matches a day, over the whole site, that spend this server's own keys (the house bot, the review panel).
+server_matches_per_day = 100
 
 [providers.openrouter]
 base_url = "https://openrouter.ai/api/v1"

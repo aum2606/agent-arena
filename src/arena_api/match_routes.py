@@ -9,14 +9,17 @@ from arq.connections import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
 from redis.exceptions import RedisError
 
+from arena.config import load_config
 from arena_api import store
 from arena_api.accounts import User
 from arena_api.auth import current_user
-from arena_api.visitor_limits import visitor_limit
+from arena_api.db import fighters_config_path
+from arena_api.visitor_limits import count_request, visitor_limit
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/matches")
+router = APIRouter(prefix="/matches", dependencies=[Depends(visitor_limit("session"))])
 
+BUDGET_KEY = "budget:server-matches"
 BUSY = "another request of yours is still being handled: try again in a moment"
 
 # Matches wait for the single worker and the free tiers make each one slow, so few may queue.
@@ -71,6 +74,15 @@ async def queue_match(queue: ArqRedis, user_id: int, create: Callable[[str], Non
             detail=f"you already have {MAX_QUEUED_PER_USER} matches waiting or playing: "
             "wait for one to finish",
         )
+    # Every match spends the server's own keys (house bot, review panel): one shared budget a day.
+    await count_request(
+        queue,
+        BUDGET_KEY,
+        "server_budget",
+        load_config(fighters_config_path()).settings.server_matches_per_day,
+        86_400,
+        detail="today's shared free-tier model budget is used up; try again tomorrow",
+    )
     match_id = f"m_{datetime.now(UTC):%Y%m%dT%H%M%S}_{secrets.token_hex(2)}"
     create(match_id)
     try:

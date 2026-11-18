@@ -28,7 +28,7 @@ def queue() -> StubQueue:
 
 
 def test_the_public_routes_have_a_limit_each() -> None:
-    assert set(VISITOR_RULES) == {"read", "login"}
+    assert set(VISITOR_RULES) == {"read", "login", "session"}
 
 
 def test_a_visitor_past_the_limit_is_turned_away_with_a_wait_time(

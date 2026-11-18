@@ -90,7 +90,7 @@ def config() -> dict[str, bool]:
     return {"github": bool(os.environ.get("GITHUB_CLIENT_ID")), "dev_login": dev_login_enabled()}
 
 
-@router.get("/me")
+@router.get("/me", dependencies=[Depends(visitor_limit("session"))])
 def me(user: Annotated[User, Depends(current_user)]) -> User:
     return user
 

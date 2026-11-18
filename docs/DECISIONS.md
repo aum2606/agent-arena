@@ -2091,3 +2091,11 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done:** sprites or avatars (Phase 3, D-031 still holds: fighters are drawn from shapes), live spectating, public ranked replays, component tests (jsdom and testing-library would be new dependencies), light mode.
 
 **Alternatives considered:** Tailwind CSS; a component library; keeping the light/dark switch.
+
+## D-076 · 2026-11-18 · The web lockfile is regenerated on Linux
+
+**Decision:** After `npm audit fix` or any dependency change on Windows, regenerate `web/package-lock.json` in the project's Linux Node image before committing: `docker run --rm -v <repo>/web:/app -w /app node:24-alpine@<digest from docker/web.Dockerfile> npm install --package-lock-only`, then check `npm ci --dry-run` there.
+
+**Why:** the lock written by `npm audit fix` on Windows (D-073) lacked two optional cross-platform packages (`@emnapi/core`, `@emnapi/runtime`). `npm ci` accepted it on Windows but refused it on Linux, so CI's web job and the web Docker image build both failed on the first push of the UI redesign. CI is the Linux check; the lock has to be valid there.
+
+**Alternatives considered:** deleting the lock and reinstalling on Windows (same platform pruning); making CI use `npm install` (loses the lock's reproducibility).

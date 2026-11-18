@@ -119,3 +119,9 @@ def test_shell_scripts_keep_unix_line_endings_even_on_a_windows_checkout() -> No
         check=True,
     )
     assert done.stdout.strip().endswith("eol: lf")
+
+
+def test_the_api_image_does_not_announce_its_server() -> None:
+    assert "--no-server-header" in text(
+        "docker/api.Dockerfile"
+    )  # no "server: uvicorn" for scanners

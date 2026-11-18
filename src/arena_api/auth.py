@@ -14,7 +14,8 @@ from pydantic import BaseModel
 
 from arena_api import accounts
 from arena_api.accounts import User
-from arena_api.visitor_limits import visitor_limit
+from arena_api.security_log import record
+from arena_api.visitor_limits import client_address, visitor_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
@@ -160,11 +161,13 @@ def github_callback(
 ) -> RedirectResponse:
     if error:
         # Cancel on GitHub (error=access_denied) or a refusal: back to a page the user can read.
+        record("login_refused", reason="github_denied")
         response = RedirectResponse("/login?error=denied")
         response.delete_cookie(STATE_COOKIE, path="/")
         return response
     # The state we set before leaving must come back unchanged, or someone else started this login.
     if not remembered or not state or not secrets.compare_digest(state, remembered):
+        record("login_refused", reason="state_mismatch")
         raise HTTPException(status_code=400, detail="sign-in state did not match; try again")
     client_id, client_secret = _github_settings()
     try:
@@ -183,6 +186,7 @@ def github_callback(
     response = RedirectResponse("/")
     response.delete_cookie(STATE_COOKIE, path="/")
     _start_session(response, user)
+    record("login", provider="github", user=user.id)
     return response
 
 
@@ -194,11 +198,14 @@ class DevLogin(BaseModel):
 def dev_login(body: DevLogin, request: Request) -> Response:
     """Local development only: sign in as any handle, no GitHub. Off unless ARENA_DEV_LOGIN=1."""
     if not dev_login_allowed(request):
+        record("dev_login_refused", ip=client_address(request))
         raise HTTPException(status_code=404, detail="not found")
     if not HANDLE.fullmatch(body.handle):
         raise HTTPException(status_code=422, detail="handle must be 1-39 letters, digits, _ or -")
     response = Response(status_code=204)
-    _start_session(response, accounts.upsert_user("dev", body.handle, body.handle))
+    user = accounts.upsert_user("dev", body.handle, body.handle)
+    _start_session(response, user)
+    record("login", provider="dev", user=user.id)
     return response
 
 
@@ -206,6 +213,7 @@ def dev_login(body: DevLogin, request: Request) -> Response:
 def logout_all(user: Annotated[User, Depends(current_user)]) -> Response:
     """Sign out on every device, this one included."""
     accounts.end_all_sessions(user.id)
+    record("logout_all", user=user.id)
     response = Response(status_code=204)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response
@@ -219,6 +227,7 @@ def delete_me(user: Annotated[User, Depends(current_user)]) -> Response:
             status_code=409,
             detail="a match of yours is waiting or being played: try again after it",
         )
+    record("account_deleted", user=user.id)
     response = Response(status_code=204)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response

@@ -2158,3 +2158,18 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done:** a content classifier (a model call per check spends the server's quota); other languages (the rules are English; the delimiters in the prompts, not this filter, are what keeps an instruction from being obeyed, D-049 and D-069); a "hide this replay" switch (replays are only ever visible to the two players, so an operator tool would do more).
 
 **Alternatives considered:** shipping a default blocked list; a model-based moderation call; refusing dev sign-in whenever any forwarding header is present (breaks `npm run dev` behind the Next.js relay, which adds a loopback address).
+
+## D-081 · 2026-11-18 · A security event log, no server banner, a written threat model
+
+**Decision:** Fourth phase of the security hardening.
+- `arena_api/security_log.py` writes one line per event to the `arena.security` logger: `security event=... key=value ...`. Values are cut to 100 characters, stripped of control characters and quoted unless plain, so a visitor cannot start a line or a field. Events: `login` (provider, user), `login_refused` (GitHub denied, state mismatch), `dev_login_refused`, `fighter_created`, `key_changed`, `ranked_pool`, `fighter_deleted`, `logout_all`, `account_deleted`, `request_refused` (the cross-site, missing-length and oversized-body guards, with status, method, path and address) and `rate_limited` (rule name). No secret, token or key is ever passed to it.
+- The API image starts uvicorn with `--no-server-header`.
+- `SECURITY.md` gains a threat model (who can do what, what prompt injection can and cannot reach, what a break-in to the API process gets) and its known-issues list is brought up to date with D-077 to D-081, including what this work did not do. It also lists the GitHub settings that are the repository owner's to change.
+
+**Why:** an investigator had nothing to read, scanners got the server name for free, and the documents described the state before the hardening.
+
+**Checked:** tests for each event and for the value handling (`tests/test_security_log.py`); the image flag (`tests/test_repo_hygiene.py`).
+
+**Not done, and found while writing the threat model:** the API process holds `KEY_ENCRYPTION_SECRET` and the GitHub client secret, so a break-in there could decrypt every stored provider key. Only the worker needs to decrypt; encrypting with a public key in the API and keeping the private key with the worker would close it, at the cost of a new key format and a migration. Also not done: shipping the log anywhere, alerting, a retention policy, per-address counts of failed sign-ins beyond the rate limits.
+
+**Alternatives considered:** logging every request (noisy, and holds paths with ids and addresses of ordinary visitors); a log table in the database (the thing an attacker would alter).

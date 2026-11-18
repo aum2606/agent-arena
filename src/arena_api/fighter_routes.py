@@ -15,6 +15,7 @@ from arena_api.fighters import FighterView
 from arena_api.limits import rate_limit
 from arena_api.match_routes import BUSY, MatchStatus, start_sparring, status_of
 from arena_api.secret_box import encrypt
+from arena_api.security_log import record
 from arena_api.visitor_limits import visitor_limit
 
 router = APIRouter(prefix="/fighters", dependencies=[Depends(visitor_limit("session"))])
@@ -147,6 +148,7 @@ def create(body: NewFighter, user: Annotated[User, Depends(current_user)]) -> Fi
         raise HTTPException(
             status_code=409, detail="you already have a fighter with that name"
         ) from exc
+    record("fighter_created", user=user.id, fighter=fighter_id, provider=body.provider)
     return _mine(user, fighter_id)
 
 
@@ -178,6 +180,8 @@ def new_version(
     fighters.add_version(
         fighter_id, body.provider, body.model, body.persona, stored, hint, body.daily_match_cap
     )
+    if body.api_key:
+        record("key_changed", user=user.id, fighter=fighter_id, provider=body.provider)
     return _mine(user, fighter_id)
 
 
@@ -188,6 +192,7 @@ def ranked_pool(
     """Let other players' ranked matches use this fighter (they spend its key), or stop them."""
     _mine(user, fighter_id)
     fighters.set_ranked_opt_in(fighter_id, body.enabled)
+    record("ranked_pool", user=user.id, fighter=fighter_id, enabled=body.enabled)
     return _mine(user, fighter_id)
 
 
@@ -202,6 +207,7 @@ def delete(fighter_id: int, user: Annotated[User, Depends(current_user)]) -> Non
             detail="a match of this fighter is waiting or running: try again after it",
         )
     fighters.delete(user.id, fighter_id)
+    record("fighter_deleted", user=user.id, fighter=fighter_id)
 
 
 @router.post("/{fighter_id}/spar", status_code=202, dependencies=[Depends(rate_limit("spar"))])

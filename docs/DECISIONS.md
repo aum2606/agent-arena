@@ -2062,3 +2062,32 @@ vendor for everyone (ties an open-source project to one company's free plan); de
 
 **Alternatives considered:** `devIndicators: false` (hides the overlay and its build-error badge); a nonce for the overlay (Next does not
 pass one to it); pinning `vitest` back (older, and still affected); leaving the gate red.
+
+## D-074 · 2026-11-18 · API fields for a readable UI
+
+**Decision:** The web redesign (owner-approved 2026-11-18: UI plus small API additions, an arena look, plain CSS, no new dependency) needs data the API did not give. Added:
+- `ReplaySummary` gains `mode` (sim, sparring or ranked) and `ended_at`. The public list is still sims only; the replay detail fills both from the match row, because the log does not say how a match came about.
+- `GET /matches/mine` (signed in, visitor-limited like the other reads): the user's latest 20 spars and ranked matches as requester or as the ranked opponent's owner, newest first, with `you` ("a" or "b"), the names, and the result fields (null until finished). Without it a new self-hosted site has nothing on its home page, since the only public list is imported sims.
+- `FighterView` gains `rating`, `games`, `wins`, `draws`, `losses` from `ratings` (rating is null before the first ranked game).
+- `GET /fighters/options` returns providers as `{name, models, key_url}`. `models` are the model ids the config already uses with that provider (house fighters and panel), as suggestions in a free-text field; `key_url` is a new optional `key_url` on each `[providers.*]` entry in `config/fighters.toml`, which must be an `https://` address.
+
+**Why:** a first-time visitor needs to see what happened (who fought, when, how it went), what their fighter has done, and where to get a key. No new write routes, no schema change, and ranked and sparring replays stay private to their owners (D-040's rule, unchanged).
+
+**Checked:** tests for each field and route (ownership, hidden sims, signed-out 401, `mine` routing before `/{match_id}`), on Linux with Postgres.
+
+**Alternatives considered:** making ranked replays public (rejected: they show a user's persona); a model list kept by hand in the UI (it would go stale; the config is where model ids are already checked, D-036 and the 2026-10-30 note).
+
+## D-075 · 2026-11-18 · A readable web UI: dark arena theme in plain CSS, shared components
+
+**Decision:** The web app is restyled and reorganised so a first-time visitor can tell what it is and what to do (owner-approved plan, 2026-11-18). No new dependency.
+- **Look:** one dark "arena" theme as CSS custom properties in `web/app/globals.css` (surface levels, fighter A blue and B orange, hit red, block green, backfire amber), the system font stack, base styles for plain elements, and `.button` / `.button-primary` / `.button-danger` classes that work on links and buttons.
+- **Components:** `web/app/components/` holds `PageHeader`, `Card`, `Badge`, `HpBar`, `EmptyState` and `MatchCard`, each with a CSS Module. Pure text and date helpers are in `web/lib/labels.ts` (unit tested).
+- **CSP-safe styling (D-064):** no `style="..."` attributes anywhere, since `style-src` carries only a nonce; all styling is in CSS files. The health bar is an SVG whose `width` attribute carries the amount.
+- **Content:** the home page explains the game in three steps and shows the signed-in user's own matches (`GET /matches/mine`, D-074) above the public replays; pages say what to do next and what each empty list means.
+- Light mode is dropped: the previous light/dark switch is replaced by the one dark theme.
+
+**Why:** the first walkthrough found bare browser-default pages, no explanation of the game, raw match ids and an empty home page on a new install. Plain CSS keeps the dependency list (next, react, react-dom, pixi.js) and the CSP as they are; Tailwind or a component library would have added a build step and an entry here for little a few shared components do not already cover.
+
+**Not done:** sprites or avatars (Phase 3, D-031 still holds: fighters are drawn from shapes), live spectating, public ranked replays, component tests (jsdom and testing-library would be new dependencies), light mode.
+
+**Alternatives considered:** Tailwind CSS; a component library; keeping the light/dark switch.

@@ -12,6 +12,7 @@ from redis.exceptions import RedisError
 from arena_api import store
 from arena_api.accounts import User
 from arena_api.auth import current_user
+from arena_api.visitor_limits import visitor_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matches")
@@ -81,6 +82,12 @@ async def queue_match(queue: ArqRedis, user_id: int, create: Callable[[str], Non
     row = store.get_match(match_id)
     assert row is not None
     return status_of(row)
+
+
+# Declared before `/{match_id}`, which would otherwise take "mine" for a match id.
+@router.get("/mine", dependencies=[Depends(visitor_limit("read"))])
+def my_matches(user: Annotated[User, Depends(current_user)]) -> list[store.MyMatch]:
+    return store.matches_for_user(user.id)
 
 
 @router.get("/{match_id}")

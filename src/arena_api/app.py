@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Annotated
 
 from arq import create_pool
@@ -81,7 +82,11 @@ def replay(replay_id: str, viewer: Annotated[User | None, Depends(optional_user)
     if log is None:
         raise HTTPException(status_code=404, detail="replay not found")
     try:
-        return parse_replay(replay_id, log)
+        parsed = parse_replay(replay_id, log)
     except ReplayError as exc:
         logger.warning("replay %s cannot be shown: %s", replay_id, exc)
         raise HTTPException(status_code=500, detail="this replay cannot be shown") from exc
+    assert row is not None  # a log is only found for an existing match
+    # The log does not say how the match came about or when it ended: the match row does.
+    summary = replace(parsed.summary, mode=row.mode, ended_at=row.ended_at)
+    return replace(parsed, summary=summary)

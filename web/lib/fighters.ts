@@ -10,10 +10,24 @@ export interface FighterView {
   daily_match_cap: number;
   /** Other players' ranked matches may spend this fighter's key. */
   ranked_opt_in: boolean;
+  /** Null until the fighter's first ranked game. */
+  rating: number | null;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+}
+
+export interface ProviderOption {
+  name: string;
+  /** Model ids this server's config already uses with the provider: suggestions only. */
+  models: string[];
+  /** Where to get a key for the provider, when the server says. */
+  key_url: string | null;
 }
 
 export interface Options {
-  providers: string[];
+  providers: ProviderOption[];
   templates: { name: string; persona: string }[];
 }
 
@@ -37,6 +51,23 @@ export interface RankedEntry {
   /** This fighter's rating change, once finished. */
   rating_delta: number | null;
   error: string | null;
+}
+
+/** One of the signed-in user's own spars or ranked matches, as `GET /matches/mine` returns it. */
+export interface MyMatch {
+  id: string;
+  mode: "sparring" | "ranked";
+  status: MatchStatus["status"];
+  /** "a" when you asked for the match, "b" when your fighter was the ranked opponent. */
+  you: "a" | "b";
+  name_a: string | null;
+  name_b: string | null;
+  /** The rest is null until the match has finished. */
+  winner: "a" | "b" | null;
+  hp_a: number | null;
+  hp_b: number | null;
+  turn_count: number | null;
+  ended_at: string | null;
 }
 
 export interface LeaderboardRow {

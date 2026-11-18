@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Card } from "../components/Card";
+
 /** Only rendered when the API runs with ARENA_DEV_LOGIN=1: pick any handle, no GitHub. */
 export function DevLogin() {
   const router = useRouter();
@@ -26,14 +28,19 @@ export function DevLogin() {
   }
 
   return (
-    <form onSubmit={submit} className="form">
-      <h2>Local development sign-in</h2>
-      <label>
-        Handle
-        <input value={handle} onChange={(e) => setHandle(e.target.value)} required />
-      </label>
-      <button type="submit">Sign in</button>
-      {error && <p role="alert">{error}</p>}
-    </form>
+    <Card title="Local development sign-in">
+      <form onSubmit={submit} className="form">
+        <p className="help">
+          This form exists only because the server runs in local development mode. Pick any handle, no password, no GitHub.
+          A public site never shows it.
+        </p>
+        <label>
+          Handle
+          <input value={handle} onChange={(e) => setHandle(e.target.value)} required placeholder="ada" />
+        </label>
+        <button type="submit">Sign in</button>
+        {error && <p role="alert">{error}</p>}
+      </form>
+    </Card>
   );
 }

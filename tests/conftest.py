@@ -85,6 +85,7 @@ backoff_base_s = 0.0
 [providers.groq]
 base_url = "https://groq.test/v1"
 api_key_env = "GROQ_API_KEY"
+key_url = "https://groq.test/keys"
 
 [providers.gemini]
 base_url = "https://gemini.test/v1"

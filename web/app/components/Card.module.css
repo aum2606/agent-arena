@@ -1,0 +1,4 @@
+.card { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+.card h2 { margin-bottom: 12px; }
+.callout { border-color: var(--accent); background: linear-gradient(180deg, rgb(109 124 255 / 14%), var(--surface)); }
+.danger { border-color: rgb(255 107 122 / 45%); }

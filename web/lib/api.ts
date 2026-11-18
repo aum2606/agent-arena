@@ -53,6 +53,9 @@ export interface ReplaySummary {
   turn_count: number;
   name_a: string | null;
   name_b: string | null;
+  mode: "sim" | "sparring" | "ranked";
+  /** ISO time the match finished; null only for a summary the API has not filled in. */
+  ended_at: string | null;
 }
 
 export interface Replay {
@@ -64,7 +67,7 @@ export interface Replay {
 }
 
 /** The fighter's name, or "Fighter A"/"Fighter B" for older logs that have none. */
-export function sideLabel(summary: ReplaySummary, side: Side): string {
+export function sideLabel(summary: Pick<ReplaySummary, "name_a" | "name_b">, side: Side): string {
   return (side === "a" ? summary.name_a : summary.name_b) ?? `Fighter ${side.toUpperCase()}`;
 }
 

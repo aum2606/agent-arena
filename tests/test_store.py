@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import psycopg
@@ -71,7 +72,9 @@ def test_failure_keeps_its_reason(database: str) -> None:
 
     store.mark_failed("m1", "groq rate limited after 8 retries")
 
-    assert store.get_match("m1") == store.MatchRow(
+    row = store.get_match("m1")
+    assert row is not None and row.ended_at is not None  # a failed match has ended too
+    assert replace(row, ended_at=None) == store.MatchRow(
         "m1", "failed", "alice", "bob", "groq rate limited after 8 retries"
     )
 

@@ -24,6 +24,11 @@ class FighterView:
     verified: bool
     daily_match_cap: int
     ranked_opt_in: bool  # other players' ranked matches may spend this fighter's key
+    rating: float | None = None  # None until the fighter's first ranked game
+    games: int = 0
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
 
 
 @dataclass(frozen=True)
@@ -41,9 +46,12 @@ class Version:
 
 _VIEW_SQL = (
     "SELECT f.id, f.name, f.daily_match_cap, f.ranked_opt_in, v.version, v.provider, v.model, "
-    "v.persona, v.key_hint, v.verified_at IS NOT NULL AS verified FROM fighters f "
+    "v.persona, v.key_hint, v.verified_at IS NOT NULL AS verified, r.rating, "
+    "COALESCE(r.games, 0) AS games, COALESCE(r.wins, 0) AS wins, "
+    "COALESCE(r.draws, 0) AS draws, COALESCE(r.losses, 0) AS losses FROM fighters f "
     "JOIN LATERAL (SELECT * FROM fighter_versions WHERE fighter_id = f.id "
-    "ORDER BY version DESC LIMIT 1) v ON true WHERE f.owner_id = %s"
+    "ORDER BY version DESC LIMIT 1) v ON true "
+    "LEFT JOIN ratings r ON r.fighter_id = f.id WHERE f.owner_id = %s"
 )
 
 

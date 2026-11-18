@@ -3,6 +3,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -30,6 +31,7 @@ class MatchRow:
     opponent_version: int | None = None
     opponent_owner: int | None = None
     rating_delta_a: float | None = None
+    ended_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,23 @@ class RankedRow:
 
 
 @dataclass(frozen=True)
+class MyMatch:
+    """One line of a user's own match list: a spar or ranked match they asked for or joined."""
+
+    id: str
+    mode: str  # sparring or ranked
+    status: str  # queued, running, finished or failed
+    you: str  # "a" when you asked for it, "b" when your fighter was the ranked opponent
+    name_a: str | None
+    name_b: str | None
+    winner: str | None  # all of these are None until it has finished
+    hp_a: float | None
+    hp_b: float | None
+    turn_count: int | None
+    ended_at: datetime | None
+
+
+@dataclass(frozen=True)
 class LeaderboardRow:
     handle: str
     name: str
@@ -70,7 +89,7 @@ class LeaderboardRow:
 
 _MATCH_COLUMNS = (
     "id, status, fighter_a, fighter_b, error, mode, requested_by, fighter_id, fighter_version, "
-    "opponent_id, opponent_version, opponent_owner, rating_delta_a"
+    "opponent_id, opponent_version, opponent_owner, rating_delta_a, ended_at"
 )
 
 
@@ -179,6 +198,20 @@ def ranked_for_fighter(fighter_id: int, limit: int = 10) -> list[RankedRow]:
             (fighter_id, fighter_id, limit),
         ).fetchall()
     return [RankedRow(**row) for row in rows]
+
+
+def matches_for_user(user_id: int, limit: int = 20) -> list[MyMatch]:
+    """The user's latest spars and ranked matches, newest first, as either side of it."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, mode, status, CASE WHEN requested_by = %s THEN 'a' ELSE 'b' END AS you, "
+            "fighter_a AS name_a, fighter_b AS name_b, winner, hp_a, hp_b, turn_count, ended_at "
+            "FROM matches WHERE mode IN ('sparring', 'ranked') "
+            "AND (requested_by = %s OR opponent_owner = %s) "
+            "ORDER BY created_at DESC, id DESC LIMIT %s",
+            (user_id, user_id, user_id, limit),
+        ).fetchall()
+    return [MyMatch(**row) for row in rows]
 
 
 def count_queued() -> int:
@@ -370,8 +403,8 @@ def list_finished() -> list[ReplaySummary]:
     with connect() as conn:
         rows = conn.execute(
             "SELECT id, winner, reason, hp_a, hp_b, turn_count, fighter_a AS name_a, "
-            "fighter_b AS name_b FROM matches WHERE status = 'finished' AND mode = 'sim' "
-            "ORDER BY id"
+            "fighter_b AS name_b, mode, ended_at FROM matches "
+            "WHERE status = 'finished' AND mode = 'sim' ORDER BY id"
         ).fetchall()
     return [ReplaySummary(**row) for row in rows]
 

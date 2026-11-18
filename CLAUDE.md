@@ -82,6 +82,7 @@ src/arena/      models.py  llm.py  prompts.py  verifier.py  safe_expr.py  equali
 src/arena_api/  app.py auth.py accounts.py fighters.py fighter_routes.py match_routes.py secret_box.py replays.py store.py ratings.py ranked_routes.py limits.py visitor_limits.py guards.py deps.py db.py jobs.py import_logs.py migrations/   (FastAPI + worker; Phase 1)
 web/            Next.js + TypeScript app (Phase 1); lib/choreography.ts plans a turn's animation, lib/stage.ts draws it (Pixi);
                 proxy.ts + lib/csp.ts set the Content-Security-Policy (D-064); lib/client-address.ts passes the visitor's address on (D-063)
+                app/globals.css = the dark arena theme as tokens; app/components/ = shared pieces (Card, Badge, HpBar, MatchCard...); lib/labels.ts = text and date helpers (D-075)
 docker/         api.Dockerfile  web.Dockerfile  sandbox.Dockerfile      docker-compose.yml and docker-compose.prod.yml at the root
 deploy/         run-worker.sh (the public deployment's worker, on the host; D-072)
 tests/          one test file per module, no network calls

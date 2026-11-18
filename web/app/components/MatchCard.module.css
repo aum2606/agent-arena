@@ -1,0 +1,10 @@
+.card { display: grid; gap: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.when { margin-left: auto; color: var(--muted); font-size: 0.875rem; }
+.versus { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.side { display: grid; gap: 6px; min-width: 0; }
+.side strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a { color: var(--side-a); }
+.b { color: var(--side-b); text-align: right; }
+.vs { color: var(--muted); font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; }
+.bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }

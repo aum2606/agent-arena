@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from arena.damage import BACKFIRE_FACTOR, BASE_DAMAGE, DIFFICULTY, STARTING_HP
@@ -73,6 +74,9 @@ class ReplaySummary:
     turn_count: int
     name_a: str | None  # None for schema 1 logs
     name_b: str | None
+    # Not in the log: the match row says them; a summary parsed from a log alone has the defaults.
+    mode: str = "sim"  # sim, sparring or ranked
+    ended_at: datetime | None = None
 
 
 @dataclass(frozen=True)

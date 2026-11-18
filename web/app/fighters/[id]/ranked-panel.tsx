@@ -5,14 +5,29 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { errorText, type RankedEntry } from "../../../lib/fighters";
+import { Badge, type BadgeTone } from "../../components/Badge";
+import { Card } from "../../components/Card";
 
 const POLL_MS = 5000;
 
+const RESULTS: Record<"W" | "D" | "L", { label: string; tone: BadgeTone }> = {
+  W: { label: "Won", tone: "good" },
+  D: { label: "Drawn", tone: "neutral" },
+  L: { label: "Lost", tone: "bad" },
+};
+
 function outcome(match: RankedEntry) {
-  if (match.status === "queued") return "waiting for the worker";
-  if (match.status === "running") return "playing… (can take many minutes)";
-  if (match.status === "failed") return `failed, not rated: ${match.error ?? "unknown error"}`;
-  return { W: "won", D: "drawn", L: "lost" }[match.result ?? "D"];
+  if (match.status === "queued") return <Badge>Waiting</Badge>;
+  if (match.status === "running") return <Badge tone="info">Playing</Badge>;
+  if (match.status === "failed") {
+    return (
+      <>
+        <Badge tone="bad">Failed</Badge> <span className="muted">not rated: {match.error ?? "unknown error"}</span>
+      </>
+    );
+  }
+  const result = RESULTS[match.result ?? "D"];
+  return <Badge tone={result.tone}>{result.label}</Badge>;
 }
 
 function change(delta: number | null) {
@@ -71,30 +86,31 @@ export function RankedPanel({
   }
 
   return (
-    <section>
-      <h2>Ranked</h2>
+    <Card title="Ranked">
       <p className="muted">
-        A full match against the closest-rated fighter of another owner. It spends both owners&apos;
-        keys. See the <Link href="/leaderboard">leaderboard</Link>.
+        A full match against the closest-rated fighter of another player. It spends both players&apos; keys, and the result
+        moves both ratings. See the <Link href="/leaderboard">leaderboard</Link>.
       </p>
-      <label>
-        <input type="checkbox" checked={optedIn} onChange={(e) => setPool(e.target.checked)} /> Let
-        other players&apos; ranked matches use this fighter (they spend its key, up to its daily
-        limit)
+      <label className="row">
+        <input type="checkbox" checked={optedIn} onChange={(e) => setPool(e.target.checked)} />
+        <span>
+          Let other players&apos; ranked matches use this fighter
+          <span className="help"> (they spend its key, up to its daily limit)</span>
+        </span>
       </label>
       <p>
         <button onClick={start} disabled={starting || busy || !verified || !optedIn}>
-          {busy ? "A ranked match is in progress" : "Play ranked"}
+          {busy ? "A ranked match is in progress…" : "Play ranked"}
         </button>
       </p>
-      {!optedIn && <p className="muted">Turn the box above on to play ranked.</p>}
-      {!verified && <p className="muted">Spar once first, so we know your key works.</p>}
+      {!verified && <p className="help">Spar once first, so we know your key works.</p>}
+      {verified && !optedIn && <p className="help">Tick the box above to play ranked.</p>}
+      {busy && <p className="help">This page updates by itself. A match on a free-tier model can take several minutes.</p>}
       {error && <p role="alert">{error}</p>}
       {matches.length > 0 && (
         <table>
           <thead>
             <tr>
-              <th>Match</th>
               <th>Opponent</th>
               <th>Result</th>
               <th>Rating</th>
@@ -104,16 +120,15 @@ export function RankedPanel({
           <tbody>
             {matches.map((m) => (
               <tr key={m.id}>
-                <td>{m.id}</td>
                 <td>{m.opponent}</td>
                 <td>{outcome(m)}</td>
                 <td>{change(m.rating_delta)}</td>
-                <td>{m.status === "finished" && <Link href={`/replays/${m.id}`}>replay</Link>}</td>
+                <td>{m.status === "finished" && <Link href={`/replays/${m.id}`}>Watch the replay →</Link>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-    </section>
+    </Card>
   );
 }

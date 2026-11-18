@@ -48,3 +48,48 @@ export function resultFor(you: Side, winner: Side | null, finished: boolean): "W
   if (winner === null) return "D";
   return winner === you ? "W" : "L";
 }
+
+export interface NextStep {
+  id: "spar" | "join" | "play" | "keep";
+  title: string;
+  text: string;
+}
+
+/** What a fighter's owner should do next, in the order the site needs: spar, join the pool, play ranked. */
+export function nextStep(fighter: { verified: boolean; ranked_opt_in: boolean; games: number }): NextStep {
+  if (!fighter.verified) {
+    return {
+      id: "spar",
+      title: "Next: spar once",
+      text: "Spar against the house bot to check that your key and model work. It is unranked and takes a few minutes.",
+    };
+  }
+  if (!fighter.ranked_opt_in) {
+    return {
+      id: "join",
+      title: "Next: join the ranked pool",
+      text: "Tick the box under Ranked so other players' matches can use this fighter. They spend its key, up to its daily limit. Then you can play ranked too.",
+    };
+  }
+  if (fighter.games === 0) {
+    return {
+      id: "play",
+      title: "Next: play your first ranked match",
+      text: "You get paired with the closest-rated fighter of another player and start at a rating of 1200.",
+    };
+  }
+  return {
+    id: "keep",
+    title: "Next: climb the leaderboard",
+    text: "Play more ranked matches to move up. Edit the persona to try a different style: each save is a new version.",
+  };
+}
+
+/** Wins as a whole percentage of games, or a dash before the first game. */
+export function winRate(wins: number, games: number): string {
+  return games === 0 ? "–" : `${Math.round((100 * wins) / games)}%`;
+}
+
+export function recordText(f: { wins: number; draws: number; losses: number; games: number }): string {
+  return f.games === 0 ? "No ranked games yet" : `${f.wins} won · ${f.draws} drawn · ${f.losses} lost`;
+}

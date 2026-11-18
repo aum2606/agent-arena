@@ -1,0 +1,4 @@
+.stats { display: flex; flex-wrap: wrap; gap: 32px; }
+.label { display: block; color: var(--muted); font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.value { color: var(--accent-strong); font-size: 2rem; font-weight: 800; line-height: 1.2; }
+.record { display: block; padding-top: 6px; font-size: 1.125rem; }

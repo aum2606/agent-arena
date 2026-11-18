@@ -1,3 +1,5 @@
+import ipaddress
+import logging
 import os
 import re
 import secrets
@@ -6,7 +8,7 @@ from typing import Annotated
 from urllib.parse import urlencode, urlparse
 
 import httpx2
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -14,6 +16,7 @@ from arena_api import accounts
 from arena_api.accounts import User
 from arena_api.visitor_limits import visitor_limit
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
 
 SESSION_COOKIE = "arena_session"
@@ -48,6 +51,39 @@ def _github_settings() -> tuple[str, str]:
 def dev_login_enabled() -> bool:
     # Never on a public address, whatever the setting: anyone could sign in as anyone (D-068).
     return os.environ.get("ARENA_DEV_LOGIN") == "1" and public_url_is_local()
+
+
+# What a proxy or tunnel in front of this stack adds to a request. Someone who browses the local
+# stack directly sends none of them with a visitor's address in it.
+_FORWARDED = ("x-forwarded-for", "x-real-ip", "cf-connecting-ip", "true-client-ip", "forwarded")
+
+
+def _came_from_elsewhere(request: Request) -> bool:
+    """True when a header says the request travelled through a proxy or tunnel from a non-local
+    address: someone tunnelled the local stack to the internet, whatever PUBLIC_URL says (D-080)."""
+    if "tailscale-funnel-request" in request.headers:
+        return True
+    for name in _FORWARDED:
+        for address in re.findall(r"[0-9A-Fa-f:.]{3,}", request.headers.get(name, "")):
+            try:
+                if not ipaddress.ip_address(address).is_loopback:
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
+def dev_login_allowed(request: Request) -> bool:
+    return dev_login_enabled() and not _came_from_elsewhere(request)
+
+
+def warn_if_dev_login() -> None:
+    """Said once at start-up: the stack is one tunnel away from being open to anyone."""
+    if os.environ.get("ARENA_DEV_LOGIN") == "1":
+        logger.warning(
+            "ARENA_DEV_LOGIN=1: anyone who can reach this API can sign in as any handle. "
+            "Local use only: never tunnel or publish this stack"
+        )
 
 
 def get_github_http() -> Iterator[httpx2.Client]:
@@ -86,8 +122,11 @@ def optional_user(token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = N
 
 
 @router.get("/config")
-def config() -> dict[str, bool]:
-    return {"github": bool(os.environ.get("GITHUB_CLIENT_ID")), "dev_login": dev_login_enabled()}
+def config(request: Request) -> dict[str, bool]:
+    return {
+        "github": bool(os.environ.get("GITHUB_CLIENT_ID")),
+        "dev_login": dev_login_allowed(request),
+    }
 
 
 @router.get("/me", dependencies=[Depends(visitor_limit("session"))])
@@ -152,9 +191,9 @@ class DevLogin(BaseModel):
 
 
 @router.post("/dev", status_code=204, dependencies=[Depends(visitor_limit("login"))])
-def dev_login(body: DevLogin) -> Response:
+def dev_login(body: DevLogin, request: Request) -> Response:
     """Local development only: sign in as any handle, no GitHub. Off unless ARENA_DEV_LOGIN=1."""
-    if not dev_login_enabled():
+    if not dev_login_allowed(request):
         raise HTTPException(status_code=404, detail="not found")
     if not HANDLE.fullmatch(body.handle):
         raise HTTPException(status_code=422, detail="handle must be 1-39 letters, digits, _ or -")

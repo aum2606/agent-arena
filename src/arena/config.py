@@ -1,5 +1,5 @@
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,8 @@ class Settings:
     attack_retries: int = 1  # how many corrections a failed attack gets before it backfires (D-062)
     # Matches a day, site-wide, that spend the server's own keys: house bot, review panel (D-077).
     server_matches_per_day: int = 100
+    # Words and phrases the deployer does not allow in problems or personas (D-080); none built in.
+    blocked_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,12 @@ def load_config(path: Path) -> Config:
         raise ConfigError(f"code_share must be between 0 and 1, not {settings.code_share}")
     if settings.attack_retries < 0:
         raise ConfigError(f"attack_retries cannot be negative, not {settings.attack_retries}")
+    terms = settings.blocked_terms
+    if not isinstance(terms, list | tuple) or not all(
+        isinstance(t, str) and 1 <= len(t) <= 100 for t in terms
+    ):
+        raise ConfigError("blocked_terms must be a list of words or phrases of 1 to 100 characters")
+    settings = replace(settings, blocked_terms=tuple(terms))
     if settings.server_matches_per_day < 1:
         raise ConfigError(
             f"server_matches_per_day must be at least 1, not {settings.server_matches_per_day}"

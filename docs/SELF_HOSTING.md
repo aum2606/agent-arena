@@ -228,6 +228,10 @@ that have both opted a verified fighter in: try it once yourself before inviting
   then delete `KEY_ENCRYPTION_OLD_SECRETS` and restart. Do it if the secret may have leaked, or from time to time.
 - **Users and their data.** Signed-in users can sign out everywhere and delete their account (with their fighters and saved
   keys) from the My fighters page.
+- **Blocked words.** Fighters' names and personas, and the problems models pose, are checked only for hidden characters and for
+  text aimed at the opponent. To refuse words of your own choosing, list them in `blocked_terms` under `[settings]` in
+  `config/fighters.toml`; a fighter with one is refused, and a problem with one is a foul. None are built in. This is a word
+  list, not a moderator: it does not understand context or other languages.
 - **Free-tier limits.** Providers throttle free keys. When matches fail with rate-limit errors, wait or add keys.
 
 ### If something is wrong

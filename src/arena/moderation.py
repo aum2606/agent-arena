@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from collections.abc import Sequence
 
 # A problem is shown to the other user's model, so it is checked first (D-049). This is a rule
 # filter for instructions aimed at the opponent, not a content moderator: it knows nothing of
@@ -60,14 +61,101 @@ _AIMED_AT_THE_OPPONENT = (
             re.IGNORECASE,
         ),
     ),
+    (
+        "tells the opponent what to answer",
+        re.compile(
+            r"\bpretend\b[^.\n]{0,20}\byou\b"
+            r"|\byou must (answer|respond|reply|output|say|print)\b"
+            r"|\b(answer|respond|reply) (only )?with\b"
+            r"|\bfrom now on,? (every|all|always|you|your|answer|reply|respond|say|output|print)\b"
+            r"|\b(do not|don't|never) (solve|answer)\b"
+            r"|\bdisregard everything\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+# Letters from other alphabets that look like Latin ones, so a Cyrillic "i" in "ignore" is not a
+# way round the rules above. Code points, because the letters look exactly like ASCII ones in this
+# file. Not a full confusables table: the common Cyrillic and Greek ones.
+_LOOK_ALIKES = str.maketrans(
+    {
+        # Cyrillic, lower case: a e o p c x y i j s
+        0x430: "a",
+        0x435: "e",
+        0x43E: "o",
+        0x440: "p",
+        0x441: "c",
+        0x445: "x",
+        0x443: "y",
+        0x456: "i",
+        0x458: "j",
+        0x455: "s",
+        # Cyrillic, upper case
+        0x410: "A",
+        0x412: "B",
+        0x415: "E",
+        0x41A: "K",
+        0x41C: "M",
+        0x41D: "H",
+        0x41E: "O",
+        0x420: "P",
+        0x421: "C",
+        0x422: "T",
+        0x425: "X",
+        0x406: "I",
+        0x408: "J",
+        0x405: "S",
+        # Greek
+        0x3BF: "o",
+        0x3BD: "v",
+        0x3B9: "i",
+        0x39F: "O",
+        0x391: "A",
+        0x392: "B",
+        0x395: "E",
+        0x396: "Z",
+        0x397: "H",
+        0x399: "I",
+        0x39A: "K",
+        0x39C: "M",
+        0x39D: "N",
+        0x3A1: "P",
+        0x3A4: "T",
+        0x3A5: "Y",
+        0x3A7: "X",
+    }
 )
 
 
+def _is_hidden(char: str) -> bool:
+    return any(low <= ord(char) <= high for low, high in _HIDDEN)
+
+
 def has_hidden_characters(text: str) -> bool:
-    return any(low <= ord(char) <= high for char in text for low, high in _HIDDEN)
+    return any(_is_hidden(char) for char in text)
 
 
-def check_problem(problem: str) -> str | None:
+def strip_hidden(text: str) -> str:
+    """`text` without the characters a person reading a replay cannot see."""
+    return "".join(char for char in text if not _is_hidden(char))
+
+
+def _plain(text: str) -> str:
+    """How a model reads `text`: full-width and look-alike letters as plain ones, nothing hidden."""
+    return unicodedata.normalize("NFKC", strip_hidden(text)).translate(_LOOK_ALIKES)
+
+
+def check_text(text: str, blocked_terms: Sequence[str]) -> str | None:
+    """Why `text` holds a term the deployer blocked (config `blocked_terms`), or None. A term is a
+    whole word or phrase in any case; the reason never repeats it (D-080)."""
+    if not blocked_terms:
+        return None
+    pattern = re.compile(r"\b(?:" + "|".join(map(re.escape, blocked_terms)) + r")\b", re.IGNORECASE)
+    return "contains a term this site does not allow" if pattern.search(_plain(text)) else None
+
+
+def check_problem(problem: str, blocked_terms: Sequence[str] = ()) -> str | None:
     """Why `problem` is a foul, or None if it may go to the defender."""
     if not problem.strip():
         return "the problem is empty"
@@ -75,9 +163,9 @@ def check_problem(problem: str) -> str | None:
         return f"the problem is over {MAX_PROBLEM_CHARS} characters"
     if has_hidden_characters(problem):
         return "the problem contains invisible or control characters"
-    # Full-width and other compatibility forms of letters read as plain letters to a model.
-    plain = unicodedata.normalize("NFKC", problem)
+    plain = _plain(problem)
     for reason, pattern in _AIMED_AT_THE_OPPONENT:
         if pattern.search(plain):
             return reason
-    return None
+    blocked = check_text(problem, blocked_terms)
+    return f"the problem {blocked}" if blocked else None

@@ -11,6 +11,9 @@ max_retries = 8
 backoff_base_s = 2.0
 # Matches a day, over the whole site, that spend this server's own keys (the house bot, the review panel).
 server_matches_per_day = 100
+# Words or phrases this site does not allow in a fighter's name or persona, or in a problem (whole words,
+# any case; a problem with one is a foul). None are built in: the list is the deployer's. For example:
+# blocked_terms = ["a word", "a phrase"]
 
 [providers.openrouter]
 base_url = "https://openrouter.ai/api/v1"

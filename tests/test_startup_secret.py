@@ -13,8 +13,8 @@ def no_secret(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Nothing may touch the database or Redis: the secret is checked first. Returns what ran."""
     monkeypatch.delenv("KEY_ENCRYPTION_SECRET", raising=False)
     ran: list[str] = []
-    monkeypatch.setattr(app_module, "migrate", lambda: ran.append("api migrate"))
-    monkeypatch.setattr(jobs, "migrate", lambda: ran.append("worker migrate"))
+    monkeypatch.setattr(app_module, "migrate_on_start", lambda: ran.append("api migrate"))
+    monkeypatch.setattr(jobs, "migrate_on_start", lambda: ran.append("worker migrate"))
     return ran
 
 

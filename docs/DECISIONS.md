@@ -2143,3 +2143,18 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done:** Row-level security; separate roles for the API and the worker; making the owner a non-superuser (the postgres image creates it as one; only the migration holds its password); an automatic upgrade path for databases created before this (SELF_HOSTING.md says how to make the role by hand).
 
 **Alternatives considered:** running migrations as the owner from the API (the API would keep owner credentials in its environment, which is what this avoids); a hand-made `GRANT` script run by the deployer (easy to get wrong).
+
+## D-080 · 2026-11-18 · Stricter text checks, the deployer's blocked terms, and a tunnel guard on dev sign-in
+
+**Decision:** Third phase of the security hardening.
+- **Filter:** more phrasings of "tell the opponent what to answer" (`pretend you ...`, `you must answer ...`, `answer only with ...`, `from now on, every ...`, `do not solve ...`), and a table of common Cyrillic and Greek look-alike letters applied (with NFKC and removal of hidden characters) before the rules run, so a Cyrillic "i" in "ignore" no longer gets past them. A regression set in `tests/test_moderation_hardening.py` holds the attempts that must be fouls and ordinary problems that share words with them and must pass.
+- **Logs:** hidden and direction-changing characters are removed from what a replay shows of a model's answer and of each attempt (problem, answer, code). Scoring used the original text, so only the display changes.
+- **Blocked terms:** `blocked_terms` under `[settings]` in `config/fighters.toml` (default none). A fighter whose name, model or persona has one is refused (422, never repeating the term); a problem with one is a foul. Whole words or phrases, any case, after the same normalisation. No list is shipped: what counts as unacceptable is the deployer's call, and a list built into an open-source repository would be wrong for most of them.
+- **Dev sign-in:** refused (and not offered by `/auth/config`) for a request carrying a proxy or tunnel header (`X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `Forwarded`, `Tailscale-Funnel-Request`) with a non-loopback address, whatever `PUBLIC_URL` says; and the API logs a warning at start-up when `ARENA_DEV_LOGIN=1`. Someone who tunnels the local stack to the internet no longer gets "sign in as anyone".
+- **Tests that pin the model boundary:** a request to a model carries only a system and a user message and no tools; no prompt has a place for a key.
+
+**Why:** the audit found the filter beaten by look-alike letters, replays able to show text a reader could not see, local sign-in one mis-set tunnel from being public, and nothing that let a deployer refuse words they would not host.
+
+**Not done:** a content classifier (a model call per check spends the server's quota); other languages (the rules are English; the delimiters in the prompts, not this filter, are what keeps an instruction from being obeyed, D-049 and D-069); a "hide this replay" switch (replays are only ever visible to the two players, so an operator tool would do more).
+
+**Alternatives considered:** shipping a default blocked list; a model-based moderation call; refusing dev sign-in whenever any forwarding header is present (breaks `npm run dev` behind the Next.js relay, which adds a loopback address).

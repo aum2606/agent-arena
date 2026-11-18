@@ -1,0 +1,6 @@
+.hero { padding: 32px 0 24px; }
+.hero h1 { max-width: 22ch; margin-bottom: 14px; font-size: clamp(1.9rem, 4.5vw, 3rem); }
+.lead { max-width: 62ch; margin-bottom: 20px; color: var(--muted); font-size: 1.125rem; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.step { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.step p { margin: 0; }

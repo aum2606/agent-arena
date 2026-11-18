@@ -1,64 +1,128 @@
+/*
+ * The design system (D-075): one dark "arena" theme, as tokens, plus base styles for plain elements. The
+ * Content-Security-Policy (D-064) blocks inline style attributes, so all styling lives in CSS files:
+ * this one, and a CSS Module next to each shared component.
+ */
 :root {
-  --bg: #fafaf9;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --line: #d6d3d1;
-  --hit: #dc2626;
-  --block: #16a34a;
-  --backfire: #d97706;
-  --selected: #1d4ed8;
+  --bg: #0b0f1a;
+  --surface: #121829;
+  --surface-2: #1a2238;
+  --line: #28324d;
+  --fg: #e8ecf5;
+  --muted: #9aa5bf;
+  --accent: #6d7cff;
+  --accent-strong: #8693ff;
+  --focus: #b4c0ff;
+  --side-a: #4aa3ff;
+  --side-b: #ff8a3d;
+  --hit: #ff6b7a;
+  --block: #3ddc97;
+  --backfire: #ffc247;
+  --selected: var(--accent-strong);
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 8px 24px rgb(0 0 0 / 30%);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1917;
-    --fg: #fafaf9;
-    --muted: #a8a29e;
-    --line: #44403c;
-    --hit: #f87171;
-    --block: #4ade80;
-    --backfire: #fbbf24;
-    --selected: #60a5fa;
-  }
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
-  margin: 0 auto;
-  padding: 16px;
-  max-width: 880px;
-  background: var(--bg);
+  margin: 0;
+  background: radial-gradient(1200px 500px at 50% -200px, #1a2450 0%, transparent 70%), var(--bg);
+  background-repeat: no-repeat;
   color: var(--fg);
-  font: 16px/1.5 system-ui, sans-serif;
+  font: 16px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--selected); }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
-.muted { color: var(--muted); }
-.site-header { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
-.site-header .grow { flex: 1; }
-.site-header button { padding: 4px 10px; font: inherit; }
-.form { display: grid; gap: 12px; max-width: 420px; }
-.form label { display: grid; gap: 4px; }
-.form input, .form select, .form textarea { padding: 6px 8px; font: inherit; }
-.stage { max-width: 720px; margin: 12px 0; border-radius: 8px; overflow: hidden; }
-.timeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
-.timeline button {
-  padding: 6px 12px; border: 2px solid var(--line); border-radius: 6px;
-  background: transparent; color: var(--fg); font: inherit; cursor: pointer;
+.page { max-width: 1100px; margin: 0 auto; padding: 24px 20px 64px; }
+
+h1, h2, h3 { line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 8px; }
+h1 { font-size: 2rem; font-weight: 800; }
+h2 { font-size: 1.25rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 700; }
+p { margin: 0 0 12px; }
+section + section { margin-top: 24px; }
+
+a { color: var(--accent-strong); text-underline-offset: 3px; }
+a:hover { color: var(--focus); }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+/* Buttons: the same classes work on <button> and <a>. */
+button, .button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--fg); font: inherit; font-weight: 600;
+  text-decoration: none; cursor: pointer;
 }
-.timeline button[aria-pressed="true"] { border-color: var(--selected); }
+button:hover:not(:disabled), .button:hover { border-color: var(--accent); color: var(--fg); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.button-primary, button[type="submit"] {
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  border-color: transparent; color: #0b0f1a;
+}
+.button-primary:hover, button[type="submit"]:hover:not(:disabled) { border-color: transparent; color: #0b0f1a; filter: brightness(1.1); }
+.button-danger { background: transparent; border-color: var(--hit); color: var(--hit); }
+.button-danger:hover:not(:disabled) { background: var(--hit); border-color: var(--hit); color: #0b0f1a; }
+.button-ghost { background: transparent; }
+
+/* Forms */
+.form { display: grid; gap: 18px; max-width: 560px; }
+.form label { display: grid; gap: 6px; font-weight: 600; }
+.form .help, .help { color: var(--muted); font-size: 0.875rem; font-weight: 400; }
+input, select, textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--fg); font: inherit; font-weight: 400;
+}
+input:hover, select:hover, textarea:hover { border-color: #3a4770; }
+input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+textarea { resize: vertical; }
+::placeholder { color: #66718e; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+th { color: var(--muted); font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+tbody tr:hover { background: rgb(255 255 255 / 2%); }
+
+code, .mono { font-family: var(--mono); font-size: 0.875rem; }
+pre { margin: 0; padding: 12px; overflow-x: auto; border-radius: var(--radius); background: var(--bg); font-family: var(--mono); font-size: 0.875rem; }
+details > summary { cursor: pointer; font-weight: 600; }
+
+.muted { color: var(--muted); }
+.stack { display: grid; gap: 16px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+[role="alert"] { padding: 10px 14px; border: 1px solid var(--hit); border-radius: var(--radius); color: var(--hit); background: rgb(255 107 122 / 8%); }
+
 .hit { color: var(--hit); }
 .block { color: var(--block); }
 .backfire { color: var(--backfire); }
-.panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
-.panel h2 { margin: 0; font-size: 18px; }
-.panel dt { margin-top: 10px; color: var(--muted); font-size: 14px; }
+
+/* The replay page keeps these class names until it is restyled in full. */
+.stage { max-width: 720px; margin: 12px auto; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); }
+.timeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.timeline button { padding: 6px 12px; background: transparent; font-weight: 500; }
+.timeline button[aria-pressed="true"] { border-color: var(--selected); background: var(--surface-2); }
+.panel { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 20px; background: var(--surface); }
+.panel h2 { margin: 0; font-size: 1.125rem; }
+.panel dt { margin-top: 12px; color: var(--muted); font-size: 0.875rem; }
 .panel dd { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mono { font-family: ui-monospace, monospace; font-size: 14px; }
 .fighters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-.fighters summary { cursor: pointer; }
 .fighters p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-.nav button { padding: 6px 12px; font: inherit; }
 .nav button[aria-pressed="true"] { border-color: var(--selected); }
+
+@media (max-width: 640px) {
+  h1 { font-size: 1.6rem; }
+  .fighters { grid-template-columns: 1fr; }
+  .page { padding: 16px 14px 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

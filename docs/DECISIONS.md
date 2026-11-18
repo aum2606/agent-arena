@@ -2076,3 +2076,18 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Checked:** tests for each field and route (ownership, hidden sims, signed-out 401, `mine` routing before `/{match_id}`), on Linux with Postgres.
 
 **Alternatives considered:** making ranked replays public (rejected: they show a user's persona); a model list kept by hand in the UI (it would go stale; the config is where model ids are already checked, D-036 and the 2026-10-30 note).
+
+## D-075 · 2026-11-18 · A readable web UI: dark arena theme in plain CSS, shared components
+
+**Decision:** The web app is restyled and reorganised so a first-time visitor can tell what it is and what to do (owner-approved plan, 2026-11-18). No new dependency.
+- **Look:** one dark "arena" theme as CSS custom properties in `web/app/globals.css` (surface levels, fighter A blue and B orange, hit red, block green, backfire amber), the system font stack, base styles for plain elements, and `.button` / `.button-primary` / `.button-danger` classes that work on links and buttons.
+- **Components:** `web/app/components/` holds `PageHeader`, `Card`, `Badge`, `HpBar`, `EmptyState` and `MatchCard`, each with a CSS Module. Pure text and date helpers are in `web/lib/labels.ts` (unit tested).
+- **CSP-safe styling (D-064):** no `style="..."` attributes anywhere, since `style-src` carries only a nonce; all styling is in CSS files. The health bar is an SVG whose `width` attribute carries the amount.
+- **Content:** the home page explains the game in three steps and shows the signed-in user's own matches (`GET /matches/mine`, D-074) above the public replays; pages say what to do next and what each empty list means.
+- Light mode is dropped: the previous light/dark switch is replaced by the one dark theme.
+
+**Why:** the first walkthrough found bare browser-default pages, no explanation of the game, raw match ids and an empty home page on a new install. Plain CSS keeps the dependency list (next, react, react-dom, pixi.js) and the CSP as they are; Tailwind or a component library would have added a build step and an entry here for little a few shared components do not already cover.
+
+**Not done:** sprites or avatars (Phase 3, D-031 still holds: fighters are drawn from shapes), live spectating, public ranked replays, component tests (jsdom and testing-library would be new dependencies), light mode.
+
+**Alternatives considered:** Tailwind CSS; a component library; keeping the light/dark switch.

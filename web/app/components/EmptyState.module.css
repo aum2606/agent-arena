@@ -1,0 +1,2 @@
+.empty { padding: 28px 20px; border: 1px dashed var(--line); border-radius: var(--radius-lg); text-align: center; }
+.empty p { max-width: 52ch; margin: 0 auto 14px; }

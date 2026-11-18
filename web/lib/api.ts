@@ -67,7 +67,7 @@ export interface Replay {
 }
 
 /** The fighter's name, or "Fighter A"/"Fighter B" for older logs that have none. */
-export function sideLabel(summary: ReplaySummary, side: Side): string {
+export function sideLabel(summary: Pick<ReplaySummary, "name_a" | "name_b">, side: Side): string {
   return (side === "a" ? summary.name_a : summary.name_b) ?? `Fighter ${side.toUpperCase()}`;
 }
 

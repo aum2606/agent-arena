@@ -1,0 +1,11 @@
+.header { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--line); background: rgb(11 15 26 / 85%); backdrop-filter: blur(10px); }
+.inner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; max-width: 1100px; margin: 0 auto; padding: 10px 20px; }
+.brand { color: var(--fg); font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+.brand::before { content: "⚔ "; color: var(--accent-strong); }
+.brand:hover { color: var(--fg); }
+.nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.link, .active { padding: 6px 12px; border-radius: var(--radius); color: var(--muted); font-weight: 600; text-decoration: none; }
+.link:hover { color: var(--fg); background: var(--surface-2); }
+.active { color: var(--fg); background: var(--surface-2); }
+.account { display: flex; align-items: center; gap: 10px; }
+.user { color: var(--muted); font-weight: 600; }

@@ -27,4 +27,13 @@ docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q runsc \
 # The compose file publishes Postgres and Redis on the host's loopback address only.
 export DATABASE_URL="${DATABASE_URL:-postgresql://arena:${POSTGRES_PASSWORD}@127.0.0.1:5442/arena}"
 export REDIS_URL="${REDIS_URL:-redis://:${REDIS_PASSWORD}@127.0.0.1:6379}"
-exec uv run --no-dev arq arena_api.jobs.WorkerSettings
+# Only what the worker needs, not the whole env file: the GitHub client secret has no business here,
+# and model-written code is a neighbour of this process (D-068, D-078).
+pass=()
+for name in PATH HOME USER LANG LC_ALL TMPDIR XDG_CACHE_HOME UV_PROJECT_ENVIRONMENT UV_CACHE_DIR \
+  DOCKER_HOST DOCKER_CONFIG DATABASE_URL MIGRATE_DATABASE_URL REDIS_URL KEY_ENCRYPTION_SECRET \
+  KEY_ENCRYPTION_OLD_SECRETS PUBLIC_URL FIGHTERS_CONFIG ARENA_DB_POOL OPENROUTER_API_KEY \
+  GEMINI_API_KEY GROQ_API_KEY; do
+  if [ -n "${!name+x}" ]; then pass+=("$name=${!name}"); fi
+done
+exec env -i "${pass[@]}" uv run --no-dev arq arena_api.jobs.WorkerSettings

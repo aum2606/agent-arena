@@ -163,6 +163,28 @@ def dev_login(body: DevLogin) -> Response:
     return response
 
 
+@router.post("/logout-all", status_code=204, dependencies=[Depends(visitor_limit("session"))])
+def logout_all(user: Annotated[User, Depends(current_user)]) -> Response:
+    """Sign out on every device, this one included."""
+    accounts.end_all_sessions(user.id)
+    response = Response(status_code=204)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
+@router.delete("/me", status_code=204, dependencies=[Depends(visitor_limit("session"))])
+def delete_me(user: Annotated[User, Depends(current_user)]) -> Response:
+    """Erase the account, its fighters and saved keys (D-078)."""
+    if not accounts.delete_account(user.id):
+        raise HTTPException(
+            status_code=409,
+            detail="a match of yours is waiting or being played: try again after it",
+        )
+    response = Response(status_code=204)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
 @router.post("/logout", status_code=204)
 def logout(token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None) -> Response:
     if token:

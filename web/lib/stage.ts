@@ -9,7 +9,7 @@ const WIDTH = 720;
 const HEIGHT = 320;
 const GROUND = 250;
 const BASE_X: Record<Side, number> = { a: 190, b: 530 };
-const COLOR: Record<Side, number> = { a: 0x3b82f6, b: 0xf97316 };
+const COLOR: Record<Side, number> = { a: 0x4aa3ff, b: 0xff8a3d }; // the page's --side-a and --side-b
 const BAR = { width: 300, height: 16, y: 34 };
 const BAR_X: Record<Side, number> = { a: 20, b: WIDTH - 20 - BAR.width };
 
@@ -107,7 +107,7 @@ export class Stage {
       b: this.label(names.b, BAR_X.b, 12),
     };
 
-    const ground = new Graphics().rect(0, GROUND, WIDTH, 2).fill(0x334155);
+    const ground = new Graphics().rect(0, GROUND, WIDTH, 2).fill(0x28324d);
     const orb = new Graphics().circle(0, 0, 14).fill(0xfacc15);
     const mark = new Text({ text: "?", style: { fill: 0x1c1917, fontSize: 18, fontWeight: "bold" } });
     mark.anchor.set(0.5);
@@ -129,7 +129,7 @@ export class Stage {
     await app.init({
       width: WIDTH,
       height: HEIGHT,
-      background: 0x0f172a,
+      background: 0x121829,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,

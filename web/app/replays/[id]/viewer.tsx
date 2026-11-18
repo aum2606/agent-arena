@@ -2,26 +2,15 @@
 
 import { useMemo, useState } from "react";
 
-import {
-  resultText,
-  sideLabel,
-  type FighterInfo,
-  type Replay,
-  type ReplaySummary,
-  type Turn,
-} from "../../../lib/api";
+import { resultText, sideLabel, type FighterInfo, type Replay, type Side, type Turn } from "../../../lib/api";
 import { planMatch } from "../../../lib/choreography";
+import { outcomeLabel, whatHappened } from "../../../lib/labels";
+import { Card } from "../../components/Card";
+import { HpBar } from "../../components/HpBar";
 import { StageView } from "./stage-view";
+import styles from "./viewer.module.css";
 
-function Row({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string | number | null;
-  mono?: boolean;
-}) {
+function Row({ label, value, mono = false }: { label: string; value: string | number | null; mono?: boolean }) {
   if (value === null) return null;
   return (
     <>
@@ -31,79 +20,148 @@ function Row({
   );
 }
 
-function RevealPanel({ turn, summary }: { turn: Turn; summary: ReplaySummary }) {
-  const defender = turn.attacker === "a" ? "b" : "a";
+/** One side's answer to the problem, with a plain verdict next to it. */
+function Answer({
+  title,
+  name,
+  side,
+  value,
+  verdict,
+  good,
+  mono = false,
+}: {
+  title: string;
+  name: string;
+  side: Side;
+  value: string | null;
+  verdict: string | null;
+  good: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div className={`${styles.answer} ${side === "a" ? styles.sideA : styles.sideB}`}>
+      <span className={styles.who}>
+        {title} · {name}
+      </span>
+      <span className={mono ? `${styles.value} mono` : styles.value}>{value ?? "nothing"}</span>
+      {verdict && <span className={good ? "block" : "hit"}>{verdict}</span>}
+    </div>
+  );
+}
+
+function RevealPanel({ turn, names }: { turn: Turn; names: Record<Side, string> }) {
+  const attacker = turn.attacker;
+  const defender: Side = attacker === "a" ? "b" : "a";
   const first = turn.first_attempt;
   const code = turn.domain === "code";
+  const backfired = turn.outcome === "backfire";
+  const answered = !turn.timed_out && turn.defender_answer !== null;
   return (
-    <section className="panel" aria-label={`Turn ${turn.n} details`}>
+    <section className={styles.reveal} aria-label={`Turn ${turn.n} details`}>
       <h2>
-        Turn {turn.n}: {sideLabel(summary, turn.attacker)} attacks →{" "}
-        <span className={turn.outcome}>{turn.outcome}</span>
+        Turn {turn.n}: {names[attacker]} attacks → <span className={turn.outcome}>{outcomeLabel(turn.outcome)}</span>
       </h2>
-      <dl>
-        {first && (
-          <>
-            <Row label="First attempt (failed its check)" value={first.problem} />
-            <Row label="First attempt: stated answer" value={first.answer} />
-            <Row label="First attempt: code" value={first.code} mono />
-            <Row label="First attempt: why it failed" value={first.reason} />
-          </>
-        )}
-        {!first && turn.retried && (
-          <Row label="First attempt" value="failed its check; retried once (details not logged)" />
-        )}
-        <Row label={first ? "Final problem" : "Problem"} value={turn.problem} />
-        <Row
-          label={code ? "Expected outputs (stated by the attacker)" : "Attacker's stated answer"}
+      <p className={styles.what}>{whatHappened(turn, names)}</p>
+
+      <h3>The problem</h3>
+      {turn.problem ? (
+        <p className={styles.problem}>{turn.problem}</p>
+      ) : (
+        <p className="muted">The attack never produced a problem that passed its check.</p>
+      )}
+
+      <div className="grid-2">
+        <Answer
+          title="Attacker"
+          name={names[attacker]}
+          side={attacker}
           value={turn.stated_answer}
+          verdict={backfired ? "failed its own check" : "proved by its own program"}
+          good={!backfired}
           mono={code}
         />
-        <Row label={code ? "Reference solution" : "Attacker's code"} value={turn.code} mono />
-        <Row label="Hidden tests (inputs)" value={turn.tests} mono />
-        <Row label="Failed its own check" value={turn.failure_reason} />
-        <Row
-          label={`${sideLabel(summary, defender)}'s ${code ? "code" : "answer"}`}
-          value={turn.timed_out ? "timed out or cut off" : turn.defender_answer}
-          mono={code && !turn.timed_out}
-        />
-        <Row
-          label="Difficulty"
-          value={
-            turn.difficulty === null
-              ? null
-              : `${turn.difficulty} (${turn.panel_failed} of ${turn.panel_answered} reference models failed it)`
-          }
-        />
-        <Row
-          label="Panel review"
-          value={
-            turn.review_overturned === null
-              ? null
-              : `${turn.review_overturned ? "overturned the hit" : "kept the hit"}: ${turn.review_for_defender} of ${turn.review_answered} reference models that answered gave the defender's answer`
-          }
-        />
-        <Row label="Defender's score" value={turn.score} />
-        <Row label="Damage" value={turn.damage_math} />
-        <Row
-          label="Took the damage"
-          value={turn.target === null ? null : sideLabel(summary, turn.target)}
-        />
-        <Row label="Turn length" value={`${(turn.duration_ms / 1000).toFixed(1)} s`} />
-      </dl>
+        {!backfired && (
+          <Answer
+            title="Defender"
+            name={names[defender]}
+            side={defender}
+            value={turn.timed_out ? "No answer in time" : turn.defender_answer}
+            verdict={answered ? (turn.score === 1 ? "correct" : "wrong") : null}
+            good={turn.score === 1}
+            mono={code && answered}
+          />
+        )}
+      </div>
+
+      <p>
+        <strong>Damage:</strong> {turn.damage_math}
+        {turn.target !== null && ` · ${names[turn.target]} took it`}
+      </p>
+      {turn.difficulty !== null && (
+        <p className="muted">
+          Difficulty {turn.difficulty}: {turn.panel_failed} of {turn.panel_answered} reference models failed this problem.
+        </p>
+      )}
+      {turn.review_overturned !== null && (
+        <p className="muted">
+          Panel review {turn.review_overturned ? "overturned the hit" : "kept the hit"}: {turn.review_for_defender} of{" "}
+          {turn.review_answered} reference models that answered gave the defender&apos;s answer.
+        </p>
+      )}
+
+      <details>
+        <summary>Show the code and the details</summary>
+        <dl>
+          {first && (
+            <>
+              <Row label="First attempt (failed its check)" value={first.problem} />
+              <Row label="First attempt: stated answer" value={first.answer} />
+              <Row label="First attempt: code" value={first.code} mono />
+              <Row label="First attempt: why it failed" value={first.reason} />
+            </>
+          )}
+          {!first && turn.retried && (
+            <Row label="First attempt" value="failed its check; retried once (details not logged)" />
+          )}
+          <Row label={code ? "Reference solution" : "Attacker's code"} value={turn.code} mono />
+          <Row label="Hidden tests (inputs)" value={turn.tests} mono />
+          <Row label="Failed its own check" value={turn.failure_reason} />
+          <Row label="Defender's score" value={turn.score} />
+          <Row label="Turn length" value={`${(turn.duration_ms / 1000).toFixed(1)} s`} />
+        </dl>
+      </details>
     </section>
   );
 }
 
-function Fighter({ label, info }: { label: string; info: FighterInfo | null }) {
-  if (info === null) return <div className="muted">{label}: no details in this older log</div>;
+function FighterCard({
+  side,
+  name,
+  info,
+  hp,
+  max,
+}: {
+  side: Side;
+  name: string;
+  info: FighterInfo | null;
+  hp: number;
+  max: number;
+}) {
   return (
-    <details>
-      <summary>
-        {label}: {info.name} ({info.provider} / {info.model})
-      </summary>
-      <p>{info.persona}</p>
-    </details>
+    <div className={`${styles.fighter} ${side === "a" ? styles.sideA : styles.sideB}`}>
+      <strong className={styles.name}>{name}</strong>
+      <span className="muted">{info ? `${info.provider} / ${info.model}` : "No details in this older log"}</span>
+      <HpBar hp={hp} max={max} side={side} label={`${name} health`} />
+      <span className="muted">
+        {hp} / {max} HP
+      </span>
+      {info && (
+        <details>
+          <summary>Persona</summary>
+          <p>{info.persona}</p>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -118,10 +176,7 @@ export function Viewer({ replay }: { replay: Replay }) {
   const { summary } = replay;
   const turn = replay.turns[selected];
   const plans = useMemo(() => planMatch(replay.turns, replay.max_hp), [replay]);
-  const names = useMemo(
-    () => ({ a: sideLabel(summary, "a"), b: sideLabel(summary, "b") }),
-    [summary],
-  );
+  const names = useMemo(() => ({ a: sideLabel(summary, "a"), b: sideLabel(summary, "b") }), [summary]);
   const last = replay.turns.length - 1;
 
   function playTurn(index: number) {
@@ -144,12 +199,20 @@ export function Viewer({ replay }: { replay: Replay }) {
   }
 
   return (
-    <>
-      <p>{resultText(summary)}</p>
-      <div className="fighters">
-        <Fighter label="A" info={replay.fighter_a} />
-        <Fighter label="B" info={replay.fighter_b} />
+    <div className="stack">
+      <Card tone="callout">
+        <p className={styles.result}>{resultText(summary)}</p>
+        <p className="help">
+          Press Play match to watch the whole fight, or pick a turn below. Each turn reveals the problem, both answers and
+          the damage.
+        </p>
+      </Card>
+
+      <div className="grid-2">
+        <FighterCard side="a" name={names.a} info={replay.fighter_a} hp={turn.hp_a} max={replay.max_hp} />
+        <FighterCard side="b" name={names.b} info={replay.fighter_b} hp={turn.hp_b} max={replay.max_hp} />
       </div>
+
       <StageView
         plan={plans[selected]}
         names={names}
@@ -159,31 +222,45 @@ export function Viewer({ replay }: { replay: Replay }) {
         runId={runId}
         onEnd={turnEnded}
       />
-      <div className="nav">
-        <button onClick={playMatch}>Play match</button>
+
+      <div className="row">
+        <button className="button-primary" onClick={playMatch}>
+          Play match
+        </button>
         <button onClick={() => playTurn(selected)}>Replay turn</button>
-        <button
-          disabled={status === "idle"}
-          onClick={() => setStatus(status === "paused" ? "playing" : "paused")}
-        >
+        <button disabled={status === "idle"} onClick={() => setStatus(status === "paused" ? "playing" : "paused")}>
           {status === "paused" ? "Resume" : "Pause"}
         </button>
         <button aria-pressed={fast} onClick={() => setFast(!fast)}>
-          {fast ? "2×" : "1×"}
+          Speed {fast ? "2×" : "1×"}
         </button>
       </div>
+
       <div className="timeline" role="group" aria-label="Turns">
         {replay.turns.map((t, i) => (
           <button key={t.n} aria-pressed={i === selected} onClick={() => playTurn(i)}>
-            {t.n} · {t.attacker.toUpperCase()} · <span className={t.outcome}>{t.outcome}</span>
+            Turn {t.n} · {names[t.attacker]} · <span className={t.outcome}>{outcomeLabel(t.outcome)}</span>
           </button>
         ))}
       </div>
-      <p className="muted">
-        {sideLabel(summary, "a")}: {turn.hp_a} HP · {sideLabel(summary, "b")}: {turn.hp_b} HP after
-        this turn
-      </p>
-      <RevealPanel turn={turn} summary={summary} />
-    </>
+
+      <RevealPanel turn={turn} names={names} />
+
+      <details className={styles.legend}>
+        <summary>How to read a replay</summary>
+        <ul>
+          <li>
+            <span className="hit">Hit</span>: the defender got the problem wrong (or ran out of time) and took damage.
+          </li>
+          <li>
+            <span className="block">Blocked</span>: the defender answered correctly, so nobody took damage.
+          </li>
+          <li>
+            <span className="backfire">Backfired</span>: the attacker&apos;s own program did not prove its answer, so the
+            attacker takes the damage instead.
+          </li>
+        </ul>
+      </details>
+    </div>
   );
 }

@@ -2044,3 +2044,21 @@ existing problem filter.
 
 **Alternatives considered:** a worker in the compose stack with the Docker socket mounted (gives the machine away); picking one tunnel
 vendor for everyone (ties an open-source project to one company's free plan); defaulting the secrets for convenience (see Why).
+
+## D-073 · 2026-11-18 · Development style policy for Next's overlay, a dependency bump, and a production-only audit gate
+
+**Decision:**
+- In development only, `style-src` is `'self' 'unsafe-inline'` with no nonce (`web/lib/csp.ts`). Production is unchanged: `'self' 'nonce-...'`, no `unsafe-inline`.
+- `next` 16.4.3 to 16.4.6 and `vitest` 5.0.5 to 5.1.1 (lockfile), which clears `npm audit --omit=dev` (a moderate `next` advisory).
+- CI's audit step is now `npm audit --omit=dev --audit-level=high`: it gates on what ships.
+
+**Why:**
+- Next's development overlay writes `<style>` tags without a nonce, so the strict policy blocked them and its button showed as an
+  unstyled grey square at the top of every page (34 console errors per page). A nonce makes browsers ignore `unsafe-inline`, so the
+  development policy cannot have both; it mirrors how `unsafe-eval` is already development-only. A production build has no overlay.
+- `npm audit` still reports 5 high findings, all one advisory: `picomatch` ReDoS (GHSA-fc5q-39xc-vjpf), reached through `vitest` ->
+  `vite` / `tinyglobby` / `fdir`. It covers every picomatch version, so there is nothing to upgrade to (npm's only "fix" is a vitest
+  downgrade). It is test tooling and never ships, but with the old gate it would fail every push. Production dependencies stay gated.
+
+**Alternatives considered:** `devIndicators: false` (hides the overlay and its build-error badge); a nonce for the overlay (Next does not
+pass one to it); pinning `vitest` back (older, and still affected); leaving the gate red.

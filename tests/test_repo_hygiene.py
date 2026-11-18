@@ -67,7 +67,8 @@ def test_ci_installs_from_the_lock_audits_and_builds_the_images() -> None:
     ci = text(".github/workflows/ci.yml")
 
     assert "uv sync --locked" in ci and "--frozen" not in ci  # a stale lock fails CI
-    assert "npm audit --audit-level=high" in ci
+    # What ships; D-073 says why dev tooling is not gated.
+    assert "npm audit --omit=dev --audit-level=high" in ci
     assert ci.count("docker build") >= 2  # the API and web images once broke unnoticed (D-068)
 
 

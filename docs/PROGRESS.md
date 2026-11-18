@@ -78,6 +78,16 @@ a cross-site write and body-size guard, a bounded connection pool); pins and CI 
 in CI, Dependabot, ignore files). 750 tests pass on Linux with Postgres and gVisor; checked live on the local stack in a browser.
 Not yet seen on GitHub: the new CI `images` job and Dependabot. What it left, and the deploy checklist, are in `SECURITY.md`.
 
+## Security hardening, second pass (D-077 to D-081, 2026-11-18)
+An audit of every route, the sign-in and sessions, the prompts and model boundary, the web app, the self-hosting kit and the GitHub settings found the
+core guards holding (owner checks, cross-site and size guards, CSP, no HTML sinks, keys never in prompts) and 12 gaps, fixed in four branches: a shared
+daily budget for server-paid matches, a per-user ranked cap, a pair limit and a session-check limit (D-077); key-secret rotation, sign out everywhere,
+account deletion and a narrower worker environment (D-078); a limited database role with a one-shot migration (D-079); a stricter problem filter with
+look-alike letters, the deployer's blocked terms, hidden characters out of logs, dev sign-in refused through tunnels (D-080); a security event log, no
+server banner and a threat model (D-081). Checked: 850+ tests on Linux with Postgres and gVisor, and the limited role against a real Postgres (it cannot
+create tables or roles, run programs or add extensions). Found and left: the API holds the key secret, so a break-in there could decrypt stored keys.
+Not done: content moderation beyond a word list, GitHub repository settings (the owner's).
+
 ## A readable web UI (D-073 to D-075, 2026-11-18)
 The first walkthrough found bare pages, no explanation of the game, raw match ids and an empty home page on a new install. Redone in
 five small branches (owner-approved plan): the dev overlay's grey box fixed (a development-only style policy) with `next` and `vitest`

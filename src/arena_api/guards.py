@@ -7,6 +7,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from arena_api.auth import public_url, public_url_is_local
+from arena_api.security_log import record
+from arena_api.visitor_limits import client_address
 
 MAX_BODY_BYTES = 64 * 1024  # the biggest real body (a persona of 2,000 characters) is a few KB
 _UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
@@ -33,7 +35,14 @@ _HEADERS = {
 }
 
 
-def _refuse(status: int, detail: str) -> Response:
+def _refuse(request: Request, status: int, detail: str) -> Response:
+    record(
+        "request_refused",
+        status=status,
+        method=request.method,
+        path=request.url.path,
+        ip=client_address(request),
+    )
     return JSONResponse({"detail": detail}, status_code=status, headers=_HEADERS)
 
 
@@ -50,12 +59,12 @@ def add_guards(app: FastAPI) -> None:
             if site not in (None, "same-origin", "none") or (
                 origin is not None and not _origin_allowed(origin)
             ):
-                return _refuse(403, "cross-site requests are not allowed")
+                return _refuse(request, 403, "cross-site requests are not allowed")
             length = request.headers.get("content-length")
             if length is None and request.headers.get("transfer-encoding"):
-                return _refuse(411, "send a Content-Length")
+                return _refuse(request, 411, "send a Content-Length")
             if length is not None and (not length.isdigit() or int(length) > MAX_BODY_BYTES):
-                return _refuse(413, "the request is too large")
+                return _refuse(request, 413, "the request is too large")
         response = await call_next(request)
         response.headers.update(_HEADERS)
         return response

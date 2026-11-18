@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException, Request
 from redis.exceptions import RedisError
 
 from arena_api.deps import get_queue
+from arena_api.security_log import record
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ async def count_request(
         logger.warning("rate limit %r not checked, Redis failed: %s", name, exc)
         return
     if used > allowed:
+        record("rate_limited", rule=name)
         raise HTTPException(
             status_code=429,
             detail=detail,

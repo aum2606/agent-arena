@@ -456,3 +456,64 @@ def test_ranked_requests_count_towards_the_users_waiting_limit(sign_in: SignIn) 
     codes = [ranked(ada, i).status_code for i in ids]
 
     assert codes == [202, 202, 429]
+
+
+def test_a_played_match_shows_in_the_fighters_rating_and_record(sign_in: SignIn) -> None:
+    finished_match(sign_in)
+
+    ada = sign_in("ada").get("/fighters").json()[0]
+    bob = sign_in("bob").get("/fighters").json()[0]
+
+    assert (ada["rating"], ada["games"], ada["wins"], ada["losses"]) == (1216.0, 1, 1, 0)
+    assert (bob["rating"], bob["games"], bob["wins"], bob["losses"]) == (1184.0, 1, 0, 1)
+
+
+def test_a_ranked_replay_says_it_is_ranked_and_when_it_ended(sign_in: SignIn) -> None:
+    match_id = finished_match(sign_in)
+
+    summary = sign_in("ada").get(f"/replays/{match_id}").json()["summary"]
+
+    assert summary["mode"] == "ranked" and summary["ended_at"]
+
+
+def test_my_matches_lists_my_spars_and_ranked_matches_newest_first(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id, _ = verified(ada), verified(bob, api_key=BOB_KEY)
+    ranked_id = str(ranked(ada, ada_id).json()["id"])
+    play(ranked_id, a_wins)
+    spar_id = str(ada.post(f"/fighters/{ada_id}/spar").json()["id"])
+
+    mine = ada.get("/matches/mine").json()
+
+    assert [m["id"] for m in mine] == [spar_id, ranked_id]
+    spar, played = mine
+    assert (spar["mode"], spar["status"], spar["you"]) == ("sparring", "queued", "a")
+    assert (spar["winner"], spar["hp_a"], spar["turn_count"], spar["ended_at"]) == (None,) * 4
+    assert (played["mode"], played["status"], played["you"], played["winner"]) == (
+        "ranked", "finished", "a", "a",
+    )  # fmt: skip
+    assert (played["name_a"], played["name_b"]) == ("ada/rex", "bob/rex")  # owner/fighter
+    assert played["turn_count"] and played["ended_at"]
+
+
+def test_the_opponents_owner_sees_the_ranked_match_as_fighter_b(sign_in: SignIn) -> None:
+    ada, bob = sign_in("ada"), sign_in("bob")
+    ada_id, _ = verified(ada), verified(bob, api_key=BOB_KEY)
+    ranked_id = str(ranked(ada, ada_id).json()["id"])
+
+    assert [(m["id"], m["you"]) for m in bob.get("/matches/mine").json()] == [(ranked_id, "b")]
+
+
+def test_my_matches_hides_other_peoples_matches_and_the_public_sims(sign_in: SignIn) -> None:
+    finished_match(sign_in)
+    sim = {"match_id": "sim1", "turns": [], "schema": 2}
+    store.insert_finished(
+        "sim1", sim, store.ReplaySummary("sim1", None, None, 0.0, 0.0, 0, None, None)
+    )
+
+    assert sign_in("cy").get("/matches/mine").json() == []
+    assert all(m["mode"] != "sim" for m in sign_in("ada").get("/matches/mine").json())
+
+
+def test_my_matches_needs_a_session(sign_in: SignIn) -> None:
+    assert TestClient(app).get("/matches/mine").status_code == 401

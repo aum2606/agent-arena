@@ -14,7 +14,7 @@ interface Props {
 export function FighterForm({ options, fighter }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [provider, setProvider] = useState(fighter?.provider ?? options.providers[0] ?? "");
+  const [provider, setProvider] = useState(fighter?.provider ?? options.providers[0]?.name ?? "");
   const [model, setModel] = useState(fighter?.model ?? "");
   const [persona, setPersona] = useState(fighter?.persona ?? options.templates[0]?.persona ?? "");
   const [apiKey, setApiKey] = useState("");
@@ -63,7 +63,7 @@ export function FighterForm({ options, fighter }: Props) {
         Provider
         <select value={provider} onChange={(e) => setProvider(e.target.value)}>
           {options.providers.map((p) => (
-            <option key={p}>{p}</option>
+            <option key={p.name}>{p.name}</option>
           ))}
         </select>
       </label>

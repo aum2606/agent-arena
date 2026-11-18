@@ -102,8 +102,11 @@ def test_lists_replays_with_their_result(database: str, client: TestClient) -> N
 
     assert response.status_code == 200
     assert [r["id"] for r in response.json()] == ["m_a", "m_b"]
-    assert response.json()[1] == {
+    second = response.json()[1]
+    assert second.pop("ended_at")  # when it finished; imported logs get the import time
+    assert second == {
         "id": "m_b",
+        "mode": "sim",
         "winner": "b",
         "reason": "decision",
         "hp_a": 100.0,

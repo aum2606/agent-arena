@@ -73,6 +73,7 @@ ignore_names = [
     "damage_math",
     "review_overturned",
     "ranked_opt_in",
+    "you",
     "review_answered",
     "review_for_defender",
     "defender_answer",

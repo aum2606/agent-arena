@@ -27,6 +27,8 @@ class Settings:
 class Provider:
     base_url: str
     api_key_env: str
+    # Where a person gets a key for this provider; the fighter form links to it.
+    key_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,9 @@ def load_config(path: Path) -> Config:
         name: _build(Provider, raw, f"provider {name!r}")
         for name, raw in data.get("providers", {}).items()
     }
+    for name, provider in providers.items():
+        if provider.key_url is not None and not provider.key_url.startswith("https://"):
+            raise ConfigError(f"provider {name!r}: key_url must be an https:// address")
     fighters: dict[str, Fighter] = {}
     for raw in data.get("fighters", []):
         fighter = _build(Fighter, raw, "fighter")

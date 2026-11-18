@@ -181,3 +181,20 @@ def test_attack_retries_default_to_one_and_cannot_be_negative(tmp_path: Path) ->
 
     with pytest.raises(ConfigError, match="attack_retries"):
         load_config(write(tmp_path, with_setting("attack_retries = -1")))
+
+
+def with_key_url(url: str) -> str:
+    line = 'api_key_env = "GROQ_API_KEY"'
+    return VALID.replace(line, f'{line}\nkey_url = "{url}"')
+
+
+def test_a_provider_may_say_where_to_get_a_key(tmp_path: Path) -> None:
+    config = load_config(write(tmp_path, with_key_url("https://example.test/keys")))
+
+    assert config.providers["groq"].key_url == "https://example.test/keys"
+    assert load_config(write(tmp_path, VALID)).providers["groq"].key_url is None
+
+
+def test_a_key_link_must_be_https(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="key_url"):
+        load_config(write(tmp_path, with_key_url("http://example.test/keys")))

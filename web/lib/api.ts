@@ -53,6 +53,9 @@ export interface ReplaySummary {
   turn_count: number;
   name_a: string | null;
   name_b: string | null;
+  mode: "sim" | "sparring" | "ranked";
+  /** ISO time the match finished; null only for a summary the API has not filled in. */
+  ended_at: string | null;
 }
 
 export interface Replay {

@@ -2062,3 +2062,17 @@ vendor for everyone (ties an open-source project to one company's free plan); de
 
 **Alternatives considered:** `devIndicators: false` (hides the overlay and its build-error badge); a nonce for the overlay (Next does not
 pass one to it); pinning `vitest` back (older, and still affected); leaving the gate red.
+
+## D-074 · 2026-11-18 · API fields for a readable UI
+
+**Decision:** The web redesign (owner-approved 2026-11-18: UI plus small API additions, an arena look, plain CSS, no new dependency) needs data the API did not give. Added:
+- `ReplaySummary` gains `mode` (sim, sparring or ranked) and `ended_at`. The public list is still sims only; the replay detail fills both from the match row, because the log does not say how a match came about.
+- `GET /matches/mine` (signed in, visitor-limited like the other reads): the user's latest 20 spars and ranked matches as requester or as the ranked opponent's owner, newest first, with `you` ("a" or "b"), the names, and the result fields (null until finished). Without it a new self-hosted site has nothing on its home page, since the only public list is imported sims.
+- `FighterView` gains `rating`, `games`, `wins`, `draws`, `losses` from `ratings` (rating is null before the first ranked game).
+- `GET /fighters/options` returns providers as `{name, models, key_url}`. `models` are the model ids the config already uses with that provider (house fighters and panel), as suggestions in a free-text field; `key_url` is a new optional `key_url` on each `[providers.*]` entry in `config/fighters.toml`, which must be an `https://` address.
+
+**Why:** a first-time visitor needs to see what happened (who fought, when, how it went), what their fighter has done, and where to get a key. No new write routes, no schema change, and ranked and sparring replays stay private to their owners (D-040's rule, unchanged).
+
+**Checked:** tests for each field and route (ownership, hidden sims, signed-out 401, `mine` routing before `/{match_id}`), on Linux with Postgres.
+
+**Alternatives considered:** making ranked replays public (rejected: they show a user's persona); a model list kept by hand in the UI (it would go stale; the config is where model ids are already checked, D-036 and the 2026-10-30 note).

@@ -182,10 +182,21 @@ def test_a_cap_can_be_set_and_changed_with_a_version(sign_in: SignIn) -> None:
 def test_options_list_the_providers_and_persona_templates(sign_in: SignIn) -> None:
     options = sign_in("ada").get("/fighters/options").json()
 
-    assert sorted(options["providers"]) == ["gemini", "groq"]
+    by_name = {p["name"]: p for p in options["providers"]}
+    assert sorted(by_name) == ["gemini", "groq"]
+    # Suggestions are the model ids the config already uses for that provider.
+    assert by_name["gemini"] == {"name": "gemini", "models": ["house-model"], "key_url": None}
+    assert by_name["groq"] == {"name": "groq", "models": [], "key_url": "https://groq.test/keys"}
     assert {t["name"] for t in options["templates"]} == {
         "Aggressive",
         "Defensive",
         "Counter-puncher",
     }
     assert all(t["persona"] for t in options["templates"])
+
+
+def test_a_new_fighter_has_no_rating_and_an_empty_record(sign_in: SignIn) -> None:
+    body = create(sign_in("ada")).json()
+
+    assert body["rating"] is None
+    assert (body["games"], body["wins"], body["draws"], body["losses"]) == (0, 0, 0, 0)

@@ -13,14 +13,17 @@ backoff_base_s = 2.0
 [providers.openrouter]
 base_url = "https://openrouter.ai/api/v1"
 api_key_env = "OPENROUTER_API_KEY"
+key_url = "https://openrouter.ai/keys"
 
 [providers.gemini]
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
 api_key_env = "GEMINI_API_KEY"
+key_url = "https://aistudio.google.com/apikey"
 
 [providers.groq]
 base_url = "https://api.groq.com/openai/v1"
 api_key_env = "GROQ_API_KEY"
+key_url = "https://console.groq.com/keys"
 
 # Model IDs checked against each provider's /models endpoint on 2026-10-30.
 [[fighters]]

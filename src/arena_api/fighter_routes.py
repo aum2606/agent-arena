@@ -103,7 +103,17 @@ def list_mine(user: Annotated[User, Depends(current_user)]) -> list[FighterView]
 
 @router.get("/options")
 def options(user: Annotated[User, Depends(current_user)]) -> dict[str, object]:
-    providers = list(load_config(fighters_config_path()).providers)
+    config = load_config(fighters_config_path())
+    # The models the config already uses are the only ones known to work with that provider.
+    used = [*config.fighters.values(), *config.panel]
+    providers = [
+        {
+            "name": name,
+            "models": list(dict.fromkeys(f.model for f in used if f.provider == name)),
+            "key_url": provider.key_url,
+        }
+        for name, provider in config.providers.items()
+    ]
     return {"providers": providers, "templates": PERSONA_TEMPLATES}
 
 

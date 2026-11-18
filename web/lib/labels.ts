@@ -1,4 +1,4 @@
-import type { Side } from "./api";
+import type { Outcome, Side, Turn } from "./api";
 
 export type MatchMode = "sim" | "sparring" | "ranked";
 export type MatchState = "queued" | "running" | "finished" | "failed";
@@ -92,4 +92,31 @@ export function winRate(wins: number, games: number): string {
 
 export function recordText(f: { wins: number; draws: number; losses: number; games: number }): string {
   return f.games === 0 ? "No ranked games yet" : `${f.wins} won · ${f.draws} drawn · ${f.losses} lost`;
+}
+
+const OUTCOMES: Record<Outcome, string> = { hit: "Hit", block: "Blocked", backfire: "Backfired" };
+
+export const outcomeLabel = (outcome: Outcome): string => OUTCOMES[outcome];
+
+const damageText = (damage: number): string => (Number.isInteger(damage) ? `${damage}` : damage.toFixed(1));
+
+/** One sentence saying how a turn went, for someone who has not read the rules. */
+export function whatHappened(
+  turn: Pick<Turn, "attacker" | "outcome" | "damage" | "timed_out" | "review_overturned">,
+  names: Record<Side, string>,
+): string {
+  const defender = names[turn.attacker === "a" ? "b" : "a"];
+  const attacker = names[turn.attacker];
+  const cost = `${damageText(turn.damage)} damage`;
+  if (turn.outcome === "backfire") {
+    return `${attacker}'s own check failed, so the attack backfired: ${attacker} took ${cost}.`;
+  }
+  if (turn.outcome === "block") {
+    return turn.review_overturned
+      ? `A reference panel judged ${defender}'s answer correct, so a hit was overturned: no damage.`
+      : `${defender} answered correctly, so the attack was blocked.`;
+  }
+  return turn.timed_out
+    ? `${defender} did not answer in time and took ${cost}.`
+    : `${defender} gave a wrong answer and took ${cost}.`;
 }

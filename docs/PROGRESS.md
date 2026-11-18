@@ -78,6 +78,18 @@ a cross-site write and body-size guard, a bounded connection pool); pins and CI 
 in CI, Dependabot, ignore files). 750 tests pass on Linux with Postgres and gVisor; checked live on the local stack in a browser.
 Not yet seen on GitHub: the new CI `images` job and Dependabot. What it left, and the deploy checklist, are in `SECURITY.md`.
 
+## A readable web UI (D-073 to D-075, 2026-11-18)
+The first walkthrough found bare pages, no explanation of the game, raw match ids and an empty home page on a new install. Redone in
+five small branches (owner-approved plan): the dev overlay's grey box fixed (a development-only style policy) with `next` and `vitest`
+bumped and CI's audit gate narrowed to production dependencies (D-073); API fields the pages need (`mode` and `ended_at` on replays,
+`GET /matches/mine`, rating and record on fighters, provider key links and model suggestions; D-074); a dark arena theme in plain CSS
+with shared components, an explained home page and sign-in (D-075); fighter cards, a guided form and a next-step callout; the replay
+page as "A vs B" with health bars, a readable reveal panel and a legend, and a styled leaderboard. Checked live on the local stub stack
+in the browser: sign-in, create a fighter, spar, a ranked match between two users, the replay, the leaderboard, a 375 px width (no
+sideways scroll), and a production build (strict CSP, no inline styles). 773 Python tests pass on Linux; 44 web tests pass.
+Not done: component tests, avatars or sprites, a light theme, public ranked replays. The two tunnels in the self-hosting guide are
+still untested.
+
 ## Self-hosting kit (D-072, 2026-11-15)
 The project is open source with no hosted instance, so deployment became a kit for anyone: `docker-compose.prod.yml` (refuses to start without
 its secrets, no dev login, Redis password, no container worker), `deploy/run-worker.sh` (the worker on a host with Docker and gVisor, refusing

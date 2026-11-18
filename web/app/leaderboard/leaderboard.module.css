@@ -1,0 +1,5 @@
+.wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.wrap table th:first-child, .wrap table td:first-child { padding-left: 20px; }
+.rank { color: var(--muted); font-weight: 700; }
+.rating { color: var(--accent-strong); font-size: 1.125rem; font-weight: 800; }
+.form { display: inline-flex; gap: 4px; }

@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { errorText, type MatchStatus } from "../../../lib/fighters";
+import { statusLabel } from "../../../lib/labels";
+import { Badge, type BadgeTone } from "../../components/Badge";
+import { Card } from "../../components/Card";
 
 const POLL_MS = 5000;
 
-function describe(match: MatchStatus) {
-  if (match.status === "queued") return "waiting for the worker";
-  if (match.status === "running") return "playing… (a free-tier match can take many minutes)";
-  if (match.status === "failed") return `failed: ${match.error ?? "unknown error"}`;
-  return null;
-}
+const TONES: Record<MatchStatus["status"], BadgeTone> = {
+  queued: "neutral",
+  running: "info",
+  finished: "good",
+  failed: "bad",
+};
 
 export function SparPanel({ fighterId, spars }: { fighterId: number; spars: MatchStatus[] }) {
   const router = useRouter();
@@ -41,41 +44,41 @@ export function SparPanel({ fighterId, spars }: { fighterId: number; spars: Matc
   }
 
   return (
-    <section>
-      <h2>Sparring</h2>
+    <Card title="Sparring">
       <p className="muted">
-        A short unranked match against the house bot. It checks that your key and model work.
+        A short unranked match against the house bot. It proves your key and model work, and it is how you earn the right
+        to play ranked.
       </p>
-      <button onClick={start} disabled={starting || busy}>
-        {busy ? "A spar is in progress" : "Spar now"}
-      </button>
+      <p>
+        <button onClick={start} disabled={starting || busy}>
+          {busy ? "A spar is in progress…" : "Spar now"}
+        </button>
+      </p>
+      {busy && <p className="help">This page updates by itself. A match on a free-tier model can take several minutes.</p>}
       {error && <p role="alert">{error}</p>}
       {spars.length > 0 && (
         <table>
           <thead>
             <tr>
-              <th>Match</th>
               <th>Version</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {spars.map((m) => (
               <tr key={m.id}>
-                <td>{m.id}</td>
-                <td>{m.fighter_version}</td>
+                <td>v{m.fighter_version}</td>
                 <td>
-                  {m.status === "finished" ? (
-                    <Link href={`/replays/${m.id}`}>finished: watch the replay</Link>
-                  ) : (
-                    describe(m)
-                  )}
+                  <Badge tone={TONES[m.status]}>{statusLabel(m.status)}</Badge>
+                  {m.status === "failed" && <span className="muted"> {m.error ?? "unknown error"}</span>}
                 </td>
+                <td>{m.status === "finished" && <Link href={`/replays/${m.id}`}>Watch the replay →</Link>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-    </section>
+    </Card>
   );
 }

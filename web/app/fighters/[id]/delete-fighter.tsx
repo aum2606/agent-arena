@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { errorText } from "../../../lib/fighters";
+import { Card } from "../../components/Card";
 
 /** Erases the fighter and every key saved for it; past matches stay on record. */
 export function DeleteFighter({ fighterId, name }: { fighterId: number; name: string }) {
@@ -23,14 +24,14 @@ export function DeleteFighter({ fighterId, name }: { fighterId: number; name: st
   }
 
   return (
-    <section>
-      <h2>Delete</h2>
+    <Card title="Danger zone" tone="danger">
       <p className="muted">
-        Erases this fighter, every version of it and the API key saved for it. Matches it played
-        stay on record.
+        Erases this fighter, every version of it and the API key saved for it. Matches it played stay on record.
       </p>
-      <button onClick={remove}>Delete fighter</button>
+      <button className="button-danger" onClick={remove}>
+        Delete fighter
+      </button>
       {error && <p role="alert">{error}</p>}
-    </section>
+    </Card>
   );
 }

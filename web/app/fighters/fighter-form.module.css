@@ -1,0 +1,7 @@
+.persona { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.persona legend { padding: 0; margin-bottom: 4px; font-weight: 600; }
+.templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.template { display: grid; justify-items: start; gap: 4px; padding: 12px; text-align: left; font-weight: 400; background: var(--bg); }
+.template strong { font-weight: 700; }
+.template span { color: var(--muted); font-size: 0.8125rem; }
+.template[aria-pressed="true"] { border-color: var(--accent); background: rgb(109 124 255 / 12%); }

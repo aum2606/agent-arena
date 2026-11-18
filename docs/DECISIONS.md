@@ -2131,3 +2131,15 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done:** deleting a user's name from other people's ranked replays beyond the header (problem text written by their model stays); an export of the user's data; ending older sessions on a new sign-in (several devices at once is allowed on purpose).
 
 **Alternatives considered:** deleting the user's ranked matches (would change the opponent's history and leave ratings unexplained); soft-deleting the account (keeps the keys).
+
+## D-079 · 2026-11-18 · The API and the worker connect to Postgres as a role that cannot change anything but rows
+
+**Decision:** In a public deployment the database has two roles. The owner (`POSTGRES_USER`, a superuser as the postgres image makes it) is used only by a one-shot `migrate` compose service that runs `python -m arena_api.migrate` and exits. The API and the worker connect as `arena_app`, created by `docker/postgres-init/10-app-role.sh` (first database creation only): login, `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION`, `SELECT/INSERT/UPDATE/DELETE` on tables and `USAGE/SELECT` on sequences (default privileges, so the owner's later migrations are covered). Those two start with `ARENA_AUTO_MIGRATE=0`, so they never need schema rights; the API waits for `migrate` to complete. The local stack is unchanged (one superuser, migrate on start). `deploy/run-worker.sh` builds its URL from `APP_DB_PASSWORD`, so the host worker never sees the owner's password.
+
+**Why:** the audit found nothing that lets a visitor inject SQL, but a bug or a break-in in the API process would otherwise have a superuser: it could read the host's files, run programs through `COPY ... PROGRAM`, and add roles.
+
+**Checked on Postgres 16 in WSL:** the migrate service exits 0, the API serves with the limited role, and its container environment has no owner password. As `arena_app`: select, insert and delete work; `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE`, `CREATE ROLE`, `COPY ... TO PROGRAM` and `CREATE EXTENSION` are refused; the role flags are all false. Tests for the compose wiring, the init script and the migrate switch are in `tests/test_db_roles.py`.
+
+**Not done:** Row-level security; separate roles for the API and the worker; making the owner a non-superuser (the postgres image creates it as one; only the migration holds its password); an automatic upgrade path for databases created before this (SELF_HOSTING.md says how to make the role by hand).
+
+**Alternatives considered:** running migrations as the owner from the API (the API would keep owner credentials in its environment, which is what this avoids); a hand-made `GRANT` script run by the deployer (easy to get wrong).

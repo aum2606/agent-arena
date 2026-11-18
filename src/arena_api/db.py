@@ -29,6 +29,14 @@ def fighters_config_path() -> Path:
     return Path(os.environ.get("FIGHTERS_CONFIG", "config/fighters.toml"))
 
 
+def migrate_on_start() -> None:
+    """Migrate when the API or worker starts, unless ARENA_AUTO_MIGRATE=0: a deployment migrates in
+    a separate step as the database's owner, so the API and the worker can connect as a role that
+    cannot change the schema (D-079)."""
+    if os.environ.get("ARENA_AUTO_MIGRATE", "1") != "0":
+        migrate()
+
+
 def migrate() -> None:
     """Apply the numbered .sql files in `migrations/` that have not run yet."""
     with psycopg.connect(database_url()) as conn:

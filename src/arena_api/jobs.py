@@ -19,7 +19,7 @@ from arena.sandbox import ensure_ready, sandboxed_verify
 from arena.verifier import verify_attack
 from arena_api import fighters, store
 from arena_api.auth import public_url_is_local
-from arena_api.db import fighters_config_path, migrate, redis_url
+from arena_api.db import fighters_config_path, migrate_on_start, redis_url
 from arena_api.replays import parse_replay
 from arena_api.secret_box import check_secret, decrypt
 
@@ -212,7 +212,7 @@ def _verify_from_env() -> Verify:
 
 async def startup(ctx: dict[str, Any]) -> None:
     check_secret()
-    migrate()
+    migrate_on_start()
     ctx["verify"] = _verify_from_env()
     config = load_config(fighters_config_path())
     ctx["config"] = config

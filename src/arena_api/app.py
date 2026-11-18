@@ -14,7 +14,7 @@ from arena_api import store
 from arena_api.accounts import User
 from arena_api.auth import optional_user
 from arena_api.auth import router as auth_router
-from arena_api.db import migrate, redis_url
+from arena_api.db import migrate_on_start, redis_url
 from arena_api.fighter_routes import router as fighter_router
 from arena_api.guards import add_guards
 from arena_api.match_routes import router as match_router
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     check_secret()
-    migrate()
+    migrate_on_start()
     app.state.queue = await create_pool(RedisSettings.from_dsn(redis_url()))
     yield
     await app.state.queue.aclose()

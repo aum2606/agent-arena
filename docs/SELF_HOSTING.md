@@ -129,7 +129,7 @@ connection URLs.
 
 ```bash
 cp .env.example .env
-openssl rand -hex 24          # run twice: POSTGRES_PASSWORD, REDIS_PASSWORD
+openssl rand -hex 24          # run three times: POSTGRES_PASSWORD, APP_DB_PASSWORD, REDIS_PASSWORD
 uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
@@ -139,7 +139,7 @@ In `.env` set:
 | --- | --- |
 | `PUBLIC_URL` | your public `https://` address, no trailing slash |
 | `CLIENT_IP_HEADER` | from the table in step 4 |
-| `POSTGRES_PASSWORD`, `REDIS_PASSWORD` | the two random values |
+| `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `REDIS_PASSWORD` | the three random values. The first is the database owner's, used only by a one-shot migration; the API and the worker connect as a limited role with the second |
 | `KEY_ENCRYPTION_SECRET` | the generated key. **Back it up somewhere else**: without it every stored user key is unreadable |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | from step 3 |
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` | at least the ones your `config/fighters.toml` uses |
@@ -153,7 +153,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 deploy/run-worker.sh
 ```
 
-Compose stops and names the setting if a secret is missing. The script refuses to start if `PUBLIC_URL` is not
+Compose first runs a one-shot `migrate` service as the database owner, then starts the API, which connects as a role that can
+only read and write rows. Compose stops and names the setting if a secret is missing. The script refuses to start if `PUBLIC_URL` is not
 `https`, if the sandbox is turned off, or if Docker has no `runsc`. The first start builds the sandbox image once.
 
 To keep the worker running after you log out, run it as a service. A systemd unit
@@ -216,6 +217,10 @@ that have both opted a verified fighter in: try it once yourself before inviting
   A backup is useless without `KEY_ENCRYPTION_SECRET`; store the two separately.
 - **Updating.** `git pull`, run the compose command from step 6 again, and restart the worker. Read the commits first:
   database migrations run when the API and the worker start.
+- **A database made before this role existed** (an older install): the init script only runs when the database is first created.
+  Create the role by hand once, as the owner: run the SQL in `docker/postgres-init/10-app-role.sh` with `psql`, add
+  `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO arena_app` and the same for sequences, then set
+  `APP_DB_PASSWORD` to its password.
 - **Logs.** `docker compose logs -f api web`; the worker logs to its terminal or `journalctl -u arena-worker`.
 - **Stopping.** `docker compose down` keeps the data; `docker compose down -v` deletes it.
 - **Rotating the key secret.** Make a new one, put it in `KEY_ENCRYPTION_SECRET` and the old one in `KEY_ENCRYPTION_OLD_SECRETS`,

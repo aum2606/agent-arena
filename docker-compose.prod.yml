@@ -6,8 +6,24 @@
 services:
   postgres:
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env} # the owner: only the migration uses it
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env} # the role the API and the worker use
+    volumes:
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro # makes that role the first time the database is created
     restart: unless-stopped
+
+  # Runs once as the database's owner, then exits; the API waits for it. Nothing else holds the owner's password.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command: ["uv", "run", "--no-sync", "python", "-m", "arena_api.migrate"]
+    environment:
+      DATABASE_URL: postgresql://arena:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/arena
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   redis:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
@@ -15,12 +31,16 @@ services:
 
   api:
     environment:
-      DATABASE_URL: postgresql://arena:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/arena
+      DATABASE_URL: postgresql://arena_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@postgres:5432/arena
+      ARENA_AUTO_MIGRATE: "0" # the migrate service does it, as the owner
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
       KEY_ENCRYPTION_SECRET: ${KEY_ENCRYPTION_SECRET:?set KEY_ENCRYPTION_SECRET in .env}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL (the https address) in .env}
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:?name the header your proxy overwrites with the visitor's address}
       ARENA_DEV_LOGIN: "0" # the sign-in-as-anyone form is for localhost only
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   worker:

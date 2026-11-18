@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 GOOD_ENV = {
-    "POSTGRES_PASSWORD": "pgpass",
+    "APP_DB_PASSWORD": "apppass",
     "REDIS_PASSWORD": "redispass",
     "KEY_ENCRYPTION_SECRET": "secret",
     "PUBLIC_URL": "https://arena.example.org",
@@ -52,7 +52,7 @@ def test_it_starts_the_worker_with_urls_built_from_the_passwords(tmp_path: Path)
 
     assert done.returncode == 0, done.stderr
     assert "uv run --no-dev arq arena_api.jobs.WorkerSettings" in done.stdout
-    assert "DB=postgresql://arena:pgpass@127.0.0.1:5442/arena" in done.stdout
+    assert "DB=postgresql://arena_app:apppass@127.0.0.1:5442/arena" in done.stdout  # not the owner
     assert "REDIS=redis://:redispass@127.0.0.1:6379" in done.stdout
 
 

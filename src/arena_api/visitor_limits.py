@@ -18,10 +18,20 @@ logger = logging.getLogger(__name__)
 VISITOR_RULES: dict[str, tuple[int, int]] = {
     "read": (60, 60),  # replays and the leaderboard
     "login": (20, 60),  # the GitHub sign-in round trip
+    # Every request that checks a session costs a database lookup, so a flood of junk cookies must
+    # not be free (D-077). Generous: a page makes a few, and a waiting match polls every 5 seconds.
+    "session": (300, 60),
 }
 
 
-async def count_request(redis: ArqRedis, key: str, name: str, allowed: int, window: int) -> None:
+async def count_request(
+    redis: ArqRedis,
+    key: str,
+    name: str,
+    allowed: int,
+    window: int,
+    detail: str = "too many requests; try again later",
+) -> None:
     """Count one request under `key`; past `allowed` in `window` seconds raise 429."""
     try:
         # SET with a lifetime first, so a counter can never outlive a crash between two calls.
@@ -35,7 +45,7 @@ async def count_request(redis: ArqRedis, key: str, name: str, allowed: int, wind
     if used > allowed:
         raise HTTPException(
             status_code=429,
-            detail="too many requests; try again later",
+            detail=detail,
             headers={"Retry-After": str(wait if wait > 0 else window)},
         )
 

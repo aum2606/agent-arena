@@ -5,6 +5,7 @@ from typing import Any
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from helpers import StubQueue
 from psycopg_pool import PoolTimeout
 
 from arena_api import store
@@ -139,7 +140,9 @@ def test_connections_come_from_one_bounded_pool(
         assert again.execute("SELECT 1 AS n").fetchone() == {"n": 1}
 
 
-def test_a_busy_pool_answers_503_not_500(database: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_busy_pool_answers_503_not_500(
+    database: str, monkeypatch: pytest.MonkeyPatch, queue: StubQueue
+) -> None:
     monkeypatch.setenv("ARENA_DB_POOL", "1")
     monkeypatch.setattr(store, "POOL_WAIT_S", 0.3)
     client = TestClient(app, raise_server_exceptions=False)

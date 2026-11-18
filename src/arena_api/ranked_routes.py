@@ -17,6 +17,9 @@ from arena_api.ratings import pick_opponent
 from arena_api.store import Entrant, LeaderboardRow, RankedRow
 from arena_api.visitor_limits import visitor_limit
 
+# A user's ranked matches a day over all their fighters; each spends two owners' keys and the panel.
+MAX_RANKED_PER_USER_PER_DAY = 10
+
 router = APIRouter()
 
 
@@ -60,6 +63,8 @@ async def _enter(fighter: FighterView, user: User, queue: ArqRedis) -> MatchStat
         )
     if store.count_recent_for_fighter(fighter_id) >= fighter.daily_match_cap:
         raise HTTPException(status_code=429, detail="this fighter has reached its daily match cap")
+    if store.count_recent_ranked(user.id) >= MAX_RANKED_PER_USER_PER_DAY:
+        raise HTTPException(status_code=429, detail="you have reached the daily ranked match limit")
     opponent = pick_opponent(
         user.id, store.rating_of(fighter_id), store.ranked_candidates(user.id, providers)
     )
@@ -108,7 +113,7 @@ def _delta(row: RankedRow, is_a: bool) -> float | None:
     return row.rating_delta_a if is_a else 0.0 - row.rating_delta_a  # never -0.0 for a draw
 
 
-@router.get("/fighters/{fighter_id}/ranked")
+@router.get("/fighters/{fighter_id}/ranked", dependencies=[Depends(visitor_limit("session"))])
 def ranked_history(
     fighter_id: int, user: Annotated[User, Depends(current_user)]
 ) -> list[RankedEntry]:

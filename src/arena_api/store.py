@@ -15,6 +15,9 @@ from arena_api.db import database_url
 from arena_api.ratings import START_RATING, Candidate, rate
 from arena_api.replays import ReplaySummary
 
+# Two owners can rate each other this many times a day, so two accounts cannot trade wins (D-077).
+MAX_PAIR_MATCHES_PER_DAY = 3
+
 
 @dataclass(frozen=True)
 class MatchRow:
@@ -281,6 +284,17 @@ def count_recent_spars(user_id: int) -> int:
     return int(row["n"]) if row else 0
 
 
+def count_recent_ranked(user_id: int) -> int:
+    """Ranked matches this user asked for in the last day, over all their fighters."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT count(*) AS n FROM matches WHERE requested_by = %s AND mode = 'ranked' "
+            "AND created_at > now() - interval '1 day'",
+            (user_id,),
+        ).fetchone()
+    return int(row["n"]) if row else 0
+
+
 def mark_running(match_id: str) -> bool:
     """True if this call moved the match from queued to running (so only one worker plays it)."""
     with connect() as conn:
@@ -441,8 +455,12 @@ def ranked_candidates(owner_id: int, providers: list[str]) -> list[Candidate]:
             "AND v.provider = ANY(%s) "
             "AND (SELECT count(*) FROM matches m WHERE (m.fighter_id = f.id "
             "OR m.opponent_id = f.id) AND m.created_at > now() - interval '1 day') "
-            "< f.daily_match_cap",
-            (START_RATING, owner_id, providers),
+            "< f.daily_match_cap "
+            "AND (SELECT count(*) FROM matches p WHERE p.mode = 'ranked' "
+            "AND p.created_at > now() - interval '1 day' "
+            "AND ((p.requested_by = %s AND p.opponent_owner = f.owner_id) "
+            "OR (p.requested_by = f.owner_id AND p.opponent_owner = %s))) < %s",
+            (START_RATING, owner_id, providers, owner_id, owner_id, MAX_PAIR_MATCHES_PER_DAY),
         ).fetchall()
     return [Candidate(**row) for row in rows]
 

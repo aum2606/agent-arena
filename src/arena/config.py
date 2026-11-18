@@ -21,6 +21,8 @@ class Settings:
     backoff_base_s: float
     code_share: float = 0.0  # chance that a turn is a code strike instead of math (D-045)
     attack_retries: int = 1  # how many corrections a failed attack gets before it backfires (D-062)
+    # Matches a day, site-wide, that spend the server's own keys: house bot, review panel (D-077).
+    server_matches_per_day: int = 100
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,10 @@ def load_config(path: Path) -> Config:
         raise ConfigError(f"code_share must be between 0 and 1, not {settings.code_share}")
     if settings.attack_retries < 0:
         raise ConfigError(f"attack_retries cannot be negative, not {settings.attack_retries}")
+    if settings.server_matches_per_day < 1:
+        raise ConfigError(
+            f"server_matches_per_day must be at least 1, not {settings.server_matches_per_day}"
+        )
     providers = {
         name: _build(Provider, raw, f"provider {name!r}")
         for name, raw in data.get("providers", {}).items()

@@ -82,7 +82,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm audit --audit-level=high
+      # What ships. Test-tooling findings with no patched version (picomatch, D-073) must not block every push.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
 
   images:

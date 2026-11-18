@@ -30,6 +30,14 @@ describe("contentSecurityPolicy", () => {
     expect(contentSecurityPolicy("abc123", true)).toContain("'unsafe-eval'");
   });
 
+  it("lets the development overlay style itself, which carries no nonce, and nothing else changes", () => {
+    const dev = directives(contentSecurityPolicy("abc123", true));
+
+    // A nonce would make browsers ignore 'unsafe-inline', so the dev policy has none for styles.
+    expect(dev.get("style-src")).toBe("'self' 'unsafe-inline'");
+    expect(dev.get("script-src")).toContain("'nonce-abc123'");
+  });
+
   it("keeps everything else on this origin and out of frames and plugins", () => {
     const policy = directives(contentSecurityPolicy("abc123", false));
 

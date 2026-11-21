@@ -2204,3 +2204,13 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not checked:** the compose stack itself in WSL (that distro has no `docker compose` plugin and no passwordless sudo to add one; Postgres and Redis ran as plain containers from the same images and init script, and the compose file was rendered and tested separately); the unit as a *system* unit (`User=`, `After=docker.service`; no sudo); Cloudflare Tunnel and Tailscale Funnel (no accounts); a real browser sign-in through GitHub on the production override.
 
 **Alternatives considered:** requiring pull requests for everyone including the owner (safer, but it changes how the repository is worked on and was not asked for); installing the Compose plugin by downloading a binary (needs approval, and the compose file was already checkable another way).
+
+## D-084 · 2026-11-21 · A batch of Dependabot updates, taken together and tested together
+
+**Decision:** Eleven of the thirteen open Dependabot pull requests were merged into one branch and checked as a whole, instead of one at a time (each one rebased onto the previous would have meant eleven CI runs and eleven lockfile conflicts): `ruff` 0.17.5, `psycopg[binary]` >=3.3.9, `openai` 3.50.0, `uv-build` >=0.13.8,<0.14, `fastapi` (the lock took the newest, 0.165.0, past the PR's 0.162.5), `@types/node` 26, `pixi.js` 8.23, `typescript` 7.0.2, and the GitHub Actions `setup-node` 7.1.0, `setup-uv` 10.3.3 and `checkout` 7.0.1 (still pinned by commit). The two lockfiles were regenerated rather than merged: `uv.lock` with `uv lock --upgrade-package`, and the web lock checked on Linux (D-076).
+
+**Held, not merged:** the `python:3.15-slim` base image (#1; the project requires Python below 3.13, so it would not install) and `node:26-alpine` (#3; the web image and CI use Node 24 and 22, and 26 has not been tested here). They stay open until the owner decides to close them or to move the project to those versions.
+
+**Checked:** ruff, ruff format, mypy and vulture clean on the new versions; 874 tests on Linux with Postgres and gVisor; web typecheck with TypeScript 7.0.2, 44 web tests and the production build. Each pull request had also passed CI on GitHub on its own. The workflow bumps and the image builds are only exercised by the next CI run.
+
+**Alternatives considered:** merging each pull request on GitHub after `@dependabot rebase` (slower, and each lockfile change would have been tested alone against an older `main`); ignoring the major versions (they passed, and the older ones would only fall further behind).

@@ -7,7 +7,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "openai>=3.0",
+    "openai>=3.50.0",
     "sympy>=1.12",
     "python-dotenv>=1.0",
     "httpx2>=2.16",  # imported directly (arena.llm); it also comes with openai
@@ -27,21 +27,21 @@ module-name = ["arena", "arena_api"]
 default-groups = ["dev", "api"]
 
 [build-system]
-requires = ["uv_build>=0.9,<0.12"]
+requires = ["uv_build>=0.13.8,<0.14"]
 build-backend = "uv_build"
 
 [dependency-groups]
 api = [
     "arq>=0.28.0",
     "cryptography>=50.0.2",
-    "fastapi>=0.162.0",
+    "fastapi>=0.162.5",
     "psycopg-pool>=3.3.3",
-    "psycopg[binary]>=3.3.6",
+    "psycopg[binary]>=3.3.9",
     "uvicorn>=0.54.0",
 ]
 dev = [
     "pytest>=8",
-    "ruff>=0.6",
+    "ruff>=0.17.5",
     "mypy>=1.11",
     "vulture>=2.11",
     "pre-commit>=3.8",

@@ -78,6 +78,15 @@ a cross-site write and body-size guard, a bounded connection pool); pins and CI 
 in CI, Dependabot, ignore files). 750 tests pass on Linux with Postgres and gVisor; checked live on the local stack in a browser.
 Not yet seen on GitHub: the new CI `images` job and Dependabot. What it left, and the deploy checklist, are in `SECURITY.md`.
 
+## The open items from the security pass, closed (D-082 to D-084, 2026-11-21)
+Stored API keys are now sealed to a public key: the API cannot open them, only the worker holds the private key (D-082). GitHub: private
+vulnerability reporting, Dependabot alerts and security updates are on, and `main` requires the four CI jobs (D-083). The self-hosting kit was run
+for real in WSL (the real worker script, limited database role, sealed keys, a spar under gVisor, a worker restart after `kill -9`, a service
+manager), which found the PATH gap in the guide's unit and a Redis port clash, now a setting. Eleven Dependabot updates were taken as one tested
+batch (TypeScript 7, setup-uv 10 and others); `python:3.15-slim` and `node:26-alpine` are held (D-084). 29 local branches deleted (all merged).
+Not done: the Cloudflare and Tailscale sections (no accounts), the unit as a system unit (no sudo in WSL), compose itself in WSL (no plugin), a
+content classifier. CI has not yet run on the batch.
+
 ## Security hardening, second pass (D-077 to D-081, 2026-11-18)
 An audit of every route, the sign-in and sessions, the prompts and model boundary, the web app, the self-hosting kit and the GitHub settings found the
 core guards holding (owner checks, cross-site and size guards, CSP, no HTML sinks, keys never in prompts) and 12 gaps, fixed in four branches: a shared

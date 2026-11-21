@@ -16,7 +16,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena-dev}
       POSTGRES_DB: arena
     ports:
-      - "127.0.0.1:5442:5432" # not 5432: local Postgres installs often own it
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5442}:5432" # not 5432: local Postgres installs often own it
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
   redis:
     image: redis:7@sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379" # move it if another project owns 6379
 
   api:
     build:

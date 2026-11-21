@@ -124,3 +124,11 @@ def test_the_public_apis_environment_holds_nothing_that_opens_a_stored_key() -> 
     api = env_of("api")
     assert "KEY_ENCRYPTION_SECRET" in api and api["KEY_ENCRYPTION_SECRET"] is None
     assert "KEY_ENCRYPTION_OLD_SECRETS" not in api
+
+
+def test_the_published_ports_can_be_moved_with_a_setting_and_stay_on_loopback() -> None:
+    # Another project on the same machine may own 6379 or 5442 (it did, while testing the guide).
+    published = {name: " ".join(map(str, svc.get("ports", []))) for name, svc in services().items()}
+
+    assert "${REDIS_HOST_PORT:-6379}" in published["redis"]
+    assert "${POSTGRES_HOST_PORT:-5442}" in published["postgres"]

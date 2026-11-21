@@ -101,3 +101,11 @@ def test_the_worker_gets_only_the_settings_it_needs(tmp_path: Path) -> None:
     assert done.returncode == 0, done.stderr
     assert "GITHUB=none" in done.stdout  # model-written code must never be near it (D-068)
     assert "GROQ=gsk_provider_key" in done.stdout  # the worker does need the provider keys
+
+
+def test_the_host_ports_can_move_when_another_project_owns_them(tmp_path: Path) -> None:
+    done = run(tmp_path, GOOD_ENV | {"POSTGRES_HOST_PORT": "5555", "REDIS_HOST_PORT": "6666"})
+
+    assert done.returncode == 0, done.stderr
+    assert "DB=postgresql://arena_app:apppass@127.0.0.1:5555/arena" in done.stdout
+    assert "REDIS=redis://:redispass@127.0.0.1:6666" in done.stdout

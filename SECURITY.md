@@ -106,8 +106,9 @@ None of this is done by the repository; it is the deployer's checklist (D-068 to
   `APP_DB_PASSWORD` (the limited role the API and the worker use) and Redis; the compose defaults are for localhost.
 - Decide what you will not host: list any words to refuse in `blocked_terms` (D-080).
 - Read the `arena.security` log lines now and then (`docker compose logs api | grep "security event="`).
-- On GitHub (the repository owner's settings, not the code's): private vulnerability reporting, branch protection on
-  `main` requiring the CI jobs, Dependabot security updates, and keep secret scanning and push protection on.
+- On GitHub (the repository owner's settings, not the code's; set for the main repository on 2026-11-21, D-083): private
+  vulnerability reporting, branch protection on `main` requiring the CI jobs, Dependabot alerts and security updates, secret
+  scanning and push protection. A fork needs its own.
 
 ## Handling secrets
 

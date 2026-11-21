@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import yaml
+from helpers import load_compose
 
 COMPOSE = Path(__file__).parents[1] / "docker-compose.yml"
 
@@ -56,7 +57,7 @@ PROD = Path(__file__).parents[1] / "docker-compose.prod.yml"
 
 
 def prod() -> dict[str, dict[str, object]]:
-    return yaml.safe_load(PROD.read_text(encoding="utf-8"))["services"]  # type: ignore[no-any-return]
+    return load_compose(PROD)["services"]  # type: ignore[no-any-return]
 
 
 def env_of(service: str) -> dict[str, str]:
@@ -71,7 +72,7 @@ def test_the_public_override_refuses_to_start_without_its_secrets() -> None:
         "api": [
             "DATABASE_URL",
             "REDIS_URL",
-            "KEY_ENCRYPTION_SECRET",
+            "KEY_PUBLIC_KEY",
             "PUBLIC_URL",
             "CLIENT_IP_HEADER",
         ],
@@ -111,3 +112,15 @@ def test_every_setting_the_public_override_requires_is_in_the_example_env_file()
     listed = set(re.findall(r"^(\w+)=", example, flags=re.MULTILINE))
 
     assert required <= listed, f"missing from .env.example: {sorted(required - listed)}"
+
+
+def test_the_public_apis_environment_holds_nothing_that_opens_a_stored_key() -> None:
+    # D-082: it seals keys to the public key. The base file's local secret is reset away, and the
+    # private key is only ever given to the worker on the host.
+    for service in ("api", "web", "migrate", "postgres", "redis"):
+        env = prod()[service].get("environment", {})
+        assert isinstance(env, dict)
+        assert "KEY_PRIVATE_KEY" not in env and "KEY_OLD_PRIVATE_KEYS" not in env
+    api = env_of("api")
+    assert "KEY_ENCRYPTION_SECRET" in api and api["KEY_ENCRYPTION_SECRET"] is None
+    assert "KEY_ENCRYPTION_OLD_SECRETS" not in api

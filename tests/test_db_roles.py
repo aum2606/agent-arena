@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-import yaml
+from helpers import load_compose
 
 from arena_api import db
 
@@ -13,7 +13,7 @@ PROD = ROOT / "docker-compose.prod.yml"
 
 
 def services() -> dict[str, dict[str, object]]:
-    return yaml.safe_load(PROD.read_text(encoding="utf-8"))["services"]  # type: ignore[no-any-return]
+    return load_compose(PROD)["services"]  # type: ignore[no-any-return]
 
 
 def env_of(service: str) -> dict[str, str]:

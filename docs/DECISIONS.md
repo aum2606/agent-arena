@@ -2173,3 +2173,20 @@ pass one to it); pinning `vitest` back (older, and still affected); leaving the 
 **Not done, and found while writing the threat model:** the API process holds `KEY_ENCRYPTION_SECRET` and the GitHub client secret, so a break-in there could decrypt every stored provider key. Only the worker needs to decrypt; encrypting with a public key in the API and keeping the private key with the worker would close it, at the cost of a new key format and a migration. Also not done: shipping the log anywhere, alerting, a retention policy, per-address counts of failed sign-ins beyond the rate limits.
 
 **Alternatives considered:** logging every request (noisy, and holds paths with ids and addresses of ordinary visitors); a log table in the database (the thing an attacker would alter).
+
+## D-082 · 2026-11-21 · Stored API keys are sealed to a public key: the API cannot open them
+
+**Decision:** Closes the gap D-081 found: the API process held `KEY_ENCRYPTION_SECRET`, so a break-in there could decrypt every stored provider key, although only the worker ever opens one (`jobs.py`). Now:
+- The API seals a key to **`KEY_PUBLIC_KEY`** and cannot open it. Only the worker has **`KEY_PRIVATE_KEY`**. The seal is an X25519 sealed box built from `cryptography` primitives already in use (an ephemeral key agrees a secret with the public key, HKDF derives a key bound to both public keys, ChaCha20-Poly1305 encrypts with the ephemeral key as associated data). No new dependency.
+- A stored value is `v2:` plus base64 of ephemeral public key, nonce and ciphertext. Values from before it (Fernet tokens, no prefix) still open while `KEY_ENCRYPTION_SECRET` is given to the worker.
+- Local development is unchanged: with no `KEY_PUBLIC_KEY`, one symmetric `KEY_ENCRYPTION_SECRET` encrypts and decrypts (D-034, D-078). The API starts with either; the worker needs the private key or the secret (`check_secret` and `check_worker_keys`).
+- `python -m arena_api.make_keys` prints a pair. `python -m arena_api.rotate_keys` opens every stored key with whatever is available and seals it to the current public key: it moves an install to the sealed format, or to a new keypair (the retired private keys go in `KEY_OLD_PRIVATE_KEYS` meanwhile).
+- `docker-compose.prod.yml` gives the API `KEY_PUBLIC_KEY` (required) and removes the local secret the base file passes (`!reset null`); `deploy/run-worker.sh` requires `KEY_PRIVATE_KEY` and passes it, and nothing else with key material in it, to the worker.
+
+**Why:** with the secret in the API's environment the encryption protected only against a copy of the database, not against the process that serves the internet.
+
+**Checked:** `tests/test_sealed_keys.py`: sealing and opening, the API-only environment can seal but not open, a different private key or any damaged value is refused, an old keypair opens while it is listed and `rotate_keys` moves values to the new one, a Fernet-era value opens and is upgraded, both start-up checks, a malformed key names its setting, every stored key of a database is upgraded, and a fighter created through the API is stored sealed. The compose test pins that the API environment has no secret and nothing private.
+
+**Not done:** the API can still store keys of its own choosing for a fighter, and the GitHub client secret stays in the API (it needs it to sign people in); a hardware-backed or external key store; versioned key ids (opening tries each listed private key in turn).
+
+**Alternatives considered:** RSA-OAEP (a key can be longer than one block); a new dependency such as PyNaCl for a sealed box (the same construction, one more package); keeping the Fernet secret in the API and relying on the database role alone (it does not stop the API process itself reading keys).

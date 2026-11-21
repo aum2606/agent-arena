@@ -34,7 +34,10 @@ services:
       DATABASE_URL: postgresql://arena_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@postgres:5432/arena
       ARENA_AUTO_MIGRATE: "0" # the migrate service does it, as the owner
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
-      KEY_ENCRYPTION_SECRET: ${KEY_ENCRYPTION_SECRET:?set KEY_ENCRYPTION_SECRET in .env}
+      # The API seals users' keys to the public key and cannot open them; the private key stays with the
+      # worker on the host (D-082). The local secret the base file gives it is taken away.
+      KEY_PUBLIC_KEY: ${KEY_PUBLIC_KEY:?set KEY_PUBLIC_KEY in .env (python -m arena_api.make_keys)}
+      KEY_ENCRYPTION_SECRET: !reset null
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL (the https address) in .env}
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:?name the header your proxy overwrites with the visitor's address}
       ARENA_DEV_LOGIN: "0" # the sign-in-as-anyone form is for localhost only

@@ -130,7 +130,7 @@ connection URLs.
 ```bash
 cp .env.example .env
 openssl rand -hex 24          # run three times: POSTGRES_PASSWORD, APP_DB_PASSWORD, REDIS_PASSWORD
-uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+uv run python -m arena_api.make_keys   # prints KEY_PUBLIC_KEY and KEY_PRIVATE_KEY
 ```
 
 In `.env` set:
@@ -140,7 +140,7 @@ In `.env` set:
 | `PUBLIC_URL` | your public `https://` address, no trailing slash |
 | `CLIENT_IP_HEADER` | from the table in step 4 |
 | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `REDIS_PASSWORD` | the three random values. The first is the database owner's, used only by a one-shot migration; the API and the worker connect as a limited role with the second |
-| `KEY_ENCRYPTION_SECRET` | the generated key. **Back it up somewhere else**: without it every stored user key is unreadable |
+| `KEY_PUBLIC_KEY`, `KEY_PRIVATE_KEY` | the printed pair. The API seals users' keys to the public one and cannot open them; only the worker on the host has the private one. **Back the private key up somewhere else**: without it every stored user key is unreadable |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | from step 3 |
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` | at least the ones your `config/fighters.toml` uses |
 
@@ -214,7 +214,7 @@ that have both opted a verified fighter in: try it once yourself before inviting
     pg_dump -U arena arena | gzip > arena-$(date +%F).sql.gz
   ```
 
-  A backup is useless without `KEY_ENCRYPTION_SECRET`; store the two separately.
+  A backup is useless without `KEY_PRIVATE_KEY`; store the two separately.
 - **Updating.** `git pull`, run the compose command from step 6 again, and restart the worker. Read the commits first:
   database migrations run when the API and the worker start.
 - **A database made before this role existed** (an older install): the init script only runs when the database is first created.
@@ -223,9 +223,13 @@ that have both opted a verified fighter in: try it once yourself before inviting
   `APP_DB_PASSWORD` to its password.
 - **Logs.** `docker compose logs -f api web`; the worker logs to its terminal or `journalctl -u arena-worker`.
 - **Stopping.** `docker compose down` keeps the data; `docker compose down -v` deletes it.
-- **Rotating the key secret.** Make a new one, put it in `KEY_ENCRYPTION_SECRET` and the old one in `KEY_ENCRYPTION_OLD_SECRETS`,
-  restart the stack and the worker, run `uv run python -m arena_api.rotate_keys` (with `DATABASE_URL` pointing at the database),
-  then delete `KEY_ENCRYPTION_OLD_SECRETS` and restart. Do it if the secret may have leaked, or from time to time.
+- **Replacing the keypair.** Make a new pair with `make_keys`. Put the new public key in `KEY_PUBLIC_KEY` and the new private key
+  in `KEY_PRIVATE_KEY`, and the old private key in `KEY_OLD_PRIVATE_KEYS`. Restart the stack and the worker, then run
+  `uv run python -m arena_api.rotate_keys` on a machine that has `DATABASE_URL`, both public and private keys (it opens each stored
+  key and seals it again). Then delete `KEY_OLD_PRIVATE_KEYS` and restart. Do it if the private key may have leaked.
+- **An install from before the sealed format** (it had `KEY_ENCRYPTION_SECRET` in the API): run `make_keys`, set `KEY_PUBLIC_KEY`
+  and `KEY_PRIVATE_KEY`, keep `KEY_ENCRYPTION_SECRET` where `rotate_keys` runs, run it, then remove the secret everywhere. Until
+  it has run the worker still opens the old values with the secret.
 - **Users and their data.** Signed-in users can sign out everywhere and delete their account (with their fighters and saved
   keys) from the My fighters page.
 - **Blocked words.** Fighters' names and personas, and the problems models pose, are checked only for hidden characters and for

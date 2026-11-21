@@ -33,9 +33,9 @@ Who can do what, as built (D-077 to D-081):
   can overturn a wrong result. Cheating that stays inside the game (a model told to lose, two cooperating accounts) is
   limited, not prevented.
 - **A break-in to the API process** gets a database role that can only read and write rows, not the database owner's
-  password. It does hold `KEY_ENCRYPTION_SECRET` and the GitHub client secret (it needs both), so it could decrypt every
-  stored provider key and act as the site's GitHub app. Only the worker needs to decrypt keys; having the API encrypt
-  with a public key and the worker hold the private one would close that, and is not done.
+  password. Stored provider keys are sealed to a public key and only the worker holds the private one (D-082), so it
+  cannot read them. It does hold the GitHub client secret (it needs it to sign people in), so it could act as the site's
+  GitHub app. It could also store keys of its own choosing for fighters, or read and change what a session can.
 - **The person running the site** can read any stored data. Users' keys are encrypted with a key only the deployer
   holds, which protects them from a copy of the database, not from the deployer.
 
@@ -100,7 +100,8 @@ None of this is done by the repository; it is the deployer's checklist (D-068 to
 - Put a reverse proxy in front that terminates TLS, sends HSTS, and **overwrites** one header with the visitor's address;
   name it in `CLIENT_IP_HEADER` on the API and the web server. Keep the web server's port 3000 and the API's port 8000
   reachable only from the proxy, or a visitor can pick their own address.
-- Make a production GitHub OAuth app (one callback each) and a **new** `KEY_ENCRYPTION_SECRET`, and back the secret up.
+- Make a production GitHub OAuth app (one callback each) and a **new** keypair (`python -m arena_api.make_keys`): the
+  public key goes to the API, the private key to the worker only (D-082). Back the private key up.
 - Use `docker-compose.prod.yml` (D-072, D-079): it refuses to start without real passwords for Postgres (the owner),
   `APP_DB_PASSWORD` (the limited role the API and the worker use) and Redis; the compose defaults are for localhost.
 - Decide what you will not host: list any words to refuse in `blocked_terms` (D-080).
@@ -110,6 +111,7 @@ None of this is done by the repository; it is the deployer's checklist (D-068 to
 
 ## Handling secrets
 
-Users' provider API keys are encrypted at rest with `KEY_ENCRYPTION_SECRET` (D-034). Keep that secret out
-of the repository and back it up: without it the saved keys cannot be read again. The API and the worker refuse to
-start without a valid one (D-066).
+Users' provider API keys are sealed at rest to `KEY_PUBLIC_KEY` and opened only with `KEY_PRIVATE_KEY` (D-082),
+which only the worker holds (local development uses the older single `KEY_ENCRYPTION_SECRET`, D-034). Keep the private key
+out of the repository and back it up: without it the saved keys cannot be read again. The API refuses to start without a
+public key and the worker without a private one (D-066).

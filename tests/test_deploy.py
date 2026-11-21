@@ -18,7 +18,7 @@ pytestmark = pytest.mark.skipif(
 GOOD_ENV = {
     "APP_DB_PASSWORD": "apppass",
     "REDIS_PASSWORD": "redispass",
-    "KEY_ENCRYPTION_SECRET": "secret",
+    "KEY_PRIVATE_KEY": "private",
     "PUBLIC_URL": "https://arena.example.org",
 }
 

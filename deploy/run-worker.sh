@@ -16,7 +16,7 @@ set -a
 . "$env_file"
 set +a
 
-for name in APP_DB_PASSWORD REDIS_PASSWORD KEY_ENCRYPTION_SECRET PUBLIC_URL; do
+for name in APP_DB_PASSWORD REDIS_PASSWORD KEY_PRIVATE_KEY PUBLIC_URL; do
   [ -n "${!name:-}" ] || die "$name is not set in $env_file"
 done
 case "$PUBLIC_URL" in https://*) ;; *) die "PUBLIC_URL must be an https:// address, not '$PUBLIC_URL'" ;; esac
@@ -33,9 +33,9 @@ export REDIS_URL="${REDIS_URL:-redis://:${REDIS_PASSWORD}@127.0.0.1:6379}"
 # and model-written code is a neighbour of this process (D-068, D-078).
 pass=()
 for name in PATH HOME USER LANG LC_ALL TMPDIR XDG_CACHE_HOME UV_PROJECT_ENVIRONMENT UV_CACHE_DIR \
-  DOCKER_HOST DOCKER_CONFIG DATABASE_URL ARENA_AUTO_MIGRATE REDIS_URL KEY_ENCRYPTION_SECRET \
-  KEY_ENCRYPTION_OLD_SECRETS PUBLIC_URL FIGHTERS_CONFIG ARENA_DB_POOL OPENROUTER_API_KEY \
-  GEMINI_API_KEY GROQ_API_KEY; do
+  DOCKER_HOST DOCKER_CONFIG DATABASE_URL ARENA_AUTO_MIGRATE REDIS_URL KEY_PRIVATE_KEY \
+  KEY_OLD_PRIVATE_KEYS KEY_ENCRYPTION_SECRET KEY_ENCRYPTION_OLD_SECRETS PUBLIC_URL \
+  FIGHTERS_CONFIG ARENA_DB_POOL OPENROUTER_API_KEY GEMINI_API_KEY GROQ_API_KEY; do
   if [ -n "${!name+x}" ]; then pass+=("$name=${!name}"); fi
 done
 exec env -i "${pass[@]}" uv run --no-dev arq arena_api.jobs.WorkerSettings

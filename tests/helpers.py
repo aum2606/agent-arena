@@ -1,6 +1,8 @@
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+import yaml
 from fastapi.testclient import TestClient
 
 type SignIn = Callable[[str], TestClient]
@@ -48,3 +50,22 @@ def make_fighter(client: TestClient, **changes: Any) -> int:
     response = client.post("/fighters", json=FIGHTER | changes)
     assert response.status_code == 201
     return int(response.json()["id"])
+
+
+class _ComposeLoader(yaml.SafeLoader):
+    """Reads a compose file, whose `!reset` and `!override` tags plain YAML does not know."""
+
+
+for _tag in ("!reset", "!override"):
+    _ComposeLoader.add_constructor(
+        _tag,
+        lambda loader, node: (
+            None if isinstance(node, yaml.ScalarNode) else loader.construct_sequence(node)
+        ),
+    )
+
+
+def load_compose(path: Path) -> dict[str, Any]:
+    """The compose file as data; a `!reset null` value reads as None."""
+    loaded: dict[str, Any] = yaml.load(path.read_text(encoding="utf-8"), Loader=_ComposeLoader)  # noqa: S506
+    return loaded

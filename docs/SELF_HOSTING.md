@@ -119,8 +119,8 @@ sudo tailscale funnel --bg 3100
 Your address is `https://<machine>.<tailnet>.ts.net`. Funnel's bandwidth is capped by Tailscale (the number is not
 published), and the free plan is for non-commercial use. Good for a beta.
 
-Whichever you pick, check it with the [header test](#7-check-the-visitor-address-header) once the site is up. The
-details above come from each vendor's documentation and were not run by the project's authors.
+Whichever you pick, check it with the [header test](#7-check-the-visitor-address-header) once the site is up. Of the three,
+only Caddy has been run (in front of the stack, in a test); the Cloudflare and Tailscale details come from their documentation.
 
 ### 5. Configure
 
@@ -169,6 +169,7 @@ Requires=docker.service
 [Service]
 User=YOUR_USER
 WorkingDirectory=/home/YOUR_USER/agent-arena
+Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/YOUR_USER/agent-arena/deploy/run-worker.sh
 Restart=always
 RestartSec=5
@@ -177,8 +178,9 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-Then `sudo systemctl enable --now arena-worker`. The worker's user must be allowed to run Docker, and `uv` must be on
-its `PATH` (systemd's is short: if the unit cannot find `uv`, set `Environment=PATH=...` in it). On WSL, systemd has to
+Then `sudo systemctl enable --now arena-worker`. The worker's user must be allowed to run Docker, and `uv` must be on the
+unit's `PATH`: systemd's own is short, and without the `Environment=PATH=` line above (edit it to where `uv` is installed) the
+unit fails at once with `env: 'uv': No such file or directory`. On WSL, systemd has to
 be enabled (`/etc/wsl.conf`, `[boot]` then `systemd=true`), and Windows has to start the distro at logon (Task
 Scheduler running `wsl -d Ubuntu-24.04 -- true`); the machine must not sleep.
 
@@ -249,6 +251,7 @@ that have both opted a verified fighter in: try it once yourself before inviting
 | sign-in loops back to the login page | `PUBLIC_URL` is not the address you browse to, or it is `http` while you use `https` |
 | everybody gets "too many requests", or pages say "The API is unreachable" while the API is up | the visitor address header is not set right: step 7 (a limited page view shows that text, with status 200) |
 | matches stay "queued" | the worker is not running |
+| compose says a port is already allocated (6379 or 5442) | another project owns it: set `REDIS_HOST_PORT` or `POSTGRES_HOST_PORT` in `.env` to a free port |
 
 ## Reporting problems
 

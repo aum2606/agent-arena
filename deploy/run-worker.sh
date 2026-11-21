@@ -26,9 +26,9 @@ docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q runsc \
 
 # The compose file publishes Postgres and Redis on the host's loopback address only.
 # The limited role, never the owner (D-079); the compose stack migrated the database already.
-export DATABASE_URL="${DATABASE_URL:-postgresql://arena_app:${APP_DB_PASSWORD}@127.0.0.1:5442/arena}"
+export DATABASE_URL="${DATABASE_URL:-postgresql://arena_app:${APP_DB_PASSWORD}@127.0.0.1:${POSTGRES_HOST_PORT:-5442}/arena}"
 export ARENA_AUTO_MIGRATE=0
-export REDIS_URL="${REDIS_URL:-redis://:${REDIS_PASSWORD}@127.0.0.1:6379}"
+export REDIS_URL="${REDIS_URL:-redis://:${REDIS_PASSWORD}@127.0.0.1:${REDIS_HOST_PORT:-6379}}"
 # Only what the worker needs, not the whole env file: the GitHub client secret has no business here,
 # and model-written code is a neighbour of this process (D-068, D-078).
 pass=()

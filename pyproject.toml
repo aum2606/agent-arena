@@ -10,7 +10,7 @@ dependencies = [
     "openai>=3.50.0",
     "sympy>=1.12",
     "python-dotenv>=1.0",
-    "httpx2>=2.16",  # imported directly (arena.llm); it also comes with openai
+    "httpx2>=2.16.2",  # imported directly (arena.llm); it also comes with openai
 ]
 
 [project.urls]

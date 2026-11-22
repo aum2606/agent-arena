@@ -41,7 +41,7 @@ api = [
 ]
 dev = [
     "pytest>=8",
-    "ruff>=0.17.5",
+    "ruff>=0.17.6",
     "mypy>=1.11",
     "vulture>=2.11",
     "pre-commit>=3.8",
